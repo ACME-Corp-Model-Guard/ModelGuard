@@ -1,0 +1,21 @@
+repos:
+  # --- Code formatting (Black) ---
+  - repo: https://github.com/psf/black
+    rev: 24.8.0  # match the version you use in CI
+    hooks:
+      - id: black
+        args: ["--check"]
+
+  # --- Linting (Flake8) ---
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.0
+    hooks:
+      - id: flake8
+        args: ["--max-line-length=127", "--max-complexity=10"]
+
+  # --- Static type checking (Mypy) ---
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.0
+    hooks:
+      - id: mypy
+        args: ["--ignore-missing-imports"]
