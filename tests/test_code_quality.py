@@ -1,6 +1,7 @@
 """
 Tests for the code_quality_metric module.
 """
+
 import os
 import tempfile
 from pathlib import Path
@@ -28,6 +29,7 @@ def test_score_with_nonexistent_path():
 
 def test_linter_configs():
     """Test detection of linter configuration files."""
+
     class TestCodeQualityMetric(CodeQualityMetric):
         def _as_path(self, path_or_url: str) -> Path:
             return Path(path_or_url)
@@ -51,6 +53,7 @@ def test_linter_configs():
 
 def test_ci_detection():
     """Test detection of CI workflow files."""
+
     class TestCodeQualityMetric(CodeQualityMetric):
         def _as_path(self, path_or_url: str) -> Path:
             return Path(path_or_url)
@@ -85,6 +88,7 @@ def test_ci_detection():
 
 def test_tests_detection():
     """Test detection of test directories and files."""
+
     class TestCodeQualityMetric(CodeQualityMetric):
         def _as_path(self, path_or_url: str) -> Path:
             return Path(path_or_url)
@@ -107,6 +111,7 @@ def test_tests_detection():
 
 def test_line_length_analysis():
     """Test analysis of code line lengths."""
+
     class TestCodeQualityMetric(CodeQualityMetric):
         def _as_path(self, path_or_url: str) -> Path:
             return Path(path_or_url)
@@ -124,9 +129,7 @@ def test_line_length_analysis():
         file_path = path / "short_lines.py"
         with open(file_path, "w") as f:
             code_content = (
-                "def hello():\n"
-                "    return 'Hello World'\n\n"
-                "print(hello())\n"
+                "def hello():\n" "    return 'Hello World'\n\n" "print(hello())\n"
             )
             f.write(code_content)
 

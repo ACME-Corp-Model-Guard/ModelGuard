@@ -27,8 +27,7 @@ class PerformanceClaimsMetric(BaseMetric, Metric):
         # Use commit count as a proxy for project maturity, which might
         # indicate more documented performance-related work.
         rc, out, _ = self._git(p, "rev-list", "--count", "HEAD")
-        commits = int(out.strip()) if \
-            (rc == 0 and out.strip().isdigit()) else 0
+        commits = int(out.strip()) if (rc == 0 and out.strip().isdigit()) else 0
 
         return {
             "performance_claims": self._saturating_scale(

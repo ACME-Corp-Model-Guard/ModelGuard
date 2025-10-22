@@ -12,13 +12,7 @@ class BaseMetric:
     def _count_lines(self, path: Path) -> int:
         return 0
 
-    def _saturating_scale(
-            self,
-            x: float,
-            *,
-            knee: float,
-            max_x: float
-    ) -> float:
+    def _saturating_scale(self, x: float, *, knee: float, max_x: float) -> float:
         """Scale value to [0,1] with a knee point and max_x saturation."""
         return 0.0
 
@@ -35,8 +29,7 @@ class BaseMetric:
         return list(files)
 
     def _as_path(self, path_or_url: str) -> Optional[Path]:
-        if (path_or_url.startswith("http://")
-                or path_or_url.startswith("https://")):
+        if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
             return None
         p = Path(path_or_url)
         if p.exists():

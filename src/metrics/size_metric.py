@@ -29,10 +29,7 @@ class SizeMetric(BaseMetric):
         commits = int(self._git("rev-list", "--count", "HEAD"))
 
         return {
-            "files": self._saturating_scale(files, max_x=1000,
-                                            knee=500),
-            "lines": self._saturating_scale(lines, max_x=50000,
-                                            knee=10000),
-            "commits": self._saturating_scale(commits, max_x=5000,
-                                              knee=1000),
+            "files": self._saturating_scale(files, max_x=1000, knee=500),
+            "lines": self._saturating_scale(lines, max_x=50000, knee=10000),
+            "commits": self._saturating_scale(commits, max_x=5000, knee=1000),
         }

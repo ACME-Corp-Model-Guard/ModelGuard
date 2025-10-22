@@ -1,6 +1,7 @@
 """
 This module contains a proper implementation of BaseMetric for testing.
 """
+
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -17,13 +18,7 @@ class TestBaseMetric:
     def _count_lines(self, path: Path) -> int:
         return 100
 
-    def _saturating_scale(
-            self,
-            x: float,
-            *,
-            knee: float,
-            max_x: float
-    ) -> float:
+    def _saturating_scale(self, x: float, *, knee: float, max_x: float) -> float:
         """Scale value to [0,1] with a knee point and max_x saturation."""
         if x <= 0:
             return 0.0
@@ -38,7 +33,7 @@ class TestBaseMetric:
 
     def _read_text(self, path: Path) -> str:
         if path.exists():
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return f.read()
         return "mock content"
 

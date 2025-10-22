@@ -17,8 +17,10 @@ import requests
 try:
     from .logging_utils import setup_logging
 except Exception:  # pragma: no cover
+
     def setup_logging() -> None:
         return
+
 
 try:
     from .metrics.net_score import NetScore
@@ -38,6 +40,7 @@ def iter_urls(path: Path):
 
 def _unit(url: str, salt: str) -> float:
     import hashlib as _h
+
     h = _h.md5((url + "::" + salt).encode("utf-8")).hexdigest()
     v = int(h[:8], 16) / 0xFFFFFFFF
     if v < 0.0:
@@ -68,9 +71,8 @@ def check_github_token() -> bool:
         print("Missing GITHUB_TOKEN environment variable", file=sys.stderr)
         return False
     # Bypass validation if running under pytest, unless forced
-    if (
-        any(mod in sys.modules for mod in ("pytest", "_pytest"))
-        and not os.environ.get("FORCE_GITHUB_TOKEN_VALIDATION")
+    if any(mod in sys.modules for mod in ("pytest", "_pytest")) and not os.environ.get(
+        "FORCE_GITHUB_TOKEN_VALIDATION"
     ):
         return True
     try:
@@ -78,9 +80,9 @@ def check_github_token() -> bool:
             "https://api.github.com/user",
             headers={
                 "Accept": "application/vnd.github.v3+json",
-                "Authorization": f"token {token}"
+                "Authorization": f"token {token}",
             },
-            timeout=10
+            timeout=10,
         )
         return resp.status_code == 200
     except Exception:
@@ -95,8 +97,8 @@ def _size_detail(url: str) -> dict:
         return {
             "raspberry_pi": 0.2,  # Limited by RAM on Raspberry Pi
             "jetson_nano": 0.35,  # Better than Pi but still limited
-            "desktop_pc": 0.85,   # Works well on most desktops
-            "aws_server": 0.95,   # Works very well on AWS
+            "desktop_pc": 0.85,  # Works well on most desktops
+            "aws_server": 0.95,  # Works very well on AWS
         }
     return {
         "raspberry_pi": _unit(url, "sz_rpi"),
@@ -125,8 +127,11 @@ def _record(ns: NetScore, url: str) -> dict:
         return {
             "url": url,
             "name": _name_from_url(url),
-            "category": "MODEL" if "bert-base-uncased"
-            in url or "model" in url.lower() else "CODE",
+            "category": (
+                "MODEL"
+                if "bert-base-uncased" in url or "model" in url.lower()
+                else "CODE"
+            ),
             "net_score": 0.0,
             "net_score_latency": 0,
             "ramp_up_time": 0.0,
@@ -188,8 +193,14 @@ def _record(ns: NetScore, url: str) -> dict:
 
     # Net score latency is the sum of all metric latencies (including size)
     net_score_latency = (
-        ramp_latency + bus_latency + perf_latency + lic_latency +
-        cq_latency + dq_latency + dac_latency + size_latency
+        ramp_latency
+        + bus_latency
+        + perf_latency
+        + lic_latency
+        + cq_latency
+        + dq_latency
+        + dac_latency
+        + size_latency
     )
 
     net = ns.combine(scores_for_net, sz_detail)
@@ -197,15 +208,16 @@ def _record(ns: NetScore, url: str) -> dict:
     rec = {
         "url": url,
         "name": (
-            "bert-base-uncased" if "bert-base-uncased" in url
-            else _name_from_url(url)
+            "bert-base-uncased" if "bert-base-uncased" in url else _name_from_url(url)
         ),
         "category": (
-            "MODEL" if (
+            "MODEL"
+            if (
                 "bert-base-uncased" in url
                 or "google-bert" in url
                 or "model" in url.lower()
-            ) else "CODE"
+            )
+            else "CODE"
         ),
         "net_score": net,
         "net_score_latency": net_score_latency,
@@ -251,34 +263,36 @@ def compute_all(path: Path) -> list[dict]:
                 net = NetScore(str(path)).combine(zeros, {"dummy": 0.0})
             except Exception:
                 net = 0.0
-            rows.append({
-                "url": url,
-                "name": _name_from_url(url),
-                "category": "CODE",
-                "net_score": net,
-                "net_score_latency": _lat_ms(t0),
-                "ramp_up_time": 0.0,
-                "ramp_up_time_latency": _lat_ms(t0),
-                "bus_factor": 0.0,
-                "bus_factor_latency": _lat_ms(t0),
-                "performance_claims": 0.0,
-                "performance_claims_latency": _lat_ms(t0),
-                "license": 0.0,
-                "license_latency": _lat_ms(t0),
-                "size_score": {
-                    "raspberry_pi": 0.0,
-                    "jetson_nano": 0.0,
-                    "desktop_pc": 0.0,
-                    "aws_server": 0.0,
-                },
-                "size_score_latency": _lat_ms(t0),
-                "dataset_and_code_score": 0.0,
-                "dataset_and_code_score_latency": _lat_ms(t0),
-                "dataset_quality": 0.0,
-                "dataset_quality_latency": _lat_ms(t0),
-                "code_quality": 0.0,
-                "code_quality_latency": _lat_ms(t0),
-            })
+            rows.append(
+                {
+                    "url": url,
+                    "name": _name_from_url(url),
+                    "category": "CODE",
+                    "net_score": net,
+                    "net_score_latency": _lat_ms(t0),
+                    "ramp_up_time": 0.0,
+                    "ramp_up_time_latency": _lat_ms(t0),
+                    "bus_factor": 0.0,
+                    "bus_factor_latency": _lat_ms(t0),
+                    "performance_claims": 0.0,
+                    "performance_claims_latency": _lat_ms(t0),
+                    "license": 0.0,
+                    "license_latency": _lat_ms(t0),
+                    "size_score": {
+                        "raspberry_pi": 0.0,
+                        "jetson_nano": 0.0,
+                        "desktop_pc": 0.0,
+                        "aws_server": 0.0,
+                    },
+                    "size_score_latency": _lat_ms(t0),
+                    "dataset_and_code_score": 0.0,
+                    "dataset_and_code_score_latency": _lat_ms(t0),
+                    "dataset_quality": 0.0,
+                    "dataset_quality_latency": _lat_ms(t0),
+                    "code_quality": 0.0,
+                    "code_quality_latency": _lat_ms(t0),
+                }
+            )
     return rows
 
 

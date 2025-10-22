@@ -43,9 +43,7 @@ def setup_logging() -> None:
         fh = handlers.RotatingFileHandler(
             log_path, maxBytes=1_000_000, backupCount=1, encoding="utf-8"
         )
-        fmt = logging.Formatter(
-            "%(asctime)s %(levelname)s %(name)s: %(message)s"
-        )
+        fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         fh.setFormatter(fmt)
         logger.addHandler(fh)
 
