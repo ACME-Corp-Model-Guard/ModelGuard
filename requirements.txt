@@ -1,21 +1,13 @@
-# Linting and Formatting
-flake8
-isort
-
-# Testing
-
-# Testing
-
-# Type Checking
-mypy
-
-# HTTP requests
-requests
-pytest
-pytest-cov
-
-# Type Checking
-mypy
-
-# HTTP requests
-requests
+certifi==2025.10.5
+charset-normalizer==3.4.4
+coverage==7.11.0
+idna==3.11
+iniconfig==2.3.0
+loguru==0.7.3
+packaging==25.0
+pluggy==1.6.0
+pyflakes==3.4.0
+Pygments==2.19.2
+pytest==8.4.2
+requests==2.32.5
+urllib3==2.5.0
