@@ -1,88 +1,107 @@
-#!/bin/bash
-# Using simpler mode for maximum compatibility
+#!/usr/bin/env bash
+
 set -e
 
-CMD="${1:-}"
-shift || true
+# Find an appropriate python interpreter
+if [ -n "$VIRTUAL_ENV" ]; then
+    # If we're in a virtual environment, use its python
+    PYTHON="python"
+elif command -v python3 &> /dev/null; then
+    PYTHON="python3"
+elif command -v python &> /dev/null; then
+    PYTHON="python"
+else
+    echo "ERROR: Python is not installed or not in PATH"
+    echo "Please install Python 3.8+ and try again"
+    exit 1
+fi
 
-case "$CMD" in
+function print_usage {
+  echo "Usage: ./run install | test | /absolute/path/to/file"
+}
+
+function run_install {
+  #bash setup.sh
+  echo "Setting up model-hub-cli environment..."
+
+  # Check if Python is available
+  if ! command -v $PYTHON &> /dev/null; then
+    echo "ERROR: Python3 is not installed or not in PATH"
+    echo "Please install Python 3.8+ and try again"
+    exit 1
+  fi
+
+  # Install dependencies
+  echo "Installing dependencies..."
+  pip install -r requirements.txt
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to install dependencies"
+    exit 1
+  fi
+
+  echo ""
+  echo "✅ Setup complete!"
+  echo "To run the application, use: ./run [command]"
+}
+
+function run_test {
+  # Run tests quietly with junitxml output
+  pytest --tb=short -q --junitxml=.results.xml > /dev/null
+
+  # Parse results.xml for test stats using grep + regex
+  TOTAL=$(grep -oP 'tests="\K[0-9]+' .results.xml)
+  FAILURES=$(grep -oP 'failures="\K[0-9]+' .results.xml)
+  ERRORS=$(grep -oP 'errors="\K[0-9]+' .results.xml)
+  SKIPPED=$(grep -oP 'skipped="\K[0-9]+' .results.xml)
+  PASSED=$((TOTAL - FAILURES - ERRORS - SKIPPED))
+
+  # Run coverage measurement quietly
+  coverage run -m pytest > /dev/null 2>&1
+
+  # Extract coverage percent from coverage report summary line
+  COVERAGE_LINE=$(coverage report | tail -1)
+  COVERAGE_PERCENT=$(echo "$COVERAGE_LINE" | awk '{print $NF}' | tr -d '%')
+
+  # Output single line
+  echo "${PASSED}/${TOTAL} test cases passed. ${COVERAGE_PERCENT}% line coverage achieved."
+}
+
+function run_test_verbose {
+  echo "Running test suite..."
+  $PYTHON -m coverage run -m pytest tests/
+  $PYTHON -m coverage report
+}
+
+function run_program {
+  local file_path="$1"
+  "$PYTHON" -m src.main "$file_path"
+}
+
+# ---- Main ----
+
+if [ $# -ne 1 ]; then
+  print_usage
+  exit 1
+fi
+
+ARG="$1"
+
+case "$ARG" in
   install)
-    # Deterministic install for grader
-    python3 -m pip install --upgrade pip
-    pip3 install -r requirements.txt
-    exit 0
+    run_install
     ;;
-
   test)
-    # Run pytest with coverage; capture full output to parse counts & coverage
-    TMP_OUT="$(mktemp)"
-    # NOTE: addopts (cov, term-missing) are already in pyproject.toml
-    # We use -v to make sure we get detailed output for test case counting
-    
-    # First check if we're in a virtual environment
-    if [ -d ".venv" ] && [ -f ".venv/bin/python" ]; then
-      PYTHON_CMD=".venv/bin/python"
-    else
-      PYTHON_CMD="python3"
-    fi
-    
-    # Run pytest with coverage and be explicit about what we're measuring
-    if $PYTHON_CMD -m pytest -v --cov=src --cov-report=term --no-header | tee "$TMP_OUT"; then
-      PYTEST_STATUS=0
-    else
-      PYTEST_STATUS=$?
-    fi
-
-    # ---- Parse TOTAL (from "collected N items") ----
-    TOTAL="$(grep -Eo 'collected [0-9]+ items?' "$TMP_OUT" | awk '{print $2}' | tail -1)"
-    TOTAL="${TOTAL:-0}"
-
-    # ---- Parse PASSED (from summary "... X passed ...") ----
-    PASSED="$(grep -Eo '[0-9]+ passed' "$TMP_OUT" | awk '{print $1}' | tail -1)"
-    PASSED="${PASSED:-0}"
-
-    # ---- Parse COVERAGE (from coverage table "TOTAL ... NN%") ----
-    # pytest-cov (term-missing) prints a table; the last column for TOTAL is the percent.
-    if grep -qE '^TOTAL[[:space:]]' "$TMP_OUT"; then
-      COVERAGE="$(grep -E '^TOTAL[[:space:]]' "$TMP_OUT" | tail -1 | awk '{print $NF}' | tr -d '%')"
-    else
-      # If we can't extract coverage, set to 0
-      COVERAGE="0"
-    fi
-
-    # Get the number of distinct test cases - this should match the "collected X items" count
-    DISTINCT_TESTS="$TOTAL"
-
-    # Format the output exactly as the autograder expects - multiple formats to ensure detection
-    echo "COVERAGE: ${COVERAGE}%"
-    echo "TOTAL COVERAGE: ${COVERAGE}%"
-    echo "Test Coverage: ${COVERAGE}%"
-    echo "Line Coverage: ${COVERAGE}%"
-    echo "${PASSED}/${TOTAL} test cases passed. ${COVERAGE}% line coverage achieved."
-    echo "Number of distinct test cases: ${DISTINCT_TESTS}"
-    
-    # These specific formats might be what the autograder is looking for
-    echo "Test suite has ${COVERAGE}% line coverage."
-    echo "Coverage: ${COVERAGE}% of the codebase"
-    echo "Total coverage for test suite: ${COVERAGE}%"
-    
-    # If pytest failed, exit 1 so CI/grader knows it failed.
-    # (Even if parsing succeeded, we honor pytest's real status.)
-    if [ "$PYTEST_STATUS" -ne 0 ]; then
-      exit 1
-    fi
-    exit 0
+    run_test
     ;;
-
+  testall)
+    run_test_verbose
+    ;;
+  /*|[A-Za-z]:*)
+    run_program "$ARG"
+    ;;
   *)
-    # Treat any other arg as a URL file path and hand off to Python CLI
-    # First check if we're in a virtual environment
-    if [ -d ".venv" ] && [ -f ".venv/bin/python" ]; then
-      PYTHON_CMD=".venv/bin/python"
-    else
-      PYTHON_CMD="python3"
-    fi
-    
-    $PYTHON_CMD -m src.main "$CMD" "$@"
+    print_usage
+    exit 1
     ;;
 esac
+
