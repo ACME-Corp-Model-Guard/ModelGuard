@@ -1,98 +1,322 @@
+#!/usr/bin/env python3
 """
-Tests for the metrics module functionality and edge cases.
+Tests for the metric classes.
 """
-from pathlib import Path
 
-from src.metrics.base_metric import BaseMetric
-from src.metrics.metric import Metric
-
-
-class TestBaseMetric(BaseMetric):
-    """A concrete implementation of BaseMetric for testing."""
-    pass
-
-
-def test_base_metric_methods():
-    """Test that base metric methods have expected return types."""
-    metric = TestBaseMetric()
-
-    assert metric._is_git_repo(Path(".")) is False
-    assert metric._git() is None
-    assert metric._count_lines(Path(".")) == 0
-    assert metric._saturating_scale(0.5, knee=0.5, max_x=1.0) == 0.0
-    assert metric._clamp01(1.5) == 0.0
-    assert metric._read_text(Path(".")) == ""
-    assert metric._glob(Path("."), []) == []
-    assert metric._as_path("nonexistent") is None
-    assert 0.0 <= metric._stable_unit_score("key", "salt") <= 1.0
+import pytest
+from src.model import Model
+from src.metrics.abstract_metric import AbstractMetric
+from src.metrics.availability_metric import AvailabilityMetric
+from src.metrics.bus_factor_metric import BusFactorMetric
+from src.metrics.code_quality_metric import CodeQualityMetric
+from src.metrics.dataset_quality_metric import DatasetQualityMetric
+from src.metrics.license_metric import LicenseMetric
+from src.metrics.performance_claims_metric import PerformanceClaimsMetric
+from src.metrics.ramp_up_metric import RampUpMetric
+from src.metrics.size_metric import SizeMetric
+from src.metrics.reproducibility_metric import ReproducibilityMetric
+from src.metrics.reviewedness_metric import ReviewednessMetric
+from src.metrics.treescore_metric import TreescoreMetric
 
 
-def test_metric_stable_unit_score():
-    """Test the stable unit score method in the Metric class."""
-    class TestMetric(Metric):
-        pass
-
-    metric = TestMetric()
-
-    # Test known metrics
-    assert metric._stable_unit_score("url", "availability") == 0.2
-    assert metric._stable_unit_score("url", "bus_factor") == 0.2
-    assert metric._stable_unit_score("url", "code_quality") == 0.2
-    assert metric._stable_unit_score("url", "dataset_quality") == 0.5
-    assert metric._stable_unit_score("url", "license") == 0.0
-    assert metric._stable_unit_score("url", "performance_claims") == 0.0
-    assert metric._stable_unit_score("url", "ramp_up") == 0.05
-
-    # Test unknown metric
-    assert metric._stable_unit_score("url", "unknown_metric") == 0.0
-
-
-def test_metric_as_path():
-    """Test the _as_path method in the Metric class."""
-    class TestMetric(Metric):
-        pass
-
-    metric = TestMetric()
-
-    # Non-existent path
-    assert metric._as_path("/path/that/does/not/exist") is None
-
-    # Existing path (current directory should exist)
-    import os
-    current_dir = os.getcwd()
-    path_obj = metric._as_path(current_dir)
-    assert path_obj is not None
-    assert isinstance(path_obj, Path)
-    assert path_obj.exists()
+class TestAbstractMetric:
+    """Test cases for the AbstractMetric base class."""
+    
+    def test_abstract_metric_initialization(self):
+        """Test AbstractMetric initialization."""
+        class ConcreteMetric(AbstractMetric):
+            def score(self, model: Model):
+                return {"test": 0.5}
+        
+        metric = ConcreteMetric("test_metric")
+        assert metric.get_metric_name() == "test_metric"
+    
+    def test_abstract_metric_abstract_method(self):
+        """Test that AbstractMetric cannot be instantiated directly."""
+        with pytest.raises(TypeError):
+            AbstractMetric("test")
+    
+    def test_utility_methods(self):
+        """Test utility methods of AbstractMetric."""
+        class ConcreteMetric(AbstractMetric):
+            def score(self, model: Model):
+                return {"test": 0.5}
+        
+        metric = ConcreteMetric("test_metric")
+        
+        # Test _clamp01
+        assert metric._clamp01(0.5) == 0.5
+        assert metric._clamp01(-0.1) == 0.0
+        assert metric._clamp01(1.1) == 1.0
+        
+        # Test _stable_unit_score
+        score1 = metric._stable_unit_score("test", "salt")
+        score2 = metric._stable_unit_score("test", "salt")
+        assert score1 == score2  # Should be stable
+        assert 0.0 <= score1 <= 1.0  # Should be in valid range
 
 
-def test_early_env_exits():
-    """Test the _early_env_exits function with environment variables."""
-    import os
+class TestAvailabilityMetric:
+    """Test cases for AvailabilityMetric."""
+    
+    def test_initialization(self):
+        """Test AvailabilityMetric initialization."""
+        metric = AvailabilityMetric()
+        assert metric.get_metric_name() == "availability"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = AvailabilityMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "availability" in result
+        assert 0.0 <= result["availability"] <= 1.0
 
-    import requests
 
-    from src.main import _early_env_exits
+class TestBusFactorMetric:
+    """Test cases for BusFactorMetric."""
+    
+    def test_initialization(self):
+        """Test BusFactorMetric initialization."""
+        metric = BusFactorMetric()
+        assert metric.get_metric_name() == "bus_factor"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = BusFactorMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "bus_factor" in result
+        assert 0.0 <= result["bus_factor"] <= 1.0
 
-    # Set FORCE_GITHUB_TOKEN_VALIDATION to force real validation
-    os.environ["FORCE_GITHUB_TOKEN_VALIDATION"] = "1"
 
-    # Mock requests.get to simulate valid token response
-    class MockRespValid:
-        status_code = 200
-    requests_get_orig = requests.get
-    requests.get = lambda *a, **kw: MockRespValid()
-    os.environ["GITHUB_TOKEN"] = "valid_token"
-    assert _early_env_exits() == 0
+class TestCodeQualityMetric:
+    """Test cases for CodeQualityMetric."""
+    
+    def test_initialization(self):
+        """Test CodeQualityMetric initialization."""
+        metric = CodeQualityMetric()
+        assert metric.get_metric_name() == "code_quality"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = CodeQualityMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "code_quality" in result
+        assert 0.0 <= result["code_quality"] <= 1.0
 
-    # Mock requests.get to simulate invalid token response
-    class MockRespInvalid:
-        status_code = 401
-    requests.get = lambda *a, **kw: MockRespInvalid()
-    os.environ["GITHUB_TOKEN"] = "INVALID"
-    assert _early_env_exits() == 1
 
-    # Clean up
-    os.environ.pop("GITHUB_TOKEN", None)
-    os.environ.pop("FORCE_GITHUB_TOKEN_VALIDATION", None)
-    requests.get = requests_get_orig
+class TestDatasetQualityMetric:
+    """Test cases for DatasetQualityMetric."""
+    
+    def test_initialization(self):
+        """Test DatasetQualityMetric initialization."""
+        metric = DatasetQualityMetric()
+        assert metric.get_metric_name() == "dataset_quality"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = DatasetQualityMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "dataset_quality" in result
+        assert 0.0 <= result["dataset_quality"] <= 1.0
+
+
+class TestLicenseMetric:
+    """Test cases for LicenseMetric."""
+    
+    def test_initialization(self):
+        """Test LicenseMetric initialization."""
+        metric = LicenseMetric()
+        assert metric.get_metric_name() == "license"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = LicenseMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset",
+            license="MIT"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "license" in result
+        assert 0.0 <= result["license"] <= 1.0
+
+
+class TestPerformanceClaimsMetric:
+    """Test cases for PerformanceClaimsMetric."""
+    
+    def test_initialization(self):
+        """Test PerformanceClaimsMetric initialization."""
+        metric = PerformanceClaimsMetric()
+        assert metric.get_metric_name() == "performance_claims"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = PerformanceClaimsMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "performance_claims" in result
+        assert 0.0 <= result["performance_claims"] <= 1.0
+
+
+class TestRampUpMetric:
+    """Test cases for RampUpMetric."""
+    
+    def test_initialization(self):
+        """Test RampUpMetric initialization."""
+        metric = RampUpMetric()
+        assert metric.get_metric_name() == "ramp_up"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = RampUpMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "ramp_up" in result
+        assert 0.0 <= result["ramp_up"] <= 1.0
+
+
+class TestSizeMetric:
+    """Test cases for SizeMetric."""
+    
+    def test_initialization(self):
+        """Test SizeMetric initialization."""
+        metric = SizeMetric()
+        assert metric.get_metric_name() == "size"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = SizeMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset",
+            size=1024.0
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "size" in result
+        assert 0.0 <= result["size"] <= 1.0
+
+
+class TestReproducibilityMetric:
+    """Test cases for ReproducibilityMetric."""
+    
+    def test_initialization(self):
+        """Test ReproducibilityMetric initialization."""
+        metric = ReproducibilityMetric()
+        assert metric.get_metric_name() == "reproducibility"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = ReproducibilityMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "reproducibility" in result
+        assert 0.0 <= result["reproducibility"] <= 1.0
+
+
+class TestReviewednessMetric:
+    """Test cases for ReviewednessMetric."""
+    
+    def test_initialization(self):
+        """Test ReviewednessMetric initialization."""
+        metric = ReviewednessMetric()
+        assert metric.get_metric_name() == "reviewedness"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = ReviewednessMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "reviewedness" in result
+        assert 0.0 <= result["reviewedness"] <= 1.0
+
+
+class TestTreescoreMetric:
+    """Test cases for TreescoreMetric."""
+    
+    def test_initialization(self):
+        """Test TreescoreMetric initialization."""
+        metric = TreescoreMetric()
+        assert metric.get_metric_name() == "treescore"
+    
+    def test_score(self):
+        """Test scoring a model."""
+        metric = TreescoreMetric()
+        model = Model(
+            name="test_model",
+            model_key="models/test_model/model",
+            code_key="models/test_model/code",
+            dataset_key="models/test_model/dataset"
+        )
+        
+        result = metric.score(model)
+        assert isinstance(result, dict)
+        assert "treescore" in result
+        assert 0.0 <= result["treescore"] <= 1.0

@@ -1,128 +1,24 @@
-import csv
-from pathlib import Path
-from typing import Dict
+#!/usr/bin/env python3
+"""
+Dataset Quality Metric implementation.
+"""
 
-from src.metrics.metric import Metric
+from typing import Union, Dict
 
-from .base_metric import BaseMetric
+from .abstract_metric import AbstractMetric
 
 
-class DatasetQualityMetric(BaseMetric, Metric):
+class DatasetQualityMetric(AbstractMetric):
     """
-    Heuristics:
-      - Look for dataset files: *.csv, *.tsv, *.jsonl
-      - For CSV/TSV: check consistent column counts across first 100 rows
-      - Penalize many blank rows
-      - Reward presence of a header row (unique column names)
-    If no datasets are present, return 0.5 as neutral
-    (doesn't penalize code repos).
+    Dataset quality assessment metric.
+    Evaluates the quality of datasets associated with models.
     """
 
-    DATA_GLOBS = ["**/*.csv", "**/*.tsv", "**/*.jsonl"]
+    def __init__(self):
+        super().__init__("dataset_quality")
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
-        if not p:
-            return {
-                "dataset_quality": self._stable_unit_score(
-                    path_or_url,
-                    "dataset_quality",
-                )
-            }
-
-        data_files = self._glob(p, self.DATA_GLOBS)
-        if not data_files:
-            return {"dataset_quality": 0.5}
-
-        # Evaluate at most first 5 files for speed
-        score_acc = 0.0
-        counted = 0
-        for f in data_files[:5]:
-            if f.suffix.lower() in {".csv", ".tsv"}:
-                delim = "\t" if f.suffix.lower() == ".tsv" else ","
-                score_acc += self._score_csv(f, delimiter=delim)
-                counted += 1
-            elif f.suffix.lower() == ".jsonl":
-                score_acc += self._score_jsonl(f)
-                counted += 1
-
-        if counted == 0:
-            return {"dataset_quality": 0.5}
-
-        return {"dataset_quality": self._clamp01(score_acc / counted)}
-
-    def _score_csv(self, path: Path, delimiter: str) -> float:
-        try:
-            with path.open("r", encoding="utf-8", errors="ignore") as fh:
-                reader = csv.reader(fh, delimiter=delimiter)
-                rows = []
-                for i, row in enumerate(reader):
-                    if i >= 200:
-                        break
-                    rows.append(row)
-        except Exception:
-            return 0.4
-
-        if not rows:
-            return 0.3
-
-        # Detect header (unique strings, non-numeric preferred)
-        header = rows[0]
-        unique_names = len(set(header)) == len(header)
-        alpha_count = sum(1 for x in header if x and not x.isdigit())
-        header_is_alpha = alpha_count >= max(1, int(0.6 * len(header)))
-        header_score = 0.2 if (unique_names and header_is_alpha) else 0.0
-
-        # Consistent column counts
-        counts = [len(r) for r in rows if any(cell.strip() for cell in r)]
-        if not counts:
-            return 0.3
-
-        mode = max(set(counts), key=counts.count)
-        consistency = counts.count(mode) / len(counts)
-
-        # Blank rows ratio
-        blank_rows = sum(1
-                         for r in rows
-                         if not any(cell.strip() for cell in r))
-        blank_ratio = blank_rows / len(rows)
-
-        s = header_score
-        if consistency >= 0.98:
-            s += 0.5
-        elif consistency >= 0.9:
-            s += 0.35
-        elif consistency >= 0.75:
-            s += 0.2
-
-        if blank_ratio >= 0.1:
-            s -= 0.1
-
-        return self._clamp01(s)
-
-    def _score_jsonl(self, path: Path) -> float:
-        total = 0
-        valid = 0
-        try:
-            with path.open("r", encoding="utf-8", errors="ignore") as fh:
-                for i, line in enumerate(fh):
-                    if i >= 200:
-                        break
-                    line = line.strip()
-                    total += 1
-                    if line.startswith("{") and line.endswith("}"):
-                        valid += 1
-        except Exception:
-            return 0.4
-
-        if total == 0:
-            return 0.3
-
-        ratio = valid / total
-        if ratio >= 0.98:
-            return 0.8
-        if ratio >= 0.9:
-            return 0.7
-        if ratio >= 0.75:
-            return 0.6
-        return 0.4
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # TODO: Implement actual dataset quality scoring when S3 integration is ready
+        # For now, return a placeholder score based on model name
+        dataset_quality_score = self._stable_unit_score(model.name, "dataset_quality")
+        return {"dataset_quality": dataset_quality_score}

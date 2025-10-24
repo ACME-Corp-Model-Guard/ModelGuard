@@ -1,39 +1,24 @@
-from typing import Dict
+#!/usr/bin/env python3
+"""
+Performance Claims Metric implementation.
+"""
 
-from .base_metric import BaseMetric
-from .metric import Metric
+from typing import Union, Dict
+
+from .abstract_metric import AbstractMetric
 
 
-class PerformanceClaimsMetric(BaseMetric, Metric):
+class PerformanceClaimsMetric(AbstractMetric):
     """
-    Project performance claims signals:
-      - performance_claims: heuristic score for performance-related activity
-
-    Returns a sub-score normalized to [0,1] with a saturating scale.
+    Performance claims assessment metric.
+    Evaluates the performance claims made about models.
     """
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
-        if not p or not self._is_git_repo(p):
-            # Fallback: deterministic but stable dictionary
-            return {
-                "performance_claims": self._stable_unit_score(
-                    path_or_url,
-                    "perf_claims",
-                )
-            }
+    def __init__(self):
+        super().__init__("performance_claims")
 
-        # Example heuristic:
-        # Use commit count as a proxy for project maturity, which might
-        # indicate more documented performance-related work.
-        rc, out, _ = self._git(p, "rev-list", "--count", "HEAD")
-        commits = int(out.strip()) if \
-            (rc == 0 and out.strip().isdigit()) else 0
-
-        return {
-            "performance_claims": self._saturating_scale(
-                commits,
-                knee=100,
-                max_x=1000,
-            )
-        }
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # TODO: Implement actual performance claims scoring when S3 integration is ready
+        # For now, return a placeholder score based on model name
+        performance_score = self._stable_unit_score(model.name, "performance_claims")
+        return {"performance_claims": performance_score}
