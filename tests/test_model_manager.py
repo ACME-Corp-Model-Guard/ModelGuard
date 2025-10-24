@@ -25,16 +25,16 @@ class TestModelManager:
         manager = ModelManager()
         
         # Check that we have the expected metrics
-        metric_names = [metric.get_metric_name() for metric in manager.metrics]
+        metric_class_names = [metric.__class__.__name__ for metric in manager.metrics]
         
         expected_metrics = [
-            "availability", "bus_factor", "code_quality", "dataset_quality",
-            "license", "performance_claims", "ramp_up", "size", "reproducibility",
-            "reviewedness", "treescore"
+            "AvailabilityMetric", "BusFactorMetric", "CodeQualityMetric", "DatasetQualityMetric",
+            "LicenseMetric", "PerformanceClaimsMetric", "RampUpMetric", "SizeMetric", 
+            "ReproducibilityMetric", "ReviewednessMetric", "TreescoreMetric"
         ]
         
         for expected_metric in expected_metrics:
-            assert expected_metric in metric_names
+            assert expected_metric in metric_class_names
     
     def test_upload_stub(self):
         """Test upload method (stub implementation)."""

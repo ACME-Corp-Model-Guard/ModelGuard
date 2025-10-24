@@ -5,20 +5,27 @@ Performance Claims Metric implementation.
 
 from typing import Union, Dict
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class PerformanceClaimsMetric(AbstractMetric):
+class PerformanceClaimsMetric(Metric):
     """
-    Performance claims assessment metric.
-    Evaluates the performance claims made about models.
+    Performance claims metric for evaluating performance claims.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
-
-    def __init__(self):
-        super().__init__("performance_claims")
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model performance claims.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Performance claims score as a dictionary
+        """
         # TODO: Implement actual performance claims scoring when S3 integration is ready
-        # For now, return a placeholder score based on model name
-        performance_score = self._stable_unit_score(model.name, "performance_claims")
-        return {"performance_claims": performance_score}
+        # For now, return a placeholder score
+        return {"performance_claims": 0.5}

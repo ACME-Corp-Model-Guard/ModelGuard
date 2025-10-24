@@ -5,20 +5,27 @@ Size Metric implementation.
 
 from typing import Union, Dict
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class SizeMetric(AbstractMetric):
+class SizeMetric(Metric):
     """
-    Size assessment metric.
-    Evaluates the size of models across different deployment scenarios.
+    Size metric for evaluating model size.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
-
-    def __init__(self):
-        super().__init__("size")
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model size.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Size score as a dictionary
+        """
         # TODO: Implement actual size scoring when S3 integration is ready
-        # For now, return a placeholder score based on model size
-        size_score = self._stable_unit_score(str(model.size), "size")
-        return {"size": size_score}
+        # For now, return a placeholder score
+        return {"size": 0.5}

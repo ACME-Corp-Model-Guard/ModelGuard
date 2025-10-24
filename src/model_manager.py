@@ -173,11 +173,12 @@ class ModelManager:
                     for metric_name, score_value in score_result.items():
                         model.set_score(metric_name, score_value)
                 else:
-                    # Single score value
-                    metric_name = metric.get_metric_name()
+                    # Single score value - use class name as metric name
+                    metric_name = metric.__class__.__name__.lower().replace("metric", "")
                     model.set_score(metric_name, score_result)
             except Exception as e:
-                print(f"Error scoring model {model.name} with metric {metric.get_metric_name()}: {e}")
+                metric_name = metric.__class__.__name__.lower().replace("metric", "")
+                print(f"Error scoring model {model.name} with metric {metric_name}: {e}")
     
     def _should_upload_model(self, model: Model) -> bool:
         """

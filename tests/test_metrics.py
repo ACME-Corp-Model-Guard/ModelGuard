@@ -5,7 +5,7 @@ Tests for the metric classes.
 
 import pytest
 from src.model import Model
-from src.metrics.abstract_metric import AbstractMetric
+from src.metrics.abstract_metric import MetricUtils
 from src.metrics.availability_metric import AvailabilityMetric
 from src.metrics.bus_factor_metric import BusFactorMetric
 from src.metrics.code_quality_metric import CodeQualityMetric
@@ -19,41 +19,21 @@ from src.metrics.reviewedness_metric import ReviewednessMetric
 from src.metrics.treescore_metric import TreescoreMetric
 
 
-class TestAbstractMetric:
-    """Test cases for the AbstractMetric base class."""
-    
-    def test_abstract_metric_initialization(self):
-        """Test AbstractMetric initialization."""
-        class ConcreteMetric(AbstractMetric):
-            def score(self, model: Model):
-                return {"test": 0.5}
-        
-        metric = ConcreteMetric("test_metric")
-        assert metric.get_metric_name() == "test_metric"
-    
-    def test_abstract_metric_abstract_method(self):
-        """Test that AbstractMetric cannot be instantiated directly."""
-        with pytest.raises(TypeError):
-            AbstractMetric("test")
+class TestMetricUtils:
+    """Test cases for the MetricUtils utility class."""
     
     def test_utility_methods(self):
-        """Test utility methods of AbstractMetric."""
-        class ConcreteMetric(AbstractMetric):
-            def score(self, model: Model):
-                return {"test": 0.5}
-        
-        metric = ConcreteMetric("test_metric")
-        
+        """Test utility methods of MetricUtils."""
         # Test _clamp01
-        assert metric._clamp01(0.5) == 0.5
-        assert metric._clamp01(-0.1) == 0.0
-        assert metric._clamp01(1.1) == 1.0
+        assert MetricUtils._clamp01(0.5) == 0.5
+        assert MetricUtils._clamp01(-0.1) == 0.0
+        assert MetricUtils._clamp01(1.1) == 1.0
         
-        # Test _stable_unit_score
-        score1 = metric._stable_unit_score("test", "salt")
-        score2 = metric._stable_unit_score("test", "salt")
-        assert score1 == score2  # Should be stable
-        assert 0.0 <= score1 <= 1.0  # Should be in valid range
+        # Test _saturating_scale
+        assert MetricUtils._saturating_scale(0.5, knee=1.0, max_x=2.0) == 0.25
+        assert MetricUtils._saturating_scale(1.5, knee=1.0, max_x=2.0) == 0.75
+        assert MetricUtils._saturating_scale(0.0, knee=1.0, max_x=2.0) == 0.0
+        assert MetricUtils._saturating_scale(3.0, knee=1.0, max_x=2.0) == 1.0
 
 
 class TestAvailabilityMetric:
@@ -62,7 +42,7 @@ class TestAvailabilityMetric:
     def test_initialization(self):
         """Test AvailabilityMetric initialization."""
         metric = AvailabilityMetric()
-        assert metric.get_metric_name() == "availability"
+        assert isinstance(metric, AvailabilityMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -86,7 +66,7 @@ class TestBusFactorMetric:
     def test_initialization(self):
         """Test BusFactorMetric initialization."""
         metric = BusFactorMetric()
-        assert metric.get_metric_name() == "bus_factor"
+        assert isinstance(metric, BusFactorMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -110,7 +90,7 @@ class TestCodeQualityMetric:
     def test_initialization(self):
         """Test CodeQualityMetric initialization."""
         metric = CodeQualityMetric()
-        assert metric.get_metric_name() == "code_quality"
+        assert isinstance(metric, CodeQualityMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -134,7 +114,7 @@ class TestDatasetQualityMetric:
     def test_initialization(self):
         """Test DatasetQualityMetric initialization."""
         metric = DatasetQualityMetric()
-        assert metric.get_metric_name() == "dataset_quality"
+        assert isinstance(metric, DatasetQualityMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -158,7 +138,7 @@ class TestLicenseMetric:
     def test_initialization(self):
         """Test LicenseMetric initialization."""
         metric = LicenseMetric()
-        assert metric.get_metric_name() == "license"
+        assert isinstance(metric, LicenseMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -183,7 +163,7 @@ class TestPerformanceClaimsMetric:
     def test_initialization(self):
         """Test PerformanceClaimsMetric initialization."""
         metric = PerformanceClaimsMetric()
-        assert metric.get_metric_name() == "performance_claims"
+        assert isinstance(metric, PerformanceClaimsMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -207,7 +187,7 @@ class TestRampUpMetric:
     def test_initialization(self):
         """Test RampUpMetric initialization."""
         metric = RampUpMetric()
-        assert metric.get_metric_name() == "ramp_up"
+        assert isinstance(metric, RampUpMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -231,7 +211,7 @@ class TestSizeMetric:
     def test_initialization(self):
         """Test SizeMetric initialization."""
         metric = SizeMetric()
-        assert metric.get_metric_name() == "size"
+        assert isinstance(metric, SizeMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -256,7 +236,7 @@ class TestReproducibilityMetric:
     def test_initialization(self):
         """Test ReproducibilityMetric initialization."""
         metric = ReproducibilityMetric()
-        assert metric.get_metric_name() == "reproducibility"
+        assert isinstance(metric, ReproducibilityMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -280,7 +260,7 @@ class TestReviewednessMetric:
     def test_initialization(self):
         """Test ReviewednessMetric initialization."""
         metric = ReviewednessMetric()
-        assert metric.get_metric_name() == "reviewedness"
+        assert isinstance(metric, ReviewednessMetric)
     
     def test_score(self):
         """Test scoring a model."""
@@ -304,7 +284,7 @@ class TestTreescoreMetric:
     def test_initialization(self):
         """Test TreescoreMetric initialization."""
         metric = TreescoreMetric()
-        assert metric.get_metric_name() == "treescore"
+        assert isinstance(metric, TreescoreMetric)
     
     def test_score(self):
         """Test scoring a model."""

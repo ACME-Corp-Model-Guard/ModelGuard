@@ -1,47 +1,21 @@
 #!/usr/bin/env python3
 """
-Abstract base class for all metrics in the ModelGuard system.
+Utility class for common metric operations.
 """
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import Union, Dict, Any, Optional
+from typing import Any, Optional
 from pathlib import Path
 
 
-class AbstractMetric(ABC):
+class MetricUtils:
     """
-    Abstract base class for all metrics.
-    Defines the interface that all concrete metric classes must implement.
+    Utility class providing common helper methods for metrics.
+    This class can be used by concrete metrics for common operations.
     """
     
-    def __init__(self, name: str):
-        """
-        Initialize the metric.
-        
-        Args:
-            name: The name of this metric
-        """
-        self.name = name
-    
-    @abstractmethod
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
-        """
-        Score a model and return the result.
-        
-        Args:
-            model: The Model object to score
-            
-        Returns:
-            Either a float score or a dictionary of scores
-        """
-        pass
-    
-    def get_metric_name(self) -> str:
-        """Get the name of this metric."""
-        return self.name
-    
-    def _is_git_repo(self, path: Path) -> bool:
+    @staticmethod
+    def _is_git_repo(path: Path) -> bool:
         """
         Check if a path is a git repository.
         
@@ -53,7 +27,8 @@ class AbstractMetric(ABC):
         """
         return (path / ".git").exists()
     
-    def _count_lines(self, path: Path) -> int:
+    @staticmethod
+    def _count_lines(path: Path) -> int:
         """
         Count lines in a file or directory.
         
@@ -73,12 +48,12 @@ class AbstractMetric(ABC):
             total_lines = 0
             for file_path in path.rglob('*'):
                 if file_path.is_file():
-                    total_lines += self._count_lines(file_path)
+                    total_lines += MetricUtils._count_lines(file_path)
             return total_lines
         return 0
     
+    @staticmethod
     def _saturating_scale(
-        self,
         x: float,
         *,
         knee: float,
@@ -106,7 +81,8 @@ class AbstractMetric(ABC):
         else:
             return 0.5 + (x - knee) / (max_x - knee) * 0.5
     
-    def _clamp01(self, x: float) -> float:
+    @staticmethod
+    def _clamp01(x: float) -> float:
         """
         Clamp a value to the range [0, 1].
         
@@ -118,7 +94,8 @@ class AbstractMetric(ABC):
         """
         return max(0.0, min(1.0, x))
     
-    def _read_text(self, path: Path) -> str:
+    @staticmethod
+    def _read_text(path: Path) -> str:
         """
         Read text from a file.
         
@@ -134,7 +111,8 @@ class AbstractMetric(ABC):
         except Exception:
             return ""
     
-    def _glob(self, base: Path, patterns: list[str]) -> list[Path]:
+    @staticmethod
+    def _glob(base: Path, patterns: list[str]) -> list[Path]:
         """
         Find files matching patterns.
         
@@ -150,7 +128,8 @@ class AbstractMetric(ABC):
             files.extend(base.glob(pattern))
         return list(files)
     
-    def _as_path(self, path_or_url: str) -> Optional[Path]:
+    @staticmethod
+    def _as_path(path_or_url: str) -> Optional[Path]:
         """
         Convert a string to a Path if it's a local path.
         
@@ -167,19 +146,3 @@ class AbstractMetric(ABC):
         if p.exists():
             return p
         return None
-    
-    def _stable_unit_score(self, key: str, salt: str) -> float:
-        """
-        Generate a stable unit score based on a key and salt.
-        
-        Args:
-            key: Key to generate score from
-            salt: Salt for the hash
-            
-        Returns:
-            Stable score between 0 and 1
-        """
-        import hashlib
-        h = hashlib.md5((key + "::" + salt).encode("utf-8")).hexdigest()
-        v = int(h[:8], 16) / 0xFFFFFFFF
-        return self._clamp01(v)

@@ -1,10 +1,9 @@
-import re
 from typing import Dict, Union
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class CodeQualityMetric(AbstractMetric):
+class CodeQualityMetric(Metric):
     """
     Heuristics (language-agnostic):
       + Presence of lint/format configs: .flake8, pyproject, .pylintrc,
@@ -49,12 +48,24 @@ class CodeQualityMetric(AbstractMetric):
         ".php",
     }
 
-    def __init__(self):
-        super().__init__("code_quality")
+    """
+    Code quality metric for evaluating code quality.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
+    """
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model code quality.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Code quality score as a dictionary
+        """
         # TODO: Implement actual code quality scoring when S3 integration is ready
-        # For now, return a placeholder score based on model name
-        code_quality_score = self._stable_unit_score(model.name, "code_quality")
-        return {"code_quality": code_quality_score}
+        # For now, return a placeholder score
+        return {"code_quality": 0.5}
 

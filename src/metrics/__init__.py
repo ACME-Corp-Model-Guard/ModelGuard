@@ -1,6 +1,6 @@
 """Package initialization."""
 
-from .abstract_metric import AbstractMetric
+from .abstract_metric import MetricUtils
 from .availability_metric import AvailabilityMetric
 from .bus_factor_metric import BusFactorMetric
 from .code_quality_metric import CodeQualityMetric
@@ -14,7 +14,7 @@ from .reviewedness_metric import ReviewednessMetric
 from .treescore_metric import TreescoreMetric
 
 __all__ = [
-    "AbstractMetric",
+    "MetricUtils",
     "AvailabilityMetric",
     "BusFactorMetric", 
     "CodeQualityMetric",

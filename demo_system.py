@@ -16,7 +16,7 @@ def main():
     print("1. Initializing ModelManager...")
     model_manager = ModelManager()
     print(f"   ModelManager created with {len(model_manager.metrics)} metrics")
-    print(f"   Available metrics: {[m.get_metric_name() for m in model_manager.metrics]}\n")
+    print(f"   Available metrics: {[m.__class__.__name__ for m in model_manager.metrics]}\n")
     
     # 2. Create some sample models
     print("2. Creating sample models...")

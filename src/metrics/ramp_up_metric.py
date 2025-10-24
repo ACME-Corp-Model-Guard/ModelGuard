@@ -5,20 +5,27 @@ Ramp Up Metric implementation.
 
 from typing import Union, Dict
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class RampUpMetric(AbstractMetric):
+class RampUpMetric(Metric):
     """
-    Ramp up time assessment metric.
-    Evaluates how quickly users can get started with a model.
+    Ramp up metric for evaluating ease of getting started.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
-
-    def __init__(self):
-        super().__init__("ramp_up")
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model ramp up time.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Ramp up score as a dictionary
+        """
         # TODO: Implement actual ramp up scoring when S3 integration is ready
-        # For now, return a placeholder score based on model name
-        ramp_up_score = self._stable_unit_score(model.name, "ramp_up")
-        return {"ramp_up": ramp_up_score}
+        # For now, return a placeholder score
+        return {"ramp_up": 0.5}

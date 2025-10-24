@@ -1,28 +1,26 @@
-from collections import Counter
 from typing import Dict, Union
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class BusFactorMetric(AbstractMetric):
+class BusFactorMetric(Metric):
     """
-    Estimate bus factor via commit author distribution.
-
-    Higher diversity (less dominance by a single author) -> higher score.
-
-    Heuristic:
-      - Get top N commits (default all) and count authors.
-      - Score = 1 - max_author_share.
-      - Scale by total number of contributors (more is better).
-
-    Fallback: stable placeholder if not a local path.
+    Bus factor metric for evaluating contributor diversity.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
-
-    def __init__(self):
-        super().__init__("bus_factor")
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model bus factor.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Bus factor score as a dictionary
+        """
         # TODO: Implement actual bus factor scoring when S3 integration is ready
-        # For now, return a placeholder score based on model name
-        bus_factor_score = self._stable_unit_score(model.name, "bus_factor")
-        return {"bus_factor": bus_factor_score}
+        # For now, return a placeholder score
+        return {"bus_factor": 0.5}

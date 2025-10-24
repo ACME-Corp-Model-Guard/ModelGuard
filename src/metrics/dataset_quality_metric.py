@@ -5,20 +5,27 @@ Dataset Quality Metric implementation.
 
 from typing import Union, Dict
 
-from .abstract_metric import AbstractMetric
+from .metric import Metric
 
 
-class DatasetQualityMetric(AbstractMetric):
+class DatasetQualityMetric(Metric):
     """
-    Dataset quality assessment metric.
-    Evaluates the quality of datasets associated with models.
+    Dataset quality metric for evaluating dataset quality.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
-
-    def __init__(self):
-        super().__init__("dataset_quality")
 
     def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model dataset quality.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Dataset quality score as a dictionary
+        """
         # TODO: Implement actual dataset quality scoring when S3 integration is ready
-        # For now, return a placeholder score based on model name
-        dataset_quality_score = self._stable_unit_score(model.name, "dataset_quality")
-        return {"dataset_quality": dataset_quality_score}
+        # For now, return a placeholder score
+        return {"dataset_quality": 0.5}
