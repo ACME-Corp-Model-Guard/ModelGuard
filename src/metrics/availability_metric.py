@@ -3,10 +3,10 @@ from typing import Dict
 
 from src.metrics.metric import Metric
 
-from .base_metric import BaseMetric
 
 
-class AvailabilityMetric(BaseMetric, Metric):
+
+class AvailabilityMetric(Metric):
     """
     Availability heuristic:
       - Repo directory exists -> base availability.
