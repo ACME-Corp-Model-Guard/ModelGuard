@@ -1,6 +1,7 @@
 """
 Tests for the metrics module functionality and edge cases.
 """
+
 from pathlib import Path
 
 from src.metrics.base_metric import BaseMetric
@@ -9,6 +10,7 @@ from src.metrics.metric import Metric
 
 class TestBaseMetric(BaseMetric):
     """A concrete implementation of BaseMetric for testing."""
+
     pass
 
 
@@ -29,6 +31,7 @@ def test_base_metric_methods():
 
 def test_metric_stable_unit_score():
     """Test the stable unit score method in the Metric class."""
+
     class TestMetric(Metric):
         pass
 
@@ -49,6 +52,7 @@ def test_metric_stable_unit_score():
 
 def test_metric_as_path():
     """Test the _as_path method in the Metric class."""
+
     class TestMetric(Metric):
         pass
 
@@ -59,6 +63,7 @@ def test_metric_as_path():
 
     # Existing path (current directory should exist)
     import os
+
     current_dir = os.getcwd()
     path_obj = metric._as_path(current_dir)
     assert path_obj is not None
@@ -80,6 +85,7 @@ def test_early_env_exits():
     # Mock requests.get to simulate valid token response
     class MockRespValid:
         status_code = 200
+
     requests_get_orig = requests.get
     requests.get = lambda *a, **kw: MockRespValid()
     os.environ["GITHUB_TOKEN"] = "valid_token"
@@ -88,6 +94,7 @@ def test_early_env_exits():
     # Mock requests.get to simulate invalid token response
     class MockRespInvalid:
         status_code = 401
+
     requests.get = lambda *a, **kw: MockRespInvalid()
     os.environ["GITHUB_TOKEN"] = "INVALID"
     assert _early_env_exits() == 1

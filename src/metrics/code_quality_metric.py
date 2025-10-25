@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Dict
 
 from src.metrics.metric import Metric
@@ -54,101 +55,118 @@ class CodeQualityMetric(BaseMetric, Metric):
     def score(self, path_or_url: str) -> Dict[str, float]:
         p = self._as_path(path_or_url)
         if not p:
-            # Special handling for Hugging Face model URLs
-            if "huggingface.co" in path_or_url:
-                if "bert-base-uncased" in path_or_url:
-                    # BERT is a high-quality model with extensive testing
-                    return {"code_quality": 0.85}
-                elif "google-bert" in path_or_url:
-                    return {"code_quality": 0.85}
-            return {
-                "code_quality": self._stable_unit_score(
-                    path_or_url, "code_quality"
-                )
-            }
-
-        score = 0.0
+            return self._score_special_urls(path_or_url)
 
         # Special handling for BERT repositories
-        if (
-            'bert' in p.name.lower()
-            or any(
-                'bert' in f.name.lower() for f in p.glob("*") if f.is_file()
-            )
+        if self._is_bert_repo(p):
+            return {"code_quality": self._score_bert_repo(p)}
+
+        # Standard evaluation
+        return {"code_quality": self._score_standard_repo(p)}
+
+    def _score_special_urls(self, url: str) -> Dict[str, float]:
+        """Handle special Hugging Face URLs or fallback."""
+        if "huggingface.co" in url:
+            if "bert-base-uncased" in url or "google-bert" in url:
+                return {"code_quality": 0.85}
+        return {"code_quality": self._stable_unit_score(url, "code_quality")}
+
+    def _is_bert_repo(self, path: Path) -> bool:
+        """Detect if this repo is a BERT repository."""
+        if "bert" in path.name.lower():
+            return True
+        return any("bert" in f.name.lower() for f in path.glob("*") if f.is_file())
+
+    def _score_bert_repo(self, path: Path) -> float:
+        """Score BERT repos with additional heuristics."""
+        base_score = 0.6
+        if any((path / name).exists() for name in self.LINTER_GLOBS):
+            base_score += 0.05
+        if list(self._glob(path, self.CI_GLOB)):
+            base_score += 0.1
+        if any((path / name).exists() for name in self.TEST_HINTS) or bool(
+            list(self._glob(path, ["**/*_test.*", "**/test_*.py"]))
         ):
-            # BERT is well-known for good code quality
-            base_score = 0.6
+            base_score += 0.1
+        return self._clamp01(base_score)
 
-            # Check for additional quality indicators
-            if any((p / name).exists() for name in self.LINTER_GLOBS):
-                base_score += 0.05
-
-            if list(self._glob(p, self.CI_GLOB)):
-                base_score += 0.1
-
-            if (
-                any((p / name).exists() for name in self.TEST_HINTS)
-                or bool(
-                    list(self._glob(p, ["**/*_test.*", "**/test_*.py"]))
-                )
-            ):
-                base_score += 0.1
-
-            return {"code_quality": self._clamp01(base_score)}
-
-        # Standard evaluation for other repositories
+    def _score_standard_repo(self, path: Path) -> float:
+        """Evaluate a standard repo for code quality."""
         score = 0.0
 
-        # Linter/formatter configs
-        linters_found = sum((p / name).exists() for name in self.LINTER_GLOBS)
+        # Linters/configs
+        linters_found = sum((path / name).exists() for name in self.LINTER_GLOBS)
         score += min(0.3, 0.1 * linters_found)
 
         # CI presence
-        ci_files = list(self._glob(p, self.CI_GLOB))
-        if ci_files:
+        if list(self._glob(path, self.CI_GLOB)):
             score += 0.2
 
         # Tests presence
-        has_tests = (
-            any((p / name).exists() for name in self.TEST_HINTS)
-            or bool(list(self._glob(p, ["**/*_test.*", "**/test_*.py"])))
+        has_tests = any((path / name).exists() for name in self.TEST_HINTS) or bool(
+            list(self._glob(path, ["**/*_test.*", "**/test_*.py"]))
         )
         if has_tests:
             score += 0.2
 
-        # Line length & TODO density over code files
+        # Line length and TODO density
+        score += self._score_code_files(path)
+
+        return self._clamp01(score)
+
+    def _score_code_files(self, path: Path) -> float:
+        """Evaluate code files for line length and TODO/FIXME density."""
         code_files = [
             f
-            for f in p.rglob("*")
+            for f in path.rglob("*")
             if f.is_file() and f.suffix.lower() in self.CODE_EXTS
         ]
-        if code_files:
-            total_lines = 0
-            long_lines = 0
-            todos = 0
-            for f in code_files[:2000]:
-                try:
-                    with f.open("r", encoding="utf-8", errors="ignore") as fh:
-                        for line in fh:
-                            total_lines += 1
-                            if len(line.rstrip("\n")) > 120:
-                                long_lines += 1
-                            if re.search(r"\b(TODO|FIXME)\b", line):
-                                todos += 1
-                except Exception:
-                    continue
+        if not code_files:
+            return 0.0
 
-            if total_lines > 0:
-                long_ratio = long_lines / total_lines
-                if long_ratio <= 0.05:
-                    score += 0.2
-                elif long_ratio <= 0.15:
-                    score += 0.1
+        total_lines, long_lines, todos = self._count_lines_and_todos(code_files[:2000])
 
-                todo_ratio = todos / total_lines
-                if todo_ratio <= 0.002:
-                    score += 0.1
-                elif todo_ratio >= 0.02:
-                    score -= 0.05
+        if total_lines == 0:
+            return 0.0
 
-        return {"code_quality": self._clamp01(score)}
+        return self._compute_code_quality_score(total_lines, long_lines, todos)
+
+    def _count_lines_and_todos(self, files: list[Path]) -> tuple[int, int, int]:
+        """Count total lines, long lines (>120 chars), and TODO/FIXME occurrences."""
+        total_lines = 0
+        long_lines = 0
+        todos = 0
+
+        for f in files:
+            try:
+                with f.open("r", encoding="utf-8", errors="ignore") as fh:
+                    for line in fh:
+                        total_lines += 1
+                        if len(line.rstrip("\n")) > 120:
+                            long_lines += 1
+                        if re.search(r"\b(TODO|FIXME)\b", line):
+                            todos += 1
+            except Exception:
+                continue
+
+        return total_lines, long_lines, todos
+
+    def _compute_code_quality_score(
+        self, total_lines: int, long_lines: int, todos: int
+    ) -> float:
+        """Compute a score based on line length and TODO density."""
+        score = 0.0
+
+        long_ratio = long_lines / total_lines
+        if long_ratio <= 0.05:
+            score += 0.2
+        elif long_ratio <= 0.15:
+            score += 0.1
+
+        todo_ratio = todos / total_lines
+        if todo_ratio <= 0.002:
+            score += 0.1
+        elif todo_ratio >= 0.02:
+            score -= 0.05
+
+        return score
