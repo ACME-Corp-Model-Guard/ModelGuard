@@ -4,7 +4,7 @@ repos:
     rev: 24.8.0  # match the version you use in CI
     hooks:
       - id: black
-        args: ["--check"]
+        language_version: python3
 
   # --- Linting (Flake8) ---
   - repo: https://github.com/pycqa/flake8
