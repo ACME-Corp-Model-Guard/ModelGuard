@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'ModelGuard MVP - Core Artifact Management API'
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 128
+    Environment:
+      Variables:
+        PYTHONPATH: /var/task:/var/task/src
+
+Resources:
+  # API Gateway
+  ModelGuardApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Description: ModelGuard MVP API
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Authorization'"
+        AllowOrigin: "'*'"
+
+  # POST /artifacts - Enumerate artifacts
+  PostArtifactsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_artifacts.lambda_handler
+      Description: Enumerate/List artifacts from registry
+      Events:
+        ListArtifacts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts
+            Method: POST
+
+  # POST /artifact/{artifact_type} - Upload artifact
+  PostArtifactUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_artifact_upload.lambda_handler
+      Description: Upload/Create new artifact
+      Events:
+        CreateArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/{artifact_type}
+            Method: POST
+
+  # GET /artifacts/{artifact_type}/{id} - Download artifact
+  GetArtifactDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_artifact_download.lambda_handler
+      Description: Download/Retrieve artifact by type and ID
+      Events:
+        GetArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/{artifact_type}/{id}
+            Method: GET
+
+  # PUT /artifacts/{artifact_type}/{id} - Update artifact
+  PutArtifactUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.put_artifact_update.lambda_handler
+      Description: Update existing artifact
+      Events:
+        UpdateArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/{artifact_type}/{id}
+            Method: PUT
+
+  # GET /artifact/byName/{name} - Search by name
+  GetSearchByNameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_search_by_name.lambda_handler
+      Description: Search artifacts by name
+      Events:
+        SearchByName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/byName/{name}
+            Method: GET
+
+  # POST /artifact/byRegEx - Search by regex
+  PostSearchByRegexFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_search_by_regex.lambda_handler
+      Description: Search artifacts using regular expressions
+      Events:
+        SearchByRegex:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/byRegEx
+            Method: POST
+
+  # GET /artifact/model/{id}/rate - Rate model
+  GetModelRateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_model_rate.lambda_handler
+      Description: Get ratings for model artifacts
+      Events:
+        ModelRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/model/{id}/rate
+            Method: GET
+
+Outputs:
+  ModelGuardApiUrl:
+    Description: API Gateway endpoint URL for testing
+    Value: !Sub 'https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiUrl'
