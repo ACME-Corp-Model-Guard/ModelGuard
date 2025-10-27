@@ -5,7 +5,7 @@ Dataset Quality Metric implementation.
 
 import csv
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 
 from .metric import Metric
 
@@ -17,12 +17,15 @@ class DatasetQualityMetric(Metric):
 
     DATA_GLOBS = ["**/*.csv", "**/*.tsv", "**/*.jsonl"]
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # Get dataset key from model and use it as the target to evaluate
+        dataset_key = model.get_dataset_key()
+        
+        p = self._as_path(dataset_key)
         if not p:
             return {
                 "dataset_quality": self._stable_unit_score(
-                    path_or_url,
+                    dataset_key,
                     "dataset_quality",
                 )
             }

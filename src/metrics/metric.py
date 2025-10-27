@@ -89,12 +89,12 @@ class Metric(ABC):
             return ""
     
     @abstractmethod
-    def score(self, path_or_url: str) -> Dict[str, float]:
+    def score(self, model: 'Model') -> Dict[str, float]:
         """
-        Score a path or URL and return the result.
+        Score a model and return the result.
         
         Args:
-            path_or_url: Path to a local directory or a URL
+            model: The Model object to score
             
         Returns:
             A dictionary of scores

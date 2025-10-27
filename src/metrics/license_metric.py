@@ -5,7 +5,7 @@ License Metric implementation.
 
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 
 from .metric import Metric
 
@@ -44,10 +44,13 @@ class LicenseMetric(Metric):
         "Unlicense": re.compile(r"\bThe Unlicense\b", re.I),
     }
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # Get code key from model and use it as the target to evaluate
+        code_key = model.get_code_key()
+        
+        p = self._as_path(code_key)
         if not p:
-            return self._score_special_urls(path_or_url)
+            return self._score_special_urls(code_key)
 
         # Check standard license files
         license_score = self._score_license_files(p)

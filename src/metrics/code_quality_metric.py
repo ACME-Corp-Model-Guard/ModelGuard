@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 
 from .metric import Metric
 
@@ -50,10 +50,13 @@ class CodeQualityMetric(Metric):
         ".php",
     }
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # Get code key from model and use it as the target to evaluate
+        code_key = model.get_code_key()
+        
+        p = self._as_path(code_key)
         if not p:
-            return self._score_special_urls(path_or_url)
+            return self._score_special_urls(code_key)
 
         # Special handling for BERT repositories
         if self._is_bert_repo(p):

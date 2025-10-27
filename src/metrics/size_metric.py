@@ -3,7 +3,7 @@
 Size Metric implementation.
 """
 
-from typing import Dict
+from typing import Dict, Union
 
 from .metric import Metric
 
@@ -13,19 +13,22 @@ class SizeMetric(Metric):
     Size metric for evaluating model size.
     """
 
-    def score(self, path_or_url: str) -> Dict[str, float]:
-        p = self._as_path(path_or_url)
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        # Get code key from model and use it as the target to evaluate
+        code_key = model.get_code_key()
+        
+        p = self._as_path(code_key)
         if not p:
             return {
-                "files": self._stable_unit_score(path_or_url, "files"),
-                "lines": self._stable_unit_score(path_or_url, "lines"),
-                "commits": self._stable_unit_score(path_or_url, "commits"),
+                "files": self._stable_unit_score(code_key, "files"),
+                "lines": self._stable_unit_score(code_key, "lines"),
+                "commits": self._stable_unit_score(code_key, "commits"),
             }
 
         if not self._is_git_repo(p):
             return {
-                "files": self._stable_unit_score(path_or_url, "files"),
-                "lines": self._stable_unit_score(path_or_url, "lines"),
+                "files": self._stable_unit_score(code_key, "files"),
+                "lines": self._stable_unit_score(code_key, "lines"),
                 "commits": 0.0,
             }
 
