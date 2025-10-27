@@ -3,9 +3,9 @@
 Tests for the metric classes.
 """
 
+from pathlib import Path
+
 import pytest
-from src.model import Model
-from src.metrics.abstract_metric import MetricUtils
 from src.metrics.availability_metric import AvailabilityMetric
 from src.metrics.bus_factor_metric import BusFactorMetric
 from src.metrics.code_quality_metric import CodeQualityMetric
@@ -17,23 +17,37 @@ from src.metrics.size_metric import SizeMetric
 from src.metrics.reproducibility_metric import ReproducibilityMetric
 from src.metrics.reviewedness_metric import ReviewednessMetric
 from src.metrics.treescore_metric import TreescoreMetric
+from src.metrics.metric import Metric
 
 
-class TestMetricUtils:
-    """Test cases for the MetricUtils utility class."""
+class TestMetricUtilities:
+    """Test cases for Metric utility methods."""
     
-    def test_utility_methods(self):
-        """Test utility methods of MetricUtils."""
-        # Test _clamp01
-        assert MetricUtils._clamp01(0.5) == 0.5
-        assert MetricUtils._clamp01(-0.1) == 0.0
-        assert MetricUtils._clamp01(1.1) == 1.0
+    def test_clamp01(self):
+        """Test clamping values to [0, 1]."""
+        # Create a minimal metric instance
+        class TestMetric(Metric):
+            def score(self, path_or_url: str) -> dict:
+                return {}
         
-        # Test _saturating_scale
-        assert MetricUtils._saturating_scale(0.5, knee=1.0, max_x=2.0) == 0.25
-        assert MetricUtils._saturating_scale(1.5, knee=1.0, max_x=2.0) == 0.75
-        assert MetricUtils._saturating_scale(0.0, knee=1.0, max_x=2.0) == 0.0
-        assert MetricUtils._saturating_scale(3.0, knee=1.0, max_x=2.0) == 1.0
+        metric = TestMetric()
+        
+        assert metric._clamp01(0.5) == 0.5
+        assert metric._clamp01(-0.1) == 0.0
+        assert metric._clamp01(1.1) == 1.0
+    
+    def test_saturating_scale(self):
+        """Test saturating scale function."""
+        class TestMetric(Metric):
+            def score(self, path_or_url: str) -> dict:
+                return {}
+        
+        metric = TestMetric()
+        
+        assert metric._saturating_scale(0.5, knee=1.0, max_x=2.0) == 0.25
+        assert metric._saturating_scale(1.5, knee=1.0, max_x=2.0) == 0.75
+        assert metric._saturating_scale(0.0, knee=1.0, max_x=2.0) == 0.0
+        assert metric._saturating_scale(3.0, knee=1.0, max_x=2.0) == 1.0
 
 
 class TestAvailabilityMetric:
@@ -44,17 +58,11 @@ class TestAvailabilityMetric:
         metric = AvailabilityMetric()
         assert isinstance(metric, AvailabilityMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = AvailabilityMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "availability" in result
         assert 0.0 <= result["availability"] <= 1.0
@@ -68,17 +76,11 @@ class TestBusFactorMetric:
         metric = BusFactorMetric()
         assert isinstance(metric, BusFactorMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = BusFactorMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "bus_factor" in result
         assert 0.0 <= result["bus_factor"] <= 1.0
@@ -92,17 +94,11 @@ class TestCodeQualityMetric:
         metric = CodeQualityMetric()
         assert isinstance(metric, CodeQualityMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = CodeQualityMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "code_quality" in result
         assert 0.0 <= result["code_quality"] <= 1.0
@@ -116,17 +112,11 @@ class TestDatasetQualityMetric:
         metric = DatasetQualityMetric()
         assert isinstance(metric, DatasetQualityMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = DatasetQualityMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "dataset_quality" in result
         assert 0.0 <= result["dataset_quality"] <= 1.0
@@ -140,18 +130,11 @@ class TestLicenseMetric:
         metric = LicenseMetric()
         assert isinstance(metric, LicenseMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = LicenseMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset",
-            license="MIT"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "license" in result
         assert 0.0 <= result["license"] <= 1.0
@@ -165,17 +148,11 @@ class TestPerformanceClaimsMetric:
         metric = PerformanceClaimsMetric()
         assert isinstance(metric, PerformanceClaimsMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = PerformanceClaimsMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "performance_claims" in result
         assert 0.0 <= result["performance_claims"] <= 1.0
@@ -189,17 +166,11 @@ class TestRampUpMetric:
         metric = RampUpMetric()
         assert isinstance(metric, RampUpMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = RampUpMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "ramp_up" in result
         assert 0.0 <= result["ramp_up"] <= 1.0
@@ -213,21 +184,15 @@ class TestSizeMetric:
         metric = SizeMetric()
         assert isinstance(metric, SizeMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = SizeMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset",
-            size=1024.0
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
-        assert "size" in result
-        assert 0.0 <= result["size"] <= 1.0
+        assert "files" in result
+        assert "lines" in result
+        assert "commits" in result
 
 
 class TestReproducibilityMetric:
@@ -238,17 +203,11 @@ class TestReproducibilityMetric:
         metric = ReproducibilityMetric()
         assert isinstance(metric, ReproducibilityMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = ReproducibilityMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "reproducibility" in result
         assert 0.0 <= result["reproducibility"] <= 1.0
@@ -262,17 +221,11 @@ class TestReviewednessMetric:
         metric = ReviewednessMetric()
         assert isinstance(metric, ReviewednessMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = ReviewednessMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "reviewedness" in result
         assert 0.0 <= result["reviewedness"] <= 1.0
@@ -286,17 +239,11 @@ class TestTreescoreMetric:
         metric = TreescoreMetric()
         assert isinstance(metric, TreescoreMetric)
     
-    def test_score(self):
-        """Test scoring a model."""
+    def test_score_with_url(self):
+        """Test scoring a URL."""
         metric = TreescoreMetric()
-        model = Model(
-            name="test_model",
-            model_key="models/test_model/model",
-            code_key="models/test_model/code",
-            dataset_key="models/test_model/dataset"
-        )
+        result = metric.score("https://example.com/repo")
         
-        result = metric.score(model)
         assert isinstance(result, dict)
         assert "treescore" in result
         assert 0.0 <= result["treescore"] <= 1.0

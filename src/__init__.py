@@ -1,13 +1,9 @@
 """Package initialization."""
 
-from .model import Model, Metric
-from .model_manager import ModelManager
-from .authorization import Authorization, Permission
+from .model import Model
+from .metrics.metric import Metric
 
 __all__ = [
     "Model",
-    "Metric", 
-    "ModelManager",
-    "Authorization",
-    "Permission"
+    "Metric"
 ]

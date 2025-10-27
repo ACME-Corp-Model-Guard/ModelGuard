@@ -6,16 +6,6 @@ Holds metadata, scores, and keys for data access in S3.
 
 from __future__ import annotations
 from typing import Dict, Union, List, Optional
-from abc import ABC, abstractmethod
-
-
-class Metric(ABC):
-    """Abstract base class for all metrics."""
-    
-    @abstractmethod
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
-        """Score a model and return the result."""
-        pass
 
 
 class Model:
@@ -115,7 +105,7 @@ class Model:
         """Retrieve the S3 key for the parent model (if applicable)."""
         return self._parent_model_key
     
-    def _score_metric(self, metric: Metric) -> None:
+    def _score_metric(self, metric: 'Metric') -> None:
         """
         Internal method for scoring the model using a given metric.
         Called when Model is initialized.

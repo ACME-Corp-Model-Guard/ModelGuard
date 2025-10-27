@@ -1,6 +1,7 @@
 """
 Tests for the logging_utils module.
 """
+
 import logging
 import os
 import tempfile
@@ -87,7 +88,7 @@ def test_setup_logging_level_1():
             logger.info("Test info message")
 
             # Verify the log file has content
-            with open(log_file, 'r') as f:
+            with open(log_file, "r") as f:
                 content = f.read()
                 assert content != ""
                 assert "INFO" in content
@@ -122,7 +123,7 @@ def test_setup_logging_with_valid_file():
             logger.info("Test message")
 
             # Verify there's content in the file
-            with open(log_file, 'r') as f:
+            with open(log_file, "r") as f:
                 content = f.read()
                 assert len(content) > 0
         finally:
@@ -156,9 +157,9 @@ def test_setup_logging_with_invalid_file():
             if isinstance(handler, logging.StreamHandler):
                 has_stream_handler = True
                 break
-        assert has_stream_handler, (
-            "No StreamHandler found when log file path is invalid"
-        )
+        assert (
+            has_stream_handler
+        ), "No StreamHandler found when log file path is invalid"
     finally:
         # Restore original settings
         logger.handlers = original_handlers

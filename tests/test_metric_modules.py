@@ -1,8 +1,10 @@
 """
 Tests for metrics modules.
 """
+
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 from src.metrics.availability_metric import AvailabilityMetric
 from src.metrics.bus_factor_metric import BusFactorMetric
@@ -15,7 +17,7 @@ from src.metrics.size_metric import SizeMetric
 
 # Base class for testing metrics
 class MetricTester:
-    def _as_path(self, path_or_url: str) -> Path:
+    def _as_path(self, path_or_url: str) -> Optional[Path]:
         return Path(path_or_url)
 
     def _glob(self, base, patterns):
@@ -144,6 +146,7 @@ def test_dataset_quality_metric_path():
 def test_dataset_quality_no_files(tmp_path):
 
     from src.metrics.dataset_quality_metric import DatasetQualityMetric
+
     metric = DatasetQualityMetric()
     result = metric.score(str(tmp_path))
     assert result["dataset_quality"] == 0.5

@@ -65,17 +65,31 @@ def test_record():
     ns = NetScore(url)
 
     # Mock NetScore.combine to avoid the actual implementation
-    with mock.patch.object(ns, 'combine', return_value=0.5):
+    with mock.patch.object(ns, "combine", return_value=0.5):
         record = _record(ns, url)
 
         expected_keys = {
-            "url", "name", "category", "net_score", "net_score_latency",
-            "ramp_up_time", "ramp_up_time_latency", "bus_factor",
-            "bus_factor_latency", "performance_claims",
-            "performance_claims_latency", "license", "license_latency",
-            "size_score", "size_score_latency", "dataset_and_code_score",
-            "dataset_and_code_score_latency", "dataset_quality",
-            "dataset_quality_latency", "code_quality", "code_quality_latency"
+            "url",
+            "name",
+            "category",
+            "net_score",
+            "net_score_latency",
+            "ramp_up_time",
+            "ramp_up_time_latency",
+            "bus_factor",
+            "bus_factor_latency",
+            "performance_claims",
+            "performance_claims_latency",
+            "license",
+            "license_latency",
+            "size_score",
+            "size_score_latency",
+            "dataset_and_code_score",
+            "dataset_and_code_score_latency",
+            "dataset_quality",
+            "dataset_quality_latency",
+            "code_quality",
+            "code_quality_latency",
         }
         assert set(record.keys()) == expected_keys
         assert record["url"] == url
@@ -93,10 +107,7 @@ def test_iter_urls():
         tmp.flush()
 
         urls = list(iter_urls(Path(tmp.name)))
-        assert urls == [
-            "https://example.com/repo1",
-            "https://example.com/repo2"
-        ]
+        assert urls == ["https://example.com/repo1", "https://example.com/repo2"]
 
 
 def test_compute_all():
@@ -108,12 +119,10 @@ def test_compute_all():
 
         # Mock _record to avoid actual implementation
         import unittest.mock as mock
+
         with mock.patch(
-            'src.main._record',
-            side_effect=lambda ns, url: {
-                "url": url,
-                "name": url.split("/")[-1]
-            }
+            "src.main._record",
+            side_effect=lambda ns, url: {"url": url, "name": url.split("/")[-1]},
         ):
             results = compute_all(Path(tmp.name))
             assert len(results) == 2

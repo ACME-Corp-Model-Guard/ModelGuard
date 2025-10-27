@@ -1,6 +1,7 @@
 """
 Additional tests for main module.
 """
+
 import os
 import tempfile
 from time import perf_counter
@@ -19,10 +20,7 @@ def test_lat_ms():
 
 def test_print_ndjson(capsys):
     """Test _print_ndjson function."""
-    rows = [
-        {"name": "test1", "value": 1},
-        {"name": "test2", "value": 2}
-    ]
+    rows = [{"name": "test1", "value": 1}, {"name": "test2", "value": 2}]
     _print_ndjson(rows)
 
     captured = capsys.readouterr()
@@ -61,11 +59,11 @@ def test_main_with_valid_file(monkeypatch):
         tmp_path = tmp.name
 
     # Mock compute_all to return a predefined result
-    with mock.patch('src.main.compute_all') as mock_compute:
+    with mock.patch("src.main.compute_all") as mock_compute:
         mock_compute.return_value = [{"url": "https://example.com"}]
 
         # Mock _print_ndjson to avoid actual printing
-        with mock.patch('src.main._print_ndjson'):
+        with mock.patch("src.main._print_ndjson"):
             result = main(["program", tmp_path])
             assert result == 0
 
@@ -112,8 +110,10 @@ def test_lat_ms_zero_and_negative():
 
 def test_print_ndjson_non_serializable():
     """Test _print_ndjson with a non-serializable object."""
+
     class NonSerializable:
         pass
+
     try:
         _print_ndjson([NonSerializable()])
     except TypeError:
@@ -132,9 +132,11 @@ def test_main_file_permission_error(monkeypatch, capsys):
         result = main(["program", tmp_path])
         assert result in (1, 2)  # Depending on where the error is caught
         captured = capsys.readouterr()
-        assert ("Error" in captured.err or
-                "Permission" in captured.err
-                or "denied" in captured.err)
+        assert (
+            "Error" in captured.err
+            or "Permission" in captured.err
+            or "denied" in captured.err
+        )
     finally:
         os.chmod(tmp_path, 0o600)
         os.unlink(tmp_path)
@@ -149,10 +151,7 @@ def test_main_with_exception():
         tmp_path = tmp.name
 
     # Mock compute_all to raise an exception
-    with mock.patch(
-        'src.main.compute_all',
-        side_effect=Exception("Test error")
-    ):
+    with mock.patch("src.main.compute_all", side_effect=Exception("Test error")):
         result = main(["program", tmp_path])
         assert result == 1
 
@@ -177,6 +176,7 @@ def test_early_env_exits_with_invalid_token(monkeypatch, capsys):
 
     class MockResp:
         status_code = 401
+
     monkeypatch.setattr(requests, "get", lambda *a, **kw: MockResp())
     result = _early_env_exits()
     assert result == 1
