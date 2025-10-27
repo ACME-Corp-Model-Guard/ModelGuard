@@ -14,14 +14,14 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "metadata": {
-                "name": "openai-whisper",
-                "id": "7364518290",
-                "type": "code"
-            },
-            "data": {
-                "url": "https://github.com/openai/whisper"
+        "body": json.dumps(
+            {
+                "metadata": {
+                    "name": "openai-whisper",
+                    "id": "7364518290",
+                    "type": "code",
+                },
+                "data": {"url": "https://github.com/openai/whisper"},
             }
-        })
+        ),
     }

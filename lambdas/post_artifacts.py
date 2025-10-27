@@ -14,9 +14,11 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps([
-            {"name": "audience-classifier", "id": "3847247294", "type": "model"},
-            {"name": "bookcorpus", "id": "5738291045", "type": "dataset"},
-            {"name": "google-research-bert", "id": "9182736455", "type": "code"}
-        ])
+        "body": json.dumps(
+            [
+                {"name": "audience-classifier", "id": "3847247294", "type": "model"},
+                {"name": "bookcorpus", "id": "5738291045", "type": "dataset"},
+                {"name": "google-research-bert", "id": "9182736455", "type": "code"},
+            ]
+        ),
     }

@@ -14,14 +14,14 @@ def lambda_handler(event, context):
     return {
         "statusCode": 201,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "metadata": {
-                "name": "bert-base-uncased",
-                "id": "9078563412",
-                "type": "model"
-            },
-            "data": {
-                "url": "https://huggingface.co/google-bert/bert-base-uncased"
+        "body": json.dumps(
+            {
+                "metadata": {
+                    "name": "bert-base-uncased",
+                    "id": "9078563412",
+                    "type": "model",
+                },
+                "data": {"url": "https://huggingface.co/google-bert/bert-base-uncased"},
             }
-        })
+        ),
     }
