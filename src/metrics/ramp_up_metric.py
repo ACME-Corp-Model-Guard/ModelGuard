@@ -1,62 +1,26 @@
-import re
+from typing import Union, Dict
 
-from src.metrics.metric import Metric
-
-from .base_metric import BaseMetric
+from .metric import Metric
 
 
-class RampUpMetric(BaseMetric, Metric):
+class RampUpMetric(Metric):
     """
-    Onboarding ease:
-      + README length & structure (badges, install, usage)
-      + CONTRIBUTING.md presence
-      + docs/ site
-      + Example commands
+    Ramp up metric for evaluating ease of getting started.
+    
+    This is a stub implementation that will be filled out when
+    S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, path_or_url: str) -> dict:
-        p = self._as_path(path_or_url)
-        if not p:
-            return {"ramp_up": self._stable_unit_score(path_or_url, "ramp_up")}
-
-        score = 0.0
-
-        readme = None
-        for name in ["README.md", "README.rst", "README.txt"]:
-            f = p / name
-            if f.exists():
-                readme = f
-                break
-
-        if readme:
-            txt = self._read_text(readme)
-            length = len(txt)
-
-            # Length scaling
-            if length >= 4000:
-                score += 0.35
-            elif length >= 1500:
-                score += 0.25
-            elif length >= 500:
-                score += 0.15
-
-            # Badges & sections
-            if re.search(r"\[!\[", txt):  # Shields.io badges
-                score += 0.05
-            if re.search(r"\b(Install|Installation)\b", txt, re.I):
-                score += 0.15
-            if re.search(r"\bUsage\b", txt, re.I):
-                score += 0.15
-            if re.search(r"```", txt):
-                score += 0.1  # Code examples
-        else:
-            # No README -> hard to ramp up
-            return {"ramp_up": 0.05}
-
-        # Contributing / docs presence
-        if (p / "CONTRIBUTING.md").exists():
-            score += 0.1
-        if (p / "docs").exists():
-            score += 0.05
-
-        return {"ramp_up": self._clamp01(score)}
+    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+        """
+        Score model ramp up time.
+        
+        Args:
+            model: The Model object to score
+            
+        Returns:
+            Ramp up score as a dictionary
+        """
+        # TODO: Implement actual ramp up scoring when S3 integration is ready
+        # For now, return a placeholder score
+        return {"ramp_up": 0.5}
