@@ -16,7 +16,7 @@ from .treescore_metric import TreescoreMetric
 __all__ = [
     "Metric",
     "AvailabilityMetric",
-    "BusFactorMetric", 
+    "BusFactorMetric",
     "CodeQualityMetric",
     "DatasetQualityMetric",
     "LicenseMetric",
@@ -25,5 +25,5 @@ __all__ = [
     "SizeMetric",
     "ReproducibilityMetric",
     "ReviewednessMetric",
-    "TreescoreMetric"
+    "TreescoreMetric",
 ]

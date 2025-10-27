@@ -20,9 +20,9 @@ def test_availability_metric():
         name="test_model",
         model_key="models/test_model/model",
         code_key="models/test_model/code",
-        dataset_key="models/test_model/dataset"
+        dataset_key="models/test_model/dataset",
     )
-    
+
     result = metric.score(model)
     assert isinstance(result, dict)
     assert "availability" in result
@@ -36,9 +36,9 @@ def test_bus_factor_metric():
         name="test_model",
         model_key="models/test_model/model",
         code_key="models/test_model/code",
-        dataset_key="models/test_model/dataset"
+        dataset_key="models/test_model/dataset",
     )
-    
+
     result = metric.score(model)
     assert isinstance(result, dict)
     assert "bus_factor" in result

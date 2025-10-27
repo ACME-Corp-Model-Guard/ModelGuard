@@ -6,18 +6,18 @@ from .metric import Metric
 class BusFactorMetric(Metric):
     """
     Bus factor metric for evaluating contributor diversity.
-    
+
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
         """
         Score model bus factor.
-        
+
         Args:
             model: The Model object to score
-            
+
         Returns:
             Bus factor score as a dictionary
         """

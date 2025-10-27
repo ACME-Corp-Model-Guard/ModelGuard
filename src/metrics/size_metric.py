@@ -6,18 +6,18 @@ from .metric import Metric
 class SizeMetric(Metric):
     """
     Size metric for evaluating model size.
-    
+
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
         """
         Score model size.
-        
+
         Args:
             model: The Model object to score
-            
+
         Returns:
             Size score as a dictionary
         """

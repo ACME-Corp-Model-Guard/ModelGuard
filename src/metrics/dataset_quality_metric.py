@@ -6,18 +6,18 @@ from .metric import Metric
 class DatasetQualityMetric(Metric):
     """
     Dataset quality metric for evaluating dataset quality.
-    
+
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
         """
         Score model dataset quality.
-        
+
         Args:
             model: The Model object to score
-            
+
         Returns:
             Dataset quality score as a dictionary
         """

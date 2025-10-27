@@ -13,7 +13,7 @@ class Model:
     """
     Represents a machine learning model in the system.
     Holds metadata, scores, and keys for accessing data in S3.
-    
+
     Attributes:
         name: Model name
         size: Model size in bytes
@@ -25,7 +25,7 @@ class Model:
         dataset_key: S3 key for the model's dataset
         parent_model_key: S3 key for parent model (optional)
     """
-    
+
     def __init__(
         self,
         name: str,
@@ -34,11 +34,11 @@ class Model:
         dataset_key: str,
         parent_model_key: Optional[str] = None,
         size: float = 0.0,
-        license: str = "unknown"
+        license: str = "unknown",
     ):
         """
         Initialize a Model instance.
-        
+
         Args:
             name: The name of the model
             model_key: S3 key for the model data
@@ -51,45 +51,50 @@ class Model:
         self.name = name
         self.size = size
         self.license = license
-        
+
         # S3 keys for data access
         self.model_key = model_key
         self.code_key = code_key
         self.dataset_key = dataset_key
         self.parent_model_key = parent_model_key
-        
+
         # Score storage - initially empty, will be populated by metrics
         self.scores: Dict[str, Union[float, Dict[str, float]]] = {}
         self.scores_latency: Dict[str, float] = {}
-    
+
     def get_score(self, metric_name: str) -> Union[float, Dict[str, float]]:
         """
         Retrieve a specific score.
-        
+
         Args:
             metric_name: Name of the metric to retrieve
-            
+
         Returns:
             The score value (float or dict)
         """
         return self.scores.get(metric_name, 0.0)
-    
+
     def get_latency(self, metric_name: str) -> float:
         """
         Retrieve a specific latency score.
-        
+
         Args:
             metric_name: Name of the metric to retrieve latency for
-            
+
         Returns:
             The latency value in milliseconds
         """
         return self.scores_latency.get(metric_name, 0.0)
-    
-    def set_score(self, metric_name: str, score: Union[float, Dict[str, float]], latency: float = 0.0) -> None:
+
+    def set_score(
+        self,
+        metric_name: str,
+        score: Union[float, Dict[str, float]],
+        latency: float = 0.0,
+    ) -> None:
         """
         Set a score for a specific metric.
-        
+
         Args:
             metric_name: Name of the metric
             score: The score value
@@ -97,11 +102,11 @@ class Model:
         """
         self.scores[metric_name] = score
         self.scores_latency[metric_name] = latency
-    
+
     def to_dict(self) -> Dict:
         """
         Convert the model to a dictionary for DynamoDB storage or API responses.
-        
+
         Returns:
             Dictionary representation of the model
         """
@@ -114,17 +119,17 @@ class Model:
             "dataset_key": self.dataset_key,
             "parent_model_key": self.parent_model_key,
             "scores": self.scores,
-            "scores_latency": self.scores_latency
+            "scores_latency": self.scores_latency,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Model':
+    def from_dict(cls, data: Dict) -> "Model":
         """
         Create a Model instance from a dictionary (e.g., from DynamoDB).
-        
+
         Args:
             data: Dictionary containing model data
-            
+
         Returns:
             Model instance
         """
@@ -135,17 +140,19 @@ class Model:
             dataset_key=data.get("dataset_key", ""),
             parent_model_key=data.get("parent_model_key"),
             size=data.get("size", 0.0),
-            license=data.get("license", "unknown")
+            license=data.get("license", "unknown"),
         )
         model.scores = data.get("scores", {})
         model.scores_latency = data.get("scores_latency", {})
         return model
-    
+
     def __str__(self) -> str:
         """String representation of the model."""
         return f"Model(name='{self.name}', size={self.size}, license='{self.license}')"
-    
+
     def __repr__(self) -> str:
         """Detailed string representation of the model."""
-        return (f"Model(name='{self.name}', size={self.size}, license='{self.license}', "
-                f"model_key='{self.model_key}')")
+        return (
+            f"Model(name='{self.name}', size={self.size}, license='{self.license}', "
+            f"model_key='{self.model_key}')"
+        )

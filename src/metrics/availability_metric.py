@@ -6,18 +6,18 @@ from .metric import Metric
 class AvailabilityMetric(Metric):
     """
     Availability metric for evaluating model availability.
-    
+
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: 'Model') -> Union[float, Dict[str, float]]:
+    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
         """
         Score model availability.
-        
+
         Args:
             model: The Model object to score
-            
+
         Returns:
             Availability score as a dictionary
         """
