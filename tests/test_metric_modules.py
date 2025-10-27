@@ -338,19 +338,22 @@ class TestSizeMetric(SizeMetric, MetricTester):
 def test_size_metric_url():
     """Test size metric with URL."""
     metric = TestSizeMetric()
-    result = metric.score("https://example.com")
-    assert "files" in result
-    assert "lines" in result
-    assert "commits" in result
-    assert isinstance(result["files"], float)
-    assert 0.0 <= result["files"] <= 1.0
+    from src.model import Model
+
+    model = Model(name="test", model_key="key", code_key="code", dataset_key="dataset")
+
+    result = metric.score(model)
+    assert "size" in result
+    assert isinstance(result["size"], float)
+    assert 0.0 <= result["size"] <= 1.0
 
 
 def test_size_metric_path():
     """Test size metric with path."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        metric = TestSizeMetric()
-        result = metric.score(tmpdir)
-        assert "files" in result
-        assert "lines" in result
-        assert "commits" in result
+    metric = TestSizeMetric()
+    from src.model import Model
+
+    model = Model(name="test", model_key="key", code_key="code", dataset_key="dataset")
+
+    result = metric.score(model)
+    assert "size" in result
