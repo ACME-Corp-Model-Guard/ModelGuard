@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     from ..model import Model
 
 
-class PerformanceClaimsMetric(Metric):
+class ReproducibilityMetric(Metric):
     """
-    Performance claims metric for evaluating performance claims.
+    Reproducibility metric for evaluating result reproducibility.
 
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
@@ -18,14 +18,14 @@ class PerformanceClaimsMetric(Metric):
 
     def score(self, model: Model) -> Union[float, Dict[str, float]]:
         """
-        Score model performance claims.
+        Score model reproducibility.
 
         Args:
             model: The Model object to score
 
         Returns:
-            Performance claims score as a dictionary
+            Reproducibility score as a dictionary
         """
-        # TODO: Implement actual performance claims scoring when S3 integration is ready
+        # TODO: Implement actual reproducibility scoring when S3 integration is ready
         # For now, return a placeholder score
-        return {"performance_claims": 0.5}
+        return {"reproducibility": 0.5}

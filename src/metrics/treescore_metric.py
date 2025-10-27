@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     from ..model import Model
 
 
-class PerformanceClaimsMetric(Metric):
+class TreescoreMetric(Metric):
     """
-    Performance claims metric for evaluating performance claims.
+    Treescore metric for evaluating code structure.
 
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
@@ -18,14 +18,14 @@ class PerformanceClaimsMetric(Metric):
 
     def score(self, model: Model) -> Union[float, Dict[str, float]]:
         """
-        Score model performance claims.
+        Score model treescore.
 
         Args:
             model: The Model object to score
 
         Returns:
-            Performance claims score as a dictionary
+            Treescore score as a dictionary
         """
-        # TODO: Implement actual performance claims scoring when S3 integration is ready
+        # TODO: Implement actual treescore scoring when S3 integration is ready
         # For now, return a placeholder score
-        return {"performance_claims": 0.5}
+        return {"treescore": 0.5}

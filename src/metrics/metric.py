@@ -1,26 +1,27 @@
-from abc import ABC
-from pathlib import Path
-from typing import Optional
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Union, Dict
+
+if TYPE_CHECKING:
+    from ..model import Model
 
 
 class Metric(ABC):
-    def _as_path(self, path_or_url: str) -> Optional[Path]:
-        p = Path(path_or_url)
-        return p if p.exists() else None
+    """
+    Abstract base class for all metrics in the ModelGuard system.
+    All concrete metrics must implement the score() method.
+    """
 
-    def _stable_unit_score(self, path_or_url: str, metric_name: str) -> float:
+    @abstractmethod
+    def score(self, model: Model) -> Union[float, Dict[str, float]]:
         """
-        Returns a stable placeholder score for non-local paths
-        or unsupported cases. This avoids random output and makes
-        results predictable for URLs.
+        Score a model and return the result.
+
+        Args:
+            model: The Model object to score
+
+        Returns:
+            Either a float score or a dictionary of scores
         """
-        fallback_scores = {
-            "availability": 0.2,
-            "bus_factor": 0.2,
-            "code_quality": 0.2,
-            "dataset_quality": 0.5,
-            "license": 0.0,
-            "performance_claims": 0.0,
-            "ramp_up": 0.05,
-        }
-        return fallback_scores.get(metric_name, 0.0)
+        pass
