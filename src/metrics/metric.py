@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Union, Dict
+from typing import TYPE_CHECKING, Union, Dict
+
+if TYPE_CHECKING:
+    from ..model import Model
 
 
 class Metric(ABC):
@@ -9,7 +14,7 @@ class Metric(ABC):
     """
 
     @abstractmethod
-    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
+    def score(self, model: Model) -> Union[float, Dict[str, float]]:
         """
         Score a model and return the result.
 

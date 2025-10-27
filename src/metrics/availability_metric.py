@@ -1,6 +1,11 @@
-from typing import Union, Dict
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union, Dict
 
 from .metric import Metric
+
+if TYPE_CHECKING:
+    from ..model import Model
 
 
 class AvailabilityMetric(Metric):
@@ -11,7 +16,7 @@ class AvailabilityMetric(Metric):
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: "Model") -> Union[float, Dict[str, float]]:
+    def score(self, model: Model) -> Union[float, Dict[str, float]]:
         """
         Score model availability.
 
