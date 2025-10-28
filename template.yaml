@@ -9,7 +9,13 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
+        LOG_LEVEL: INFO
         PYTHONPATH: /var/task:/var/task/src
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Authorization'"
+      AllowOrigin: "'*'"
 
 Resources:
   # API Gateway
