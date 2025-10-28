@@ -4,7 +4,7 @@ Description: 'ModelGuard MVP - Core Artifact Management API'
 
 Globals:
   Function:
-    Runtime: python3.13
+    Runtime: python3.12
     Timeout: 15
     MemorySize: 128
     Environment:
