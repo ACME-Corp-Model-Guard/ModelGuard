@@ -10,6 +10,8 @@ Globals:
     Environment:
       Variables:
         PYTHONPATH: /var/task:/var/task/src
+    Tracing: Active
+    Role: arn:aws:iam::378950442938:role/BasicLambdaRole
 
 Resources:
   # API Gateway
