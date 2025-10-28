@@ -9,7 +9,10 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
+        LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
         PYTHONPATH: /var/task:/var/task/src
+    Tracing: Active
+    Role: arn:aws:iam::378950442938:role/BasicLambdaRole
 
 Resources:
   # API Gateway
