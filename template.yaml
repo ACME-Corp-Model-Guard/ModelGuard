@@ -11,11 +11,8 @@ Globals:
       Variables:
         LOG_LEVEL: INFO
         PYTHONPATH: /var/task:/var/task/src
-  Api:
-    Cors:
-      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      AllowHeaders: "'Content-Type,X-Authorization'"
-      AllowOrigin: "'*'"
+    Tracing: Active
+    Role: arn:aws:iam::378950442938:role/BasicLambdaRole
 
 Resources:
   # API Gateway
