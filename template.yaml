@@ -4,7 +4,7 @@ Description: 'ModelGuard MVP - Core Artifact Management API'
 
 Globals:
   Function:
-    Runtime: python3.13
+    Runtime: python3.12
     Timeout: 15
     MemorySize: 128
     Environment:
@@ -12,7 +12,6 @@ Globals:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
         PYTHONPATH: /var/task:/var/task/src
     Tracing: Active
-    Role: arn:aws:iam::378950442938:role/BasicLambdaRole
 
 Resources:
   # API Gateway
@@ -33,6 +32,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.post_artifacts.lambda_handler
       Description: Enumerate/List artifacts from registry
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         ListArtifacts:
           Type: Api
@@ -48,6 +48,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.post_artifact_upload.lambda_handler
       Description: Upload/Create new artifact
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         CreateArtifact:
           Type: Api
@@ -63,6 +64,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.get_artifact_download.lambda_handler
       Description: Download/Retrieve artifact by type and ID
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         GetArtifact:
           Type: Api
@@ -78,6 +80,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.put_artifact_update.lambda_handler
       Description: Update existing artifact
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         UpdateArtifact:
           Type: Api
@@ -93,6 +96,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.get_search_by_name.lambda_handler
       Description: Search artifacts by name
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         SearchByName:
           Type: Api
@@ -108,6 +112,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.post_search_by_regex.lambda_handler
       Description: Search artifacts using regular expressions
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         SearchByRegex:
           Type: Api
@@ -123,6 +128,7 @@ Resources:
       CodeUri: ./
       Handler: lambdas.get_model_rate.lambda_handler
       Description: Get ratings for model artifacts
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         ModelRate:
           Type: Api
