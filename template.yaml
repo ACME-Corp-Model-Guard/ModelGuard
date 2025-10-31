@@ -148,7 +148,7 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          API_BASE: "https://<your-api-id>.execute-api.us-east-1.amazonaws.com/prod"
+          API_BASE: "https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/"
       Events:
         Root:
           Type: Api
