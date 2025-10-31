@@ -4,9 +4,10 @@ Upload/Create new artifact
 """
 
 import json
+from typing import Any, Dict
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Stub handler for POST /artifact/{artifact_type} - Upload new artifact
     Register a new artifact by providing downloadable source URL
