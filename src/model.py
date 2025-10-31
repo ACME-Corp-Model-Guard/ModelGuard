@@ -14,7 +14,6 @@ from src.metrics.net_score import calculate_net_score
 import time  # high-resolution timing
 
 
-
 METRICS: list[_metrics.Metric] = [
     _metrics.AvailabilityMetric(),
     _metrics.BusFactorMetric(),
