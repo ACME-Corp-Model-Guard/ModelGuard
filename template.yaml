@@ -137,6 +137,30 @@ Resources:
             Path: /artifact/model/{id}/rate
             Method: GET
 
+  # Web Interface
+  WebUIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: web.app.handler
+      Runtime: python3.12
+      CodeUri: .
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          API_BASE: "https://<your-api-id>.execute-api.us-east-1.amazonaws.com/prod"
+      Events:
+        Root:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+        Web:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
