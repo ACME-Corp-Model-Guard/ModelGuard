@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ModelGuard Registry</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>ModelGuard Registry</h1>
+    <nav>
+      <a href="/upload" class="button">Upload New Model</a>
+    </nav>
+  </header>
+
+  <section class="stats">
+    <div class="card">
+      <h2>Total Models</h2>
+      <p>{{ models | length }}</p>
+    </div>
+    <!-- You can add more metrics here later -->
+  </section>
+
+  <section class="model-list">
+    <h2>Available Models</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in models %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>
+            {% if m.score is defined %}
+              <span class="badge">{{ m.score }}</span>
+            {% else %}
+              n/a
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

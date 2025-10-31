@@ -1,9 +1,10 @@
 import os
 import sys
+
 from loguru import logger
 
 
-def setup_logging():
+def setup_logging() -> None:
     """
     Configure Loguru logging for both local development and AWS Lambda.
 
@@ -34,7 +35,9 @@ def setup_logging():
         logger.add(
             sys.stdout,
             level=log_level,
-            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {name}:{function}:{line} | {message}",
+            format=(
+                "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {name}:{function}:{line} | {message}"
+            ),
             serialize=True,  # JSON output for CloudWatch
             enqueue=True,  # async logging
             backtrace=True,  # show full stack traces
@@ -45,7 +48,12 @@ def setup_logging():
         logger.add(
             sys.stdout,
             level=log_level,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
+            format=(
+                "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+                "<level>{level: <8}</level> | "
+                "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+                "<level>{message}</level>"
+            ),
             colorize=True,
             enqueue=True,
             backtrace=True,

@@ -4,9 +4,10 @@ Get ratings for model artifacts
 """
 
 import json
+from typing import Any, Dict
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Stub handler for GET /artifact/model/{id}/rate - Rate model
     Return model rating with all required metrics from the OpenAPI spec
