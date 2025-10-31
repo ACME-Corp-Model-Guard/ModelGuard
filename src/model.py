@@ -11,7 +11,9 @@ from typing import Dict, Union, Optional
 # Add a local import to the metrics module (avoids circular import issues)
 from . import metrics as _metrics
 from src.metrics.net_score import calculate_net_score
+
 import time  # high-resolution timing
+
 
 
 METRICS: list[_metrics.Metric] = [

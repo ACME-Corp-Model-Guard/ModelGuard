@@ -73,7 +73,7 @@ def test_to_dict():
     assert "scores_latency" in model_dict
 
 
-def test_from_dict():
+def test_create_with_scores():
     """Test creating model from dictionary."""
     data = {
         "name": "test_model",
@@ -86,7 +86,7 @@ def test_from_dict():
         "scores_latency": {"availability": 100.0},
     }
 
-    model = Model.from_dict(data)
+    model = Model.create_with_scores(data)
 
     assert model.name == "test_model"
     assert model.size == 1024.0
