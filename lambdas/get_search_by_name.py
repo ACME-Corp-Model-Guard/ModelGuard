@@ -15,7 +15,9 @@ TABLE_NAME = "Artifacts"  # TODO: Replace placeholder with actual table name
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
-ArtifactMetadata = Dict[str, Any]  # Could be a TypedDict or Pydantic model
+ArtifactMetadata = Dict[
+    str, Any
+]  # TODO: Decide type: could be a TypedDict or Pydantic model
 
 
 def lambda_handler(event, context):
