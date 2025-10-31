@@ -75,7 +75,7 @@ ModelGuard is implemented as a modular system using Python 3.12 with the followi
 - **`src/model.py`**: Core `Model` class handling model metadata and scoring
 - **`src/metrics/`**: Implements baseline and extended model metrics
 - **`lambdas/`**: AWS Lambda functions serving API endpoints
-- **`web/`**: Flask-based web interface with templates and static assets
+- **`web/`**: Undecided framework!!!
 - **AWS Components**:
   - **Lambda**: Serverless compute for API requests
   - **S3**: Versioned object storage for models
