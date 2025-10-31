@@ -11,9 +11,41 @@ Globals:
       Variables:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
         PYTHONPATH: /var/task:/var/task/src
+        ARTIFACTS_TABLE: !Ref ArtifactsTable
+        ARTIFACTS_BUCKET: !Ref ArtifactsBucket
     Tracing: Active
 
 Resources:
+  # DynamoDB Table - Model Metadata
+  ArtifactsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Artifacts-Metadata
+      BillingMode: PAY_PER_REQUEST  # On-demand pricing
+      AttributeDefinitions:
+        - AttributeName: artifact_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: artifact_id
+          KeyType: HASH  # Primary key
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  # S3 Bucket - Model/Code/Dataset Storage
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'ModelGuard-Artifacts-Files'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
   # API Gateway
   ModelGuardApi:
     Type: AWS::Serverless::Api
@@ -167,3 +199,15 @@ Outputs:
     Value: !Sub 'https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/'
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
+
+  ArtifactsTableName:
+    Description: DynamoDB table for model metadata
+    Value: !Ref ArtifactsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TableName'
+
+  ArtifactsBucketName:
+    Description: S3 bucket for model/code/dataset storage
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
