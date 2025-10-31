@@ -7,6 +7,7 @@ Ready for Lambda integration with DynamoDB and S3.
 
 from __future__ import annotations
 from typing import Dict, Union, Optional
+
 # Add a local import to the metrics module (avoids circular import issues)
 from . import metrics as _metrics
 import time  # high-resolution timing
@@ -158,14 +159,14 @@ class Model:
         """
         scores: Dict[str, Union[float, Dict[str, float]]] = {}
         latencies: Dict[str, float] = {}
-        
+
         for metric in METRICS:
             t0 = time.perf_counter()
             value = metric.score(self)
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
-            
+
             # Use the metric class name as the key
-            metric_name = metric.__class__.__name__.replace('Metric', '')
+            metric_name = metric.__class__.__name__.replace("Metric", "")
             scores[metric_name] = value
             latencies[metric_name] = elapsed_ms
 
@@ -174,9 +175,9 @@ class Model:
 
         # Calculate NetScore separately
         t0 = time.perf_counter()
-        self.scores['NetScore'] = _metrics.calculate_net_score(self.scores)
+        self.scores["NetScore"] = _metrics.calculate_net_score(self.scores)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-        self.scores_latency['NetScore'] = elapsed_ms
+        self.scores_latency["NetScore"] = elapsed_ms
 
     def __str__(self) -> str:
         """String representation of the model."""
