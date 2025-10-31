@@ -3,7 +3,9 @@ annotated-types==0.7.0
 anyio==4.11.0
 black==25.9.0
 boto3==1.40.63
+boto3-stubs==1.40.64
 botocore==1.40.63
+botocore-stubs==1.40.64
 certifi==2025.10.5
 cfgv==3.4.0
 charset-normalizer==3.4.4
@@ -46,7 +48,9 @@ s3transfer==0.14.0
 six==1.17.0
 sniffio==1.3.1
 starlette==0.49.1
+types-awscrt==0.28.2
 types-requests==2.32.4.20250913
+types-s3transfer==0.14.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.5.0
