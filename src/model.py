@@ -10,7 +10,9 @@ from typing import Dict, Union, Optional
 
 # Add a local import to the metrics module (avoids circular import issues)
 from . import metrics as _metrics
+from src.metrics.net_score import calculate_net_score
 import time  # high-resolution timing
+
 
 
 METRICS: list[_metrics.Metric] = [
@@ -24,7 +26,7 @@ METRICS: list[_metrics.Metric] = [
     _metrics.ReproducibilityMetric(),
     _metrics.ReviewednessMetric(),
     _metrics.SizeMetric(),
-    _metrics.TreeScoreMetric(),
+    _metrics.TreescoreMetric(),
 ]
 
 
@@ -175,7 +177,7 @@ class Model:
 
         # Calculate NetScore separately
         t0 = time.perf_counter()
-        self.scores["NetScore"] = _metrics.calculate_net_score(self.scores)
+        self.scores["NetScore"] = calculate_net_score(self.scores)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         self.scores_latency["NetScore"] = elapsed_ms
 
