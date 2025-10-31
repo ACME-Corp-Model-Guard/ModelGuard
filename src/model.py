@@ -7,6 +7,24 @@ Ready for Lambda integration with DynamoDB and S3.
 
 from __future__ import annotations
 from typing import Dict, Union, Optional
+# Add a local import to the metrics module (avoids circular import issues)
+from . import metrics as _metrics
+import time  # high-resolution timing
+
+
+METRICS: list[_metrics.Metric] = [
+    _metrics.AvailabilityMetric(),
+    _metrics.BusFactorMetric(),
+    _metrics.CodeQualityMetric(),
+    _metrics.DatasetQualityMetric(),
+    _metrics.LicenseMetric(),
+    _metrics.PerformanceClaimsMetric(),
+    _metrics.RampUpMetric(),
+    _metrics.ReproducibilityMetric(),
+    _metrics.ReviewednessMetric(),
+    _metrics.SizeMetric(),
+    _metrics.TreeScoreMetric(),
+]
 
 
 class Model:
@@ -62,6 +80,9 @@ class Model:
         self.scores: Dict[str, Union[float, Dict[str, float]]] = {}
         self.scores_latency: Dict[str, float] = {}
 
+        # Compute initial scores once for new models
+        self._compute_scores()
+
     def get_score(self, metric_name: str) -> Union[float, Dict[str, float]]:
         """
         Retrieve a specific score.
@@ -86,23 +107,6 @@ class Model:
         """
         return self.scores_latency.get(metric_name, 0.0)
 
-    def set_score(
-        self,
-        metric_name: str,
-        score: Union[float, Dict[str, float]],
-        latency: float = 0.0,
-    ) -> None:
-        """
-        Set a score for a specific metric.
-
-        Args:
-            metric_name: Name of the metric
-            score: The score value
-            latency: The latency in milliseconds
-        """
-        self.scores[metric_name] = score
-        self.scores_latency[metric_name] = latency
-
     def to_dict(self) -> Dict:
         """
         Convert the model to a dictionary for DynamoDB storage or API responses.
@@ -123,9 +127,10 @@ class Model:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Model":
+    def create_with_scores(cls, data: Dict) -> "Model":
         """
         Create a Model instance from a dictionary (e.g., from DynamoDB).
+        Scores and latencies are populated from the data - no need to recompute.
 
         Args:
             data: Dictionary containing model data
@@ -145,6 +150,33 @@ class Model:
         model.scores = data.get("scores", {})
         model.scores_latency = data.get("scores_latency", {})
         return model
+
+    def _compute_scores(self) -> None:
+        """
+        Populate scores and scores_latency by running each metric once.
+        Iterates the static METRICS list and times each metric.score() call.
+        """
+        scores: Dict[str, Union[float, Dict[str, float]]] = {}
+        latencies: Dict[str, float] = {}
+        
+        for metric in METRICS:
+            t0 = time.perf_counter()
+            value = metric.score(self)
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            
+            # Use the metric class name as the key
+            metric_name = metric.__class__.__name__.replace('Metric', '')
+            scores[metric_name] = value
+            latencies[metric_name] = elapsed_ms
+
+        self.scores = scores
+        self.scores_latency = latencies
+
+        # Calculate NetScore separately
+        t0 = time.perf_counter()
+        self.scores['NetScore'] = _metrics.calculate_net_score(self.scores)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        self.scores_latency['NetScore'] = elapsed_ms
 
     def __str__(self) -> str:
         """String representation of the model."""
