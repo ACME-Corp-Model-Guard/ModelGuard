@@ -1,49 +1,55 @@
 from statistics import mean
-from typing import Dict
+from typing import Dict, Union
 
 
-class NetScore:
+def calculate_net_score(scores: Dict[str, Union[float, Dict[str, float]]]) -> float:
     """
-    Weighted composite score.
+    Calculate weighted composite score from individual metric scores.
 
-    Default weights (sum to 1):
-      availability:       0.10
-      bus factor:         0.15
-      code quality:       0.20
-      dataset quality:    0.05
-      license:            0.10
-      performance claims: 0.10
-      ramp up:            0.15
-      size (aggregate):   0.15
+    Args:
+        scores: Dictionary of metric names to scores (0.0-1.0)
+                Values can be floats or nested dicts of scores (which are averaged)
+                Expected keys: availability, bus_factor, code_quality,
+                dataset_quality, license, performance_claims, ramp_up,
+                size, reproducibility, reviewedness, tree_score
+
+    Returns:
+        Weighted net score clamped to [0.0, 1.0]
     """
+    weights = {
+        "availability": 0.07,
+        "bus_factor": 0.05,
+        "code_quality": 0.09,
+        "dataset_quality": 0.09,
+        "license": 0.20,
+        "performance_claims": 0.05,
+        "ramp_up": 0.09,
+        "size": 0.10,
+        "reproducibility": 0.10,
+        "reviewedness": 0.06,
+        "tree_score": 0.10,
+    }
 
-    def __init__(self, url_or_path: str):
-        self.target = url_or_path
-        self.weights = {
-            "availability": 0.10,
-            "bus_factor": 0.15,
-            "code_quality": 0.20,
-            "dataset_quality": 0.05,
-            "license": 0.10,
-            "performance_claims": 0.10,
-            "ramp_up": 0.15,
-            "size": 0.15,
-        }
+    total = 0.0
+    weight_sum = 0.0
 
-    def combine(
-        self,
-        scores: Dict[str, float],
-        size_scores: Dict[str, float],
-    ) -> float:
-        size_val = mean(size_scores.values()) if size_scores else 0.0
-        total = 0.0
-        wsum = 0.0
-        for name, w in self.weights.items():
-            if name == "size":
-                val = size_val
+    for metric_name, weight in weights.items():
+        if metric_name in scores:
+            raw_score = scores[metric_name]
+
+            # If score is a dict, average its values
+            if isinstance(raw_score, dict):
+                score = mean(raw_score.values()) if raw_score else 0.0
             else:
-                val = scores.get(name, 0.0)
-            total += w * max(0.0, min(1.0, float(val)))
-            wsum += w
-        result = total / wsum if wsum > 0 else 0.0
-        return max(0.0, min(1.0, result))  # Clamp final result
+                score = float(raw_score)
+
+            # Clamp individual score to [0.0, 1.0]
+            score = max(0.0, min(1.0, score))
+            total += weight * score
+            weight_sum += weight
+
+    # Calculate weighted average
+    result = total / weight_sum if weight_sum > 0 else 0.0
+
+    # Clamp final result to [0.0, 1.0]
+    return max(0.0, min(1.0, result))
