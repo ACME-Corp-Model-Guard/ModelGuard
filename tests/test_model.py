@@ -1,10 +1,9 @@
 """Tests for the Model class."""
 
-import pytest
 from src.model import Model
 
 
-def test_model_initialization():
+def test_model_initialization() -> None:
     """Test model initialization with all parameters."""
     model = Model(
         name="test_model",
@@ -25,7 +24,7 @@ def test_model_initialization():
     assert model.parent_model_key == "models/parent_model/model"
 
 
-def test_model_initialization_minimal():
+def test_model_initialization_minimal() -> None:
     """Test model initialization with minimal parameters."""
     model = Model(
         name="minimal_model",
@@ -40,7 +39,7 @@ def test_model_initialization_minimal():
     assert model.parent_model_key is None
 
 
-def test_get_score():
+def test_get_score() -> None:
     """Test getting scores."""
     model = Model(
         name="test_model",
@@ -53,7 +52,7 @@ def test_get_score():
     assert model.get_score("availability") == 0.0
 
 
-def test_to_dict():
+def test_to_dict() -> None:
     """Test converting model to dictionary."""
     model = Model(
         name="test_model",
@@ -73,7 +72,7 @@ def test_to_dict():
     assert "scores_latency" in model_dict
 
 
-def test_create_with_scores():
+def test_create_with_scores() -> None:
     """Test creating model from dictionary."""
     data = {
         "name": "test_model",

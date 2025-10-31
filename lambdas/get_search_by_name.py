@@ -20,7 +20,7 @@ ArtifactMetadata = Dict[
 ]  # TODO: Decide type: could be a TypedDict or Pydantic model
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for GET /artifact/byName/{name}.
     Returns artifact metadata entries that match the provided name.

@@ -4,9 +4,10 @@ Search artifacts using regular expressions
 """
 
 import json
+from typing import Any, Dict
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Stub handler for POST /artifact/byRegEx - Search by regex
     Search for artifacts using regular expression over names and READMEs
