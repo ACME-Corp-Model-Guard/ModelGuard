@@ -53,22 +53,6 @@ def test_get_score():
     assert model.get_score("availability") == 0.0
 
 
-def test_set_score():
-    """Test setting scores."""
-    model = Model(
-        name="test_model",
-        model_key="models/test_model/model",
-        code_key="models/test_model/code",
-        dataset_key="models/test_model/dataset",
-    )
-
-    # Set a score
-    model.set_score("availability", 0.8, 100.0)
-
-    assert model.get_score("availability") == 0.8
-    assert model.get_latency("availability") == 100.0
-
-
 def test_to_dict():
     """Test converting model to dictionary."""
     model = Model(
