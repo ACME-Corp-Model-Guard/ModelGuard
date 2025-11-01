@@ -36,7 +36,7 @@ Resources:
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'ModelGuard-Artifacts-Files'
+      BucketName: !Sub 'modelguard-artifacts-files'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -178,6 +178,7 @@ Resources:
       CodeUri: .
       Timeout: 10
       MemorySize: 256
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Environment:
         Variables:
           API_BASE: "https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/"
