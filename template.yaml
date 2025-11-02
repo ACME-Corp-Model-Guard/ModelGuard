@@ -25,9 +25,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: artifact_id
           AttributeType: S
+        - AttributeName: name
+          AttributeType: S
       KeySchema:
         - AttributeName: artifact_id
           KeyType: HASH  # Primary key
+      GlobalSecondaryIndexes:
+        - IndexName: NameIndex
+          KeySchema:
+            - AttributeName: name
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: ModelGuard

@@ -11,7 +11,7 @@ from boto3.dynamodb.conditions import Key
 from loguru import logger
 
 # DynamoDB Table
-TABLE_NAME = "Artifacts"  # TODO: Replace placeholder with actual table name
+TABLE_NAME = "ModelGuard-Artifacts-Metadata"
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
@@ -78,18 +78,25 @@ def query_artifacts_by_name(name: str) -> List[ArtifactMetadata]:
     Assumes `id` is stored as a string.
     """
     try:
-        response = table.query(KeyConditionExpression=Key("name").eq(name))
+        response = table.query(
+            IndexName='NameIndex',  # Specify the GSI
+            KeyConditionExpression=Key("name").eq(name)
+        )
         items = response.get("Items", [])
         artifacts: List[ArtifactMetadata] = []
 
         for item in items:
             # Validate Required Fields
-            if "name" in item and "id" in item and "type" in item:
-                artifact_type = item["type"]
+            if "name" in item and "artifact_id" in item and "artifact_type" in item:
+                artifact_type = item["artifact_type"]
                 if artifact_type not in {"model", "dataset", "code"}:
                     continue  # Skip Invalid Type
                 artifacts.append(
-                    {"name": item["name"], "id": item["id"], "type": artifact_type}
+                    {
+                        "name": item["name"],
+                        "id": item["artifact_id"],  # Map artifact_id to id for API response
+                        "type": artifact_type
+                    }
                 )
 
         return artifacts
