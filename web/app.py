@@ -7,9 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from mangum import Mangum
 
-API_BASE = os.environ.get(
-    "API_BASE", "https://<api-id>.execute-api.us-east-1.amazonaws.com/prod"
-)
+API_BASE = os.environ.get("API_BASE", "http://localhost:3000")
 
 app = FastAPI(title="ModelGuard Web UI")
 templates = Jinja2Templates(directory="web/templates")
