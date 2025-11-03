@@ -6,7 +6,7 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 15
-    MemorySize: 128
+    MemorySize: 512  # MB of RAM (also sets /tmp to 512MB)
     Environment:
       Variables:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
@@ -25,9 +25,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: artifact_id
           AttributeType: S
+        - AttributeName: name
+          AttributeType: S
       KeySchema:
         - AttributeName: artifact_id
           KeyType: HASH  # Primary key
+      GlobalSecondaryIndexes:
+        - IndexName: NameIndex
+          KeySchema:
+            - AttributeName: name
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: ModelGuard
