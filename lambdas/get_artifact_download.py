@@ -16,7 +16,7 @@ except ImportError:
     ClientError = Exception
 
 from src.model import Model
-from src.logging_utils import setup_logging
+from src.logger import logger
 
 # Environment variables
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
@@ -151,12 +151,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Retrieves artifacts (model, code, or dataset) from S3 based on model ID.
     """
-    try:
-        setup_logging()
-    except Exception:
-        pass
-
     path_params = event.get("pathParameters") or {}
+    logger.info(f"Processing GET /artifacts/{path_params.get('artifact_type', 'unknown')}/{path_params.get('id', 'unknown')}")
     artifact_type = path_params.get("artifact_type", "").lower()
     artifact_id = path_params.get("id", "")
 
@@ -171,9 +167,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     query_params = event.get("queryStringParameters") or {}
     metadata_only = query_params.get("metadata_only", "").lower() in ("true", "1", "yes")
+    
+    if metadata_only:
+        logger.info(f"Requesting metadata only for {artifact_id}")
 
     model = _load_model_from_dynamodb(artifact_id)
     if model is None:
+        logger.warning(f"Model not found: {artifact_id}")
         return _error_response(404, f"Model not found: {artifact_id}", "MODEL_NOT_FOUND")
 
     s3_key = None
@@ -185,11 +185,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         s3_key = model.dataset_key
 
     if not s3_key:
+        logger.warning(f"{artifact_type} artifact not found for model: {artifact_id}")
         return _error_response(
             404, f"{artifact_type.capitalize()} artifact not found for model: {artifact_id}", "ARTIFACT_NOT_FOUND"
         )
 
     if metadata_only:
+        logger.info(f"Returning metadata for {artifact_id}, type: {artifact_type}")
         artifact_info = {
             "artifact_type": artifact_type,
             "model_name": artifact_id,
@@ -200,7 +202,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     try:
         file_content, content_type = _download_from_s3(s3_key)
+        logger.info(f"Downloaded from S3: {s3_key}, size: {len(file_content)} bytes")
     except RuntimeError as e:
+        logger.error(f"S3 download failed: {e}")
         return _error_response(500, str(e), "S3_DOWNLOAD_ERROR")
 
     if not content_type or content_type == "application/octet-stream":
@@ -222,4 +226,5 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         content_type = content_type_map.get(file_ext, content_type or "application/octet-stream")
 
+    logger.info(f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type}, size: {len(file_content)} bytes")
     return _create_binary_response(200, file_content, content_type)

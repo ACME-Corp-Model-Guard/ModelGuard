@@ -17,7 +17,7 @@ except ImportError:
     ClientError = Exception
 
 from src.model import Model
-from src.logging_utils import setup_logging
+from src.logger import logger
 
 # Environment variables
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
@@ -242,22 +242,20 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Uploads artifacts (model, code, or dataset) to S3 and updates model metadata in DynamoDB.
     """
-    try:
-        setup_logging()
-    except Exception:
-        pass
-
     path_params = event.get("pathParameters") or {}
+    logger.info(f"Processing POST /artifact/{path_params.get('artifact_type', 'unknown')}")
     artifact_type = path_params.get("artifact_type", "").lower()
 
     valid_types = {"model", "code", "dataset"}
     if artifact_type not in valid_types:
+        logger.warning(f"Invalid artifact_type: {artifact_type}")
         return _error_response(
             400, f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}", "INVALID_ARTIFACT_TYPE"
         )
 
     body_bytes, content_type = _parse_body(event)
     if not body_bytes:
+        logger.warning("Request body is missing")
         return _error_response(400, "Request body is required", "MISSING_BODY")
 
     model_name = None
@@ -281,15 +279,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             model_name = os.path.splitext(filename)[0]
         else:
             model_name = f"model-{uuid.uuid4().hex[:8]}"
+        logger.info(f"Generated model_name: {model_name}")
 
     try:
         s3_key = _upload_to_s3(artifact_type, model_name, file_content, filename)
+        logger.info(f"Uploaded to S3: {s3_key}, size: {len(file_content)} bytes")
     except RuntimeError as e:
+        logger.error(f"S3 upload failed: {e}")
         return _error_response(500, str(e), "S3_UPLOAD_ERROR")
 
     model = _load_model_from_dynamodb(model_name)
     is_new_model = model is None
     if is_new_model:
+        logger.info(f"Creating new model: {model_name}")
         model = Model(
             name=model_name,
             model_key="",
@@ -298,6 +300,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             size=len(file_content),
             license="unknown",
         )
+    else:
+        logger.info(f"Updating existing model: {model_name}")
 
     if artifact_type == "model":
         model.model_key = s3_key
@@ -308,13 +312,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         model.dataset_key = s3_key
 
     if is_new_model:
+        logger.info(f"Computing scores for new model: {model_name}")
         model._compute_scores()
 
     try:
         _save_model_to_dynamodb(model)
+        logger.info(f"Saved model to DynamoDB: {model_name}")
     except RuntimeError as e:
+        logger.error(f"DynamoDB save failed: {e}")
         return _error_response(500, str(e), "DYNAMODB_SAVE_ERROR")
 
+    logger.info(f"Successfully processed upload: {model_name}, type: {artifact_type}, s3_key: {s3_key}")
     return _create_response(
         200,
         {
