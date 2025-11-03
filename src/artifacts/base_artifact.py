@@ -132,8 +132,7 @@ class BaseArtifact(ABC):
         # Fetch metadata from external source
         metadata = fetch_artifact_metadata(url, artifact_type)
 
-        # Ensure artifact_type and source_url are set
-        metadata["artifact_type"] = artifact_type
+        # Ensure source_url is set
         metadata["source_url"] = url
 
         # Create artifact using factory method

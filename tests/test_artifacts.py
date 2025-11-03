@@ -222,12 +222,12 @@ class TestFileStorage:
     """Tests for S3 file storage utilities."""
 
     @patch("src.artifacts.utils.file_storage.boto3.client")
-    @patch("src.artifacts.utils.file_storage._download_direct_url")
+    @patch("src.artifacts.utils.file_storage._download_from_huggingface")
     @patch.dict("os.environ", {"ARTIFACTS_BUCKET": "test-bucket"})
-    def test_upload_artifact_to_s3_direct_url(
+    def test_upload_artifact_to_s3_huggingface(
         self, mock_download: MagicMock, mock_boto: MagicMock
     ) -> None:
-        """Test uploading artifact from direct URL."""
+        """Test uploading artifact from HuggingFace URL."""
         from src.artifacts.utils.file_storage import upload_artifact_to_s3
 
         mock_download.return_value = "/tmp/test-file"
@@ -237,7 +237,7 @@ class TestFileStorage:
         upload_artifact_to_s3(
             artifact_id="test-id",
             s3_key="models/test-id",
-            source_url="https://example.com/model.bin",
+            source_url="https://huggingface.co/bert-base-uncased",
         )
 
         mock_s3.upload_file.assert_called_once()
