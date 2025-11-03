@@ -8,8 +8,8 @@ from datetime import datetime
 import uuid
 import os
 
-import boto3
-from botocore.exceptions import ClientError
+import boto3  # type: ignore[import-untyped]
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from src.logger import logger
 
@@ -22,7 +22,6 @@ class BaseArtifact(ABC):
     - Factory method for creating type-specific artifacts
     - Common fields (artifact_id, artifact_type, name, version, etc.)
     - Serialization (to_dict/from_dict)
-    - DynamoDB/S3 integration stubs
     """
 
     # Valid artifact types
@@ -30,10 +29,10 @@ class BaseArtifact(ABC):
 
     def __init__(
         self,
+        artifact_type: str,
+        name: str,
+        source_url: str,
         artifact_id: Optional[str] = None,
-        artifact_type: str = None,
-        name: str = None,
-        source_url: str = None,
         s3_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
@@ -66,7 +65,7 @@ class BaseArtifact(ABC):
         )
 
     @staticmethod
-    def create(artifact_type: str, **kwargs) -> "BaseArtifact":
+    def create(artifact_type: str, **kwargs: Any) -> "BaseArtifact":
         """
         Factory method to create the appropriate artifact subclass.
 

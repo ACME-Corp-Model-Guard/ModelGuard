@@ -6,8 +6,8 @@ Search artifacts by name
 import json
 from typing import Any, Dict, List
 
-import boto3
-from boto3.dynamodb.conditions import Key
+import boto3  # type: ignore[import-untyped]
+from boto3.dynamodb.conditions import Key  # type: ignore[import-untyped]
 from loguru import logger
 
 # DynamoDB Table

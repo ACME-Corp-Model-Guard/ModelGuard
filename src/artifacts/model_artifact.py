@@ -42,9 +42,9 @@ class ModelArtifact(BaseArtifact):
 
     def __init__(
         self,
+        name: str,
+        source_url: str,
         artifact_id: Optional[str] = None,
-        name: str = None,
-        source_url: str = None,
         size: float = 0.0,
         license: str = "unknown",
         s3_key: Optional[str] = None,

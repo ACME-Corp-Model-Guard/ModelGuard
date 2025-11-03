@@ -18,9 +18,9 @@ class CodeArtifact(BaseArtifact):
 
     def __init__(
         self,
+        name: str,
+        source_url: str,
         artifact_id: Optional[str] = None,
-        name: str = None,
-        source_url: str = None,
         s3_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
