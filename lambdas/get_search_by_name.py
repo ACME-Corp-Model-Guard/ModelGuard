@@ -79,8 +79,8 @@ def query_artifacts_by_name(name: str) -> List[ArtifactMetadata]:
     """
     try:
         response = table.query(
-            IndexName='NameIndex',  # Specify the GSI
-            KeyConditionExpression=Key("name").eq(name)
+            IndexName="NameIndex",  # Specify the GSI
+            KeyConditionExpression=Key("name").eq(name),
         )
         items = response.get("Items", [])
         artifacts: List[ArtifactMetadata] = []
@@ -94,8 +94,10 @@ def query_artifacts_by_name(name: str) -> List[ArtifactMetadata]:
                 artifacts.append(
                     {
                         "name": item["name"],
-                        "id": item["artifact_id"],  # Map artifact_id to id for API response
-                        "type": artifact_type
+                        "id": item[
+                            "artifact_id"
+                        ],  # Map artifact_id to id for API response
+                        "type": artifact_type,
                     }
                 )
 

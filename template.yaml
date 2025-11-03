@@ -6,7 +6,7 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 15
-    MemorySize: 128
+    MemorySize: 512  # MB of RAM (also sets /tmp to 512MB)
     Environment:
       Variables:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging

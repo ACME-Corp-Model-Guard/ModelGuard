@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Union, Dict
 from .metric import Metric
 
 if TYPE_CHECKING:
-    from ..model import Model
+    from src.artifacts import ModelArtifact
 
 
 class AvailabilityMetric(Metric):
@@ -16,12 +16,12 @@ class AvailabilityMetric(Metric):
     S3 and SageMaker/Bedrock integration is available.
     """
 
-    def score(self, model: Model) -> Union[float, Dict[str, float]]:
+    def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Score model availability.
 
         Args:
-            model: The Model object to score
+            model: The ModelArtifact object to score
 
         Returns:
             Availability score as a dictionary

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Union, Dict
 
 if TYPE_CHECKING:
-    from ..model import Model
+    from src.artifacts import ModelArtifact
 
 
 class Metric(ABC):
@@ -14,12 +14,12 @@ class Metric(ABC):
     """
 
     @abstractmethod
-    def score(self, model: Model) -> Union[float, Dict[str, float]]:
+    def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Score a model and return the result.
 
         Args:
-            model: The Model object to score
+            model: The ModelArtifact object to score
 
         Returns:
             Either a float score or a dictionary of scores
