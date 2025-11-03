@@ -16,7 +16,7 @@ except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
 
-from src.model import Model
+from src.model import Model  # type: ignore[import-not-found]
 from src.logger import logger
 from src.artifacts import BaseArtifact
 from src.artifacts.utils.file_storage import upload_artifact_to_s3

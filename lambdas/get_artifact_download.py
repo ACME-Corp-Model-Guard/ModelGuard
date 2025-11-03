@@ -15,7 +15,7 @@ except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
 
-from src.model import Model
+from src.model import Model  # type: ignore[import-not-found]
 from src.logger import logger
 
 # Environment variables
