@@ -10,14 +10,18 @@ import uuid
 from typing import Any, Dict, Optional
 
 try:
-    import boto3
+    import boto3  # type: ignore
     from botocore.exceptions import ClientError
 except ImportError:
-    boto3 = None
-    ClientError = Exception
+    boto3 = None  # type: ignore[assignment]
+    ClientError = Exception  # type: ignore[assignment, misc]
 
 from src.model import Model
 from src.logger import logger
+from src.artifacts import BaseArtifact
+from src.artifacts.utils.file_storage import upload_artifact_to_s3
+from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
+from src.artifacts.utils.api_ingestion import IngestionError
 
 # Environment variables
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
@@ -29,15 +33,15 @@ s3_client = None
 dynamodb_client = None
 
 
-def _get_aws_clients():
+def _get_aws_clients() -> tuple[Any, Any]:
     """Initialize AWS clients if boto3 is available."""
     global s3_client, dynamodb_client
     if boto3 is None:
-        return None, None
+        return None, None  # type: ignore[return-value]
     if s3_client is None:
-        s3_client = boto3.client("s3", region_name=AWS_REGION)
+        s3_client = boto3.client("s3", region_name=AWS_REGION)  # type: ignore
     if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)
+        dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)  # type: ignore
     return s3_client, dynamodb_client
 
 
@@ -60,7 +64,9 @@ def _create_response(
     }
 
 
-def _error_response(status_code: int, message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
+def _error_response(
+    status_code: int, message: str, error_code: Optional[str] = None
+) -> Dict[str, Any]:
     """Create an error response."""
     body = {"error": message}
     if error_code:
@@ -72,7 +78,9 @@ def _parse_body(event: Dict[str, Any]) -> tuple[bytes, Optional[str]]:
     """Parse the request body from API Gateway event."""
     body = event.get("body", "")
     is_base64 = event.get("isBase64Encoded", False)
-    content_type = event.get("headers", {}).get("content-type", event.get("headers", {}).get("Content-Type", ""))
+    content_type = event.get("headers", {}).get(
+        "content-type", event.get("headers", {}).get("Content-Type", "")
+    )
 
     if is_base64 and body:
         try:
@@ -92,20 +100,20 @@ def _parse_multipart_form_data(body: bytes, content_type: str) -> Dict[str, Any]
 
     try:
         boundary = None
-        for part in content_type.split(";"):
-            part = part.strip()
-            if part.startswith("boundary="):
-                boundary = part.split("=", 1)[1].strip('"')
+        for content_part in content_type.split(";"):
+            content_part = content_part.strip()
+            if content_part.startswith("boundary="):
+                boundary = content_part.split("=", 1)[1].strip('"')
                 break
 
         if not boundary:
             return {}
 
         parts = body.split(f"--{boundary}".encode())
-        result = {"fields": {}, "files": {}}
+        result: Dict[str, Any] = {"fields": {}, "files": {}}
 
-        for part in parts[1:-1]:
-            part = part.strip()
+        for part_raw in parts[1:-1]:
+            part: bytes = part_raw.strip()
             if not part:
                 continue
 
@@ -134,7 +142,9 @@ def _parse_multipart_form_data(body: bytes, content_type: str) -> Dict[str, Any]
                 if filename:
                     result["files"][name] = {"filename": filename, "content": data}
                 else:
-                    result["fields"][name] = data.decode("utf-8", errors="ignore").strip()
+                    result["fields"][name] = data.decode(
+                        "utf-8", errors="ignore"
+                    ).strip()
 
         return result
     except Exception:
@@ -142,7 +152,10 @@ def _parse_multipart_form_data(body: bytes, content_type: str) -> Dict[str, Any]
 
 
 def _upload_to_s3(
-    artifact_type: str, model_name: str, file_content: bytes, filename: Optional[str] = None
+    artifact_type: str,
+    model_name: str,
+    file_content: bytes,
+    filename: Optional[str] = None,
 ) -> str:
     """Upload artifact file to S3."""
     s3_client, _ = _get_aws_clients()
@@ -170,7 +183,9 @@ def _save_model_to_dynamodb(model: Model) -> None:
     """Save model metadata to DynamoDB."""
     _, dynamodb = _get_aws_clients()
     if dynamodb is None:
-        raise RuntimeError("DynamoDB client not available. boto3 required for DynamoDB operations.")
+        raise RuntimeError(
+            "DynamoDB client not available. boto3 required for DynamoDB operations."
+        )
 
     model_dict = model.to_dict()
 
@@ -191,12 +206,81 @@ def _save_model_to_dynamodb(model: Model) -> None:
         dynamodb_item["scores"] = {"S": json.dumps(model_dict["scores"])}
 
     if model_dict.get("scores_latency"):
-        dynamodb_item["scores_latency"] = {"S": json.dumps(model_dict["scores_latency"])}
+        dynamodb_item["scores_latency"] = {
+            "S": json.dumps(model_dict["scores_latency"])
+        }
 
     try:
         dynamodb.put_item(TableName=DYNAMODB_TABLE, Item=dynamodb_item)
     except ClientError as e:
         raise RuntimeError(f"Failed to save to DynamoDB: {str(e)}")
+
+
+def _handle_url_ingestion(artifact_type: str, url: str) -> Dict[str, Any]:
+    """
+    Handle URL-based artifact ingestion using the new artifact system.
+
+    Args:
+        artifact_type: One of 'model', 'dataset', 'code'
+        url: URL to artifact (HuggingFace or GitHub)
+
+    Returns:
+        API Gateway response with artifact metadata
+    """
+    try:
+        logger.info(f"Creating {artifact_type} artifact from URL: {url}")
+
+        # Create artifact from URL (fetches metadata automatically)
+        artifact = BaseArtifact.from_url(url, artifact_type)
+
+        logger.info(f"Created artifact: {artifact.artifact_id}, name: {artifact.name}")
+
+        # Upload artifact file to S3 (downloads from source and uploads)
+        try:
+            upload_artifact_to_s3(artifact.artifact_id, artifact.s3_key, url)
+            logger.info(f"Successfully uploaded artifact {artifact.artifact_id} to S3")
+        except Exception as e:
+            logger.error(f"Failed to upload artifact to S3: {e}", exc_info=True)
+            return _error_response(
+                500, f"Failed to upload artifact: {str(e)}", "S3_UPLOAD_ERROR"
+            )
+
+        # Save artifact metadata to DynamoDB
+        try:
+            save_artifact_to_dynamodb(artifact.to_dict())
+            logger.info(
+                f"Successfully saved artifact {artifact.artifact_id} to DynamoDB"
+            )
+        except Exception as e:
+            logger.error(f"Failed to save artifact to DynamoDB: {e}", exc_info=True)
+            return _error_response(
+                500, f"Failed to save artifact: {str(e)}", "DYNAMODB_SAVE_ERROR"
+            )
+
+        logger.info(
+            f"Successfully ingested {artifact_type} artifact from URL: {artifact.artifact_id}"
+        )
+
+        return _create_response(
+            200,
+            {
+                "message": "Artifact ingested successfully from URL",
+                "artifact_type": artifact_type,
+                "artifact_id": artifact.artifact_id,
+                "name": artifact.name,
+                "s3_key": artifact.s3_key,
+                "artifact": artifact.to_dict(),
+            },
+        )
+
+    except IngestionError as e:
+        logger.error(f"Artifact ingestion failed: {e}", exc_info=True)
+        return _error_response(
+            400, f"Failed to ingest artifact: {str(e)}", "INGESTION_ERROR"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during artifact ingestion: {e}", exc_info=True)
+        return _error_response(500, f"Unexpected error: {str(e)}", "INTERNAL_ERROR")
 
 
 def _load_model_from_dynamodb(model_name: str) -> Optional[Model]:
@@ -243,14 +327,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Uploads artifacts (model, code, or dataset) to S3 and updates model metadata in DynamoDB.
     """
     path_params = event.get("pathParameters") or {}
-    logger.info(f"Processing POST /artifact/{path_params.get('artifact_type', 'unknown')}")
+    logger.info(
+        f"Processing POST /artifact/{path_params.get('artifact_type', 'unknown')}"
+    )
     artifact_type = path_params.get("artifact_type", "").lower()
 
     valid_types = {"model", "code", "dataset"}
     if artifact_type not in valid_types:
         logger.warning(f"Invalid artifact_type: {artifact_type}")
         return _error_response(
-            400, f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}", "INVALID_ARTIFACT_TYPE"
+            400,
+            f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}",
+            "INVALID_ARTIFACT_TYPE",
         )
 
     body_bytes, content_type = _parse_body(event)
@@ -258,6 +346,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         logger.warning("Request body is missing")
         return _error_response(400, "Request body is required", "MISSING_BODY")
 
+    # Check if this is a URL-based ingestion (JSON body with 'url' field)
+    try:
+        if content_type and "application/json" in content_type:
+            body_json = json.loads(body_bytes.decode("utf-8"))
+            if "url" in body_json:
+                logger.info(
+                    f"Processing URL-based ingestion for {artifact_type}: {body_json['url']}"
+                )
+                return _handle_url_ingestion(artifact_type, body_json["url"])
+    except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+        # Not JSON or missing url field, treat as file upload
+        pass
+
+    # Handle file upload (multipart/form-data)
+    logger.info(f"Processing file upload for {artifact_type}")
     model_name = None
     file_content = body_bytes
     filename = None
@@ -303,6 +406,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     else:
         logger.info(f"Updating existing model: {model_name}")
 
+    # Type narrowing: model is guaranteed to be Model here
+    assert model is not None, "Model should not be None at this point"
+
     if artifact_type == "model":
         model.model_key = s3_key
         model.size = len(file_content)
@@ -322,7 +428,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         logger.error(f"DynamoDB save failed: {e}")
         return _error_response(500, str(e), "DYNAMODB_SAVE_ERROR")
 
-    logger.info(f"Successfully processed upload: {model_name}, type: {artifact_type}, s3_key: {s3_key}")
+    logger.info(
+        f"Successfully processed upload: {model_name}, type: {artifact_type}, s3_key: {s3_key}"
+    )
     return _create_response(
         200,
         {

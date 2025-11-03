@@ -9,11 +9,11 @@ import os
 from typing import Any, Dict, Optional, Tuple
 
 try:
-    import boto3
+    import boto3  # type: ignore
     from botocore.exceptions import ClientError
 except ImportError:
-    boto3 = None
-    ClientError = Exception
+    boto3 = None  # type: ignore[assignment]
+    ClientError = Exception  # type: ignore[assignment, misc]
 
 from src.model import Model
 from src.logger import logger
@@ -28,15 +28,15 @@ s3_client = None
 dynamodb_client = None
 
 
-def _get_aws_clients():
+def _get_aws_clients() -> Tuple[Any, Any]:
     """Initialize AWS clients if boto3 is available."""
     global s3_client, dynamodb_client
     if boto3 is None:
-        return None, None
+        return None, None  # type: ignore[return-value]
     if s3_client is None:
-        s3_client = boto3.client("s3", region_name=AWS_REGION)
+        s3_client = boto3.client("s3", region_name=AWS_REGION)  # type: ignore
     if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)
+        dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)  # type: ignore
     return s3_client, dynamodb_client
 
 
@@ -59,7 +59,9 @@ def _create_response(
     }
 
 
-def _error_response(status_code: int, message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
+def _error_response(
+    status_code: int, message: str, error_code: Optional[str] = None
+) -> Dict[str, Any]:
     """Create an error response."""
     body = {"error": message}
     if error_code:
@@ -68,7 +70,10 @@ def _error_response(status_code: int, message: str, error_code: Optional[str] = 
 
 
 def _create_binary_response(
-    status_code: int, body: bytes, content_type: str = "application/octet-stream", headers: Optional[Dict[str, str]] = None
+    status_code: int,
+    body: bytes,
+    content_type: str = "application/octet-stream",
+    headers: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Create a standardized API Gateway response with binary body."""
     default_headers = {
@@ -152,29 +157,39 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Retrieves artifacts (model, code, or dataset) from S3 based on model ID.
     """
     path_params = event.get("pathParameters") or {}
-    logger.info(f"Processing GET /artifacts/{path_params.get('artifact_type', 'unknown')}/{path_params.get('id', 'unknown')}")
+    logger.info(
+        f"Processing GET /artifacts/{path_params.get('artifact_type', 'unknown')}/{path_params.get('id', 'unknown')}"
+    )
     artifact_type = path_params.get("artifact_type", "").lower()
     artifact_id = path_params.get("id", "")
 
     valid_types = {"model", "code", "dataset"}
     if artifact_type not in valid_types:
         return _error_response(
-            400, f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}", "INVALID_ARTIFACT_TYPE"
+            400,
+            f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}",
+            "INVALID_ARTIFACT_TYPE",
         )
 
     if not artifact_id:
         return _error_response(400, "Artifact ID is required", "MISSING_ID")
 
     query_params = event.get("queryStringParameters") or {}
-    metadata_only = query_params.get("metadata_only", "").lower() in ("true", "1", "yes")
-    
+    metadata_only = query_params.get("metadata_only", "").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     if metadata_only:
         logger.info(f"Requesting metadata only for {artifact_id}")
 
     model = _load_model_from_dynamodb(artifact_id)
     if model is None:
         logger.warning(f"Model not found: {artifact_id}")
-        return _error_response(404, f"Model not found: {artifact_id}", "MODEL_NOT_FOUND")
+        return _error_response(
+            404, f"Model not found: {artifact_id}", "MODEL_NOT_FOUND"
+        )
 
     s3_key = None
     if artifact_type == "model":
@@ -187,7 +202,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if not s3_key:
         logger.warning(f"{artifact_type} artifact not found for model: {artifact_id}")
         return _error_response(
-            404, f"{artifact_type.capitalize()} artifact not found for model: {artifact_id}", "ARTIFACT_NOT_FOUND"
+            404,
+            f"{artifact_type.capitalize()} artifact not found for model: {artifact_id}",
+            "ARTIFACT_NOT_FOUND",
         )
 
     if metadata_only:
@@ -224,7 +241,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             ".csv": "text/csv",
             ".txt": "text/plain",
         }
-        content_type = content_type_map.get(file_ext, content_type or "application/octet-stream")
+        content_type = content_type_map.get(
+            file_ext, content_type or "application/octet-stream"
+        )
 
-    logger.info(f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type}, size: {len(file_content)} bytes")
+    logger.info(
+        f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type}, size: {len(file_content)} bytes"
+    )
     return _create_binary_response(200, file_content, content_type)
