@@ -7,8 +7,8 @@ import os
 import tempfile
 import subprocess
 import requests
-import boto3
-from botocore.exceptions import ClientError
+import boto3  # type: ignore[import-untyped]
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 from typing import Optional
 
 from src.logger import logger
@@ -38,7 +38,7 @@ def _download_from_huggingface(source_url: str, artifact_id: str) -> str:
     logger.info(f"Downloading artifact {artifact_id} from HuggingFace: {source_url}")
 
     try:
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
 
         # Parse model ID from URL
         parts = source_url.rstrip("/").split("huggingface.co/")

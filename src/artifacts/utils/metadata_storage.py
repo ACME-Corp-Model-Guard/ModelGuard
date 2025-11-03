@@ -3,8 +3,8 @@ DynamoDB storage utilities for artifact metadata.
 """
 
 import os
-import boto3
-from botocore.exceptions import ClientError
+import boto3  # type: ignore[import-untyped]
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 from typing import Dict, Any
 
 from src.logger import logger

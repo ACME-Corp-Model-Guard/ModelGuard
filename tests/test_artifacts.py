@@ -16,7 +16,7 @@ from src.artifacts import (
 class TestBaseArtifact:
     """Tests for BaseArtifact factory and serialization."""
 
-    def test_create_model_artifact(self):
+    def test_create_model_artifact(self) -> None:
         """Test factory creates ModelArtifact."""
         artifact = BaseArtifact.create(
             artifact_type="model",
@@ -28,7 +28,7 @@ class TestBaseArtifact:
         assert artifact.name == "test-model"
         assert artifact.source_url == "https://example.com/model"
 
-    def test_create_dataset_artifact(self):
+    def test_create_dataset_artifact(self) -> None:
         """Test factory creates DatasetArtifact."""
         artifact = BaseArtifact.create(
             artifact_type="dataset",
@@ -38,7 +38,7 @@ class TestBaseArtifact:
         assert isinstance(artifact, DatasetArtifact)
         assert artifact.artifact_type == "dataset"
 
-    def test_create_code_artifact(self):
+    def test_create_code_artifact(self) -> None:
         """Test factory creates CodeArtifact."""
         artifact = BaseArtifact.create(
             artifact_type="code",
@@ -48,14 +48,14 @@ class TestBaseArtifact:
         assert isinstance(artifact, CodeArtifact)
         assert artifact.artifact_type == "code"
 
-    def test_invalid_artifact_type(self):
+    def test_invalid_artifact_type(self) -> None:
         """Test invalid artifact type raises error."""
         with pytest.raises(ValueError, match="Invalid artifact_type"):
             BaseArtifact.create(
                 artifact_type="invalid", name="test", source_url="https://example.com"
             )
 
-    def test_to_dict_includes_source_url(self):
+    def test_to_dict_includes_source_url(self) -> None:
         """Test serialization includes source_url."""
         artifact = BaseArtifact.create(
             artifact_type="code", name="test", source_url="https://github.com/test/repo"
@@ -69,7 +69,7 @@ class TestBaseArtifact:
 class TestModelArtifact:
     """Tests for ModelArtifact."""
 
-    def test_model_artifact_creation(self):
+    def test_model_artifact_creation(self) -> None:
         """Test ModelArtifact initialization."""
         model = ModelArtifact(
             name="bert-base",
@@ -83,7 +83,7 @@ class TestModelArtifact:
         assert model.license == "apache-2.0"
         assert model.artifact_type == "model"
 
-    def test_model_to_dict(self):
+    def test_model_to_dict(self) -> None:
         """Test ModelArtifact serialization."""
         model = ModelArtifact(
             name="test-model",
@@ -102,7 +102,7 @@ class TestFromURL:
     """Tests for from_url class method."""
 
     @patch("src.artifacts.utils.api_ingestion.fetch_artifact_metadata")
-    def test_from_url_creates_artifact(self, mock_fetch):
+    def test_from_url_creates_artifact(self, mock_fetch: MagicMock) -> None:
         """Test from_url creates artifact with metadata."""
         mock_fetch.return_value = {
             "name": "bert-base-uncased",
@@ -121,7 +121,7 @@ class TestFromURL:
         mock_fetch.assert_called_once()
 
     @patch("src.artifacts.utils.api_ingestion.fetch_artifact_metadata")
-    def test_from_url_sets_source_url(self, mock_fetch):
+    def test_from_url_sets_source_url(self, mock_fetch: MagicMock) -> None:
         """Test from_url stores source URL."""
         mock_fetch.return_value = {"name": "test"}
 
@@ -135,7 +135,7 @@ class TestAPIIngestion:
     """Tests for API ingestion utilities."""
 
     @patch("src.artifacts.utils.api_ingestion.requests.get")
-    def test_fetch_huggingface_model_metadata(self, mock_get):
+    def test_fetch_huggingface_model_metadata(self, mock_get: MagicMock) -> None:
         """Test HuggingFace model metadata fetching."""
         from src.artifacts.utils.api_ingestion import fetch_huggingface_model_metadata
 
@@ -157,7 +157,7 @@ class TestAPIIngestion:
         assert result["license"] == "apache-2.0"
 
     @patch("src.artifacts.utils.api_ingestion.requests.get")
-    def test_fetch_github_code_metadata(self, mock_get):
+    def test_fetch_github_code_metadata(self, mock_get: MagicMock) -> None:
         """Test GitHub repo metadata fetching."""
         from src.artifacts.utils.api_ingestion import fetch_github_code_metadata
 
@@ -178,7 +178,7 @@ class TestAPIIngestion:
         assert result["metadata"]["stars"] == 50000
         assert result["metadata"]["language"] == "Python"
 
-    def test_invalid_url_raises_error(self):
+    def test_invalid_url_raises_error(self) -> None:
         """Test invalid URL raises IngestionError."""
         from src.artifacts.utils.api_ingestion import fetch_artifact_metadata
 
@@ -191,7 +191,7 @@ class TestMetadataStorage:
 
     @patch("src.artifacts.utils.metadata_storage.boto3.resource")
     @patch.dict("os.environ", {"ARTIFACTS_TABLE": "test-table"})
-    def test_save_artifact_to_dynamodb(self, mock_boto):
+    def test_save_artifact_to_dynamodb(self, mock_boto: MagicMock) -> None:
         """Test saving artifact to DynamoDB."""
         from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
 
@@ -209,7 +209,7 @@ class TestMetadataStorage:
 
         mock_table.put_item.assert_called_once_with(Item=artifact_dict)
 
-    def test_save_without_env_var_raises_error(self):
+    def test_save_without_env_var_raises_error(self) -> None:
         """Test saving without ARTIFACTS_TABLE env var raises error."""
         from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
 
@@ -224,7 +224,9 @@ class TestFileStorage:
     @patch("src.artifacts.utils.file_storage.boto3.client")
     @patch("src.artifacts.utils.file_storage._download_direct_url")
     @patch.dict("os.environ", {"ARTIFACTS_BUCKET": "test-bucket"})
-    def test_upload_artifact_to_s3_direct_url(self, mock_download, mock_boto):
+    def test_upload_artifact_to_s3_direct_url(
+        self, mock_download: MagicMock, mock_boto: MagicMock
+    ) -> None:
         """Test uploading artifact from direct URL."""
         from src.artifacts.utils.file_storage import upload_artifact_to_s3
 
@@ -242,7 +244,7 @@ class TestFileStorage:
 
     @patch("src.artifacts.utils.file_storage.boto3.client")
     @patch.dict("os.environ", {"ARTIFACTS_BUCKET": "test-bucket"})
-    def test_download_artifact_from_s3(self, mock_boto):
+    def test_download_artifact_from_s3(self, mock_boto: MagicMock) -> None:
         """Test downloading artifact from S3."""
         from src.artifacts.utils.file_storage import download_artifact_from_s3
 
