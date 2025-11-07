@@ -12,6 +12,7 @@ from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 from typing import Optional
 
 from src.logger import logger
+from .types import ArtifactType
 
 
 class FileDownloadError(Exception):
@@ -20,7 +21,7 @@ class FileDownloadError(Exception):
     pass
 
 
-def _download_from_huggingface(source_url: str, artifact_id: str) -> str:
+def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type: Optional[ArtifactType] = None) -> str:
     """
     Download artifact from HuggingFace Hub.
     Uses huggingface_hub library for proper authentication and caching.
@@ -28,33 +29,41 @@ def _download_from_huggingface(source_url: str, artifact_id: str) -> str:
     Args:
         source_url: HuggingFace URL (e.g., "https://huggingface.co/bert-base-uncased")
         artifact_id: Artifact ID for logging
+        artifact_type: Should be "model" or "dataset", not "code"
 
     Returns:
         Path to downloaded temporary file
 
     Raises:
-        FileDownloadError: If download fails
+        FileDownloadError: If download fails or artifact_type is "code"
     """
     logger.info(f"Downloading artifact {artifact_id} from HuggingFace: {source_url}")
 
+    # Validate artifact type for HuggingFace
+    if artifact_type == "code":
+        logger.error("Cannot download code artifacts from HuggingFace")
+        raise FileDownloadError("Code artifacts should be downloaded from GitHub, not HuggingFace")
+
     try:
-        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+        from huggingface_hub import snapshot_download # type: ignore[import-untyped]
+        from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
 
         # Parse model ID from URL
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
 
-        model_id = parts[1].replace("/tree/", "/").replace("/blob/", "/")
-        # Remove any trailing path after model ID
-        model_id = "/".join(model_id.split("/")[:2])
+        model_id = parts[1]  # Get the part after "huggingface.co/"
+        # Remove any trailing path after model ID (like /tree/main or /blob/main/config.json)
+        model_id = "/".join(model_id.split("/")[:2])  # Keep only owner/repo
 
         logger.debug(f"Parsed HuggingFace model ID: {model_id}")
-
-        # Download entire model snapshot to temp directory
+        
+        # Download with specific error handling
         cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
         snapshot_path = snapshot_download(
             repo_id=model_id,
+            repo_type=artifact_type, # "model" or "dataset"
             cache_dir=cache_dir,
             local_dir=cache_dir,
             local_dir_use_symlinks=False,
@@ -77,6 +86,15 @@ def _download_from_huggingface(source_url: str, artifact_id: str) -> str:
         raise FileDownloadError(
             "huggingface_hub library required for HuggingFace downloads. Install with: pip install huggingface_hub"
         )
+    except RepositoryNotFoundError:
+        logger.error(f"HuggingFace model not found: {model_id}")
+        raise FileDownloadError(f"Model '{model_id}' not found on HuggingFace Hub")
+    except RevisionNotFoundError as e:
+        logger.error(f"HuggingFace model: {model_id} revision not found: {e}")
+        raise FileDownloadError(f"Model: {model_id} revision not found: {e}")
+    except ValueError as e:
+        logger.error(f"ValueError during HuggingFace download: {e}")
+        raise FileDownloadError(f"HuggingFace download failed: {e}")
     except Exception as e:
         logger.error(f"Failed to download from HuggingFace: {e}", exc_info=True)
         raise FileDownloadError(f"HuggingFace download failed: {e}")
@@ -156,7 +174,7 @@ def _download_from_github(source_url: str, artifact_id: str) -> str:
         raise FileDownloadError(f"GitHub download failed: {e}")
 
 
-def upload_artifact_to_s3(artifact_id: str, s3_key: str, source_url: str) -> None:
+def upload_artifact_to_s3(artifact_id: str, artifact_type: ArtifactType, s3_key: str, source_url: str) -> None:
     """
     Download artifact from source URL and upload to S3.
     Automatically detects platform (HuggingFace, GitHub, direct URL) and uses appropriate download method.
@@ -164,6 +182,7 @@ def upload_artifact_to_s3(artifact_id: str, s3_key: str, source_url: str) -> Non
 
     Args:
         artifact_id: Artifact ID for logging
+        artifact_type: One of 'model', 'dataset', 'code'
         s3_key: S3 key to upload to
         source_url: URL to download artifact from
 

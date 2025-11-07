@@ -17,6 +17,8 @@ from .metadata_storage import (
     save_artifact_to_dynamodb,
 )
 
+from .types import ArtifactType
+
 __all__ = [
     "fetch_artifact_metadata",
     "fetch_huggingface_model_metadata",
@@ -26,4 +28,5 @@ __all__ = [
     "upload_artifact_to_s3",
     "download_artifact_from_s3",
     "save_artifact_to_dynamodb",
+    "ArtifactType",
 ]

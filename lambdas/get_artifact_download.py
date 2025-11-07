@@ -21,7 +21,7 @@ from src.logger import logger
 # Environment variables
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
 DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 
 # Initialize AWS clients
 s3_client = None
