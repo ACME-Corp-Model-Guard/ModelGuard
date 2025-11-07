@@ -3,28 +3,46 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 
-export const Route = createFileRoute('/')({ component: Dashboard })
+export const Route = createFileRoute('/')({ component: ProtectedDashboard })
 
-function Dashboard() {
+function ProtectedDashboard() {
+  const auth = useAuth()
+
+  if (auth.isLoading) return <div>Loading...</div>
+  if (auth.error) return <div>Error: {auth.error.message}</div>
+
+  // Redirect to Cognito login if not authenticated
+  if (!auth.isAuthenticated) {
+    auth.signinRedirect()
+    return <div>Redirecting to login...</div>
+  }
+
+  return <Dashboard token={auth.user?.id_token} />
+}
+
+function Dashboard({ token }: { token?: string }) {
   const [modelCount, setModelCount] = useState<number>(0)
   const [artifactCount, setArtifactCount] = useState<number>(0)
   const [healthStatus, setHealthStatus] = useState<string>('Unknown')
 
-  // Example: fetch data from API
   useEffect(() => {
     async function fetchData() {
       try {
-        const healthRes = await fetch('/health')
-        if (healthRes.ok) {
-          setHealthStatus('OK')
-        } else {
-          setHealthStatus('Degraded')
-        }
+        // Health check with token
+        const healthRes = await fetch('/health', {
+          headers: token ? { 'X-Authorization': `Bearer ${token}` } : {},
+        })
+        setHealthStatus(healthRes.ok ? 'OK' : 'Degraded')
 
+        // Fetch artifacts with token
         const artifactsRes = await fetch('/artifacts', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'X-Authorization': `Bearer ${token}` }),
+          },
           body: JSON.stringify([{ name: '*' }]),
         })
         if (artifactsRes.ok) {
@@ -39,7 +57,7 @@ function Dashboard() {
     }
 
     fetchData()
-  }, [])
+  }, [token])
 
   return (
     <div className="p-6 space-y-6">
