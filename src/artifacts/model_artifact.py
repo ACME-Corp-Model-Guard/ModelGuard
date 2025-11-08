@@ -115,7 +115,7 @@ class ModelArtifact(BaseArtifact):
         scores: Dict[str, Union[float, Dict[str, float]]] = {}
         latencies: Dict[str, float] = {}
 
-        def run_metric(metric):
+        def run_metric(metric: _metrics.Metric) -> tuple[str, float | dict[str, float], float]:
             metric_name = metric.__class__.__name__.replace("Metric", "")
             t0 = time.perf_counter()
             try:
