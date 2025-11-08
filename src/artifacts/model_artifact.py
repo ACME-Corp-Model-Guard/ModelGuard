@@ -2,17 +2,17 @@
 Model artifact class with scoring functionality.
 """
 
-from typing import Dict, Any, Optional, Union
-from datetime import datetime
+import concurrent.futures
 import time
-
-from .base_artifact import BaseArtifact
-from src.metrics.net_score import calculate_net_score
-from src.logger import logger
+import traceback
+from typing import Any, Dict, Optional, Union
 
 # Import metrics module to access METRICS list
 from src import metrics as _metrics
+from src.logger import logger
+from src.metrics.net_score import calculate_net_score
 
+from .base_artifact import BaseArtifact
 
 # Static list of all metrics to run on model artifacts
 METRICS: list[_metrics.Metric] = [
@@ -104,49 +104,50 @@ class ModelArtifact(BaseArtifact):
 
     def _compute_scores(self) -> None:
         """
-        Populate scores and scores_latency by running each metric once.
-        Iterates the static METRICS list and times each metric.score() call.
+        Populate scores and scores_latency by running each metric in parallel.
 
-        Note: Metrics expect a Model object, but we're transitioning to ModelArtifact.
-        For now, we'll pass self and assume metrics will be updated to handle ModelArtifact.
+        Uses ThreadPoolExecutor since metrics may involve I/O (HTTP, S3, etc.).
+        Falls back gracefully if any metric raises an exception.
         """
-        logger.info(f"Computing scores for model artifact: {self.artifact_id}")
+        logger.info(f"Computing scores (parallel) for model artifact: {self.artifact_id}")
         scores: Dict[str, Union[float, Dict[str, float]]] = {}
         latencies: Dict[str, float] = {}
 
-        for metric in METRICS:
+        def run_metric(metric):
             metric_name = metric.__class__.__name__.replace("Metric", "")
             t0 = time.perf_counter()
             try:
-                # Pass self (ModelArtifact) to metric.score()
-                # Metrics will need to be updated to handle ModelArtifact instead of Model
                 value = metric.score(self)
                 elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                logger.debug(f"[{metric_name}] scored {value} in {elapsed_ms:.2f}ms")
+                return metric_name, value, elapsed_ms
+            except Exception as e:
+                logger.error(
+                    f"Metric {metric_name} failed for artifact {self.artifact_id}: {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+                return metric_name, 0.0, 0.0
 
+        # Run all metrics concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(METRICS))) as executor:
+            futures = {executor.submit(run_metric, m): m for m in METRICS}
+            for future in concurrent.futures.as_completed(futures):
+                metric_name, value, elapsed_ms = future.result()
                 scores[metric_name] = value
                 latencies[metric_name] = elapsed_ms
-                logger.debug(
-                    f"Metric {metric_name} scored {value} in {elapsed_ms:.2f}ms"
-                )
-            except Exception as e:
-                # If metric fails, store error and continue
-                scores[metric_name] = 0.0
-                latencies[metric_name] = 0.0
-                logger.error(
-                    f"Metric {metric_name} failed for artifact {self.artifact_id}: {e}",
-                    exc_info=True,
-                )
+
+        # Compute NetScore (sequential, depends on other scores)
+        t0 = time.perf_counter()
+        scores["NetScore"] = calculate_net_score(scores)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        latencies["NetScore"] = elapsed_ms
 
         self.scores = scores
         self.scores_latency = latencies
 
-        # Calculate NetScore separately
-        t0 = time.perf_counter()
-        self.scores["NetScore"] = calculate_net_score(self.scores)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
-        self.scores_latency["NetScore"] = elapsed_ms
         logger.info(
-            f"Computed NetScore {self.scores['NetScore']:.3f} for artifact {self.artifact_id}"
+            f"Computed NetScore {self.scores['NetScore']:.3f} for artifact {self.artifact_id} "
+            f"({len(METRICS)} metrics in parallel)"
         )
 
     def to_dict(self) -> Dict[str, Any]:
