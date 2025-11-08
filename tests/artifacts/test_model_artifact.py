@@ -8,6 +8,7 @@ from src.artifacts.model_artifact import ModelArtifact
 @pytest.fixture
 def mock_metric_class():
     """Create a dummy metric with a .score() method."""
+
     class DummyMetric:
         def __init__(self, name="DummyMetric", value=1.0):
             self._name = name
