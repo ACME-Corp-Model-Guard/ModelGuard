@@ -2,9 +2,6 @@
 S3 storage utilities for artifact files.
 Handles platform-specific download mechanisms (HuggingFace, GitHub, direct URLs).
 
-TODO: For model downloads, we need to support both:
-1. Download locally to Lambda for processing/analysis
-2. Generate presigned URLs for API users to download directly from S3
 """
 
 import os
@@ -25,7 +22,9 @@ class FileDownloadError(Exception):
     pass
 
 
-def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type: ArtifactType) -> str:
+def _download_from_huggingface(
+    source_url: str, artifact_id: str, artifact_type: ArtifactType
+) -> str:
     """
     Download artifact from HuggingFace Hub.
     Uses huggingface_hub library for proper authentication and caching.
@@ -46,12 +45,23 @@ def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type:
     # Validate artifact type for HuggingFace
     if artifact_type == "code":
         logger.error("Cannot download code artifacts from HuggingFace")
-        raise FileDownloadError("Code artifacts should be downloaded from GitHub, not HuggingFace")
+        raise FileDownloadError(
+            "Code artifacts should be downloaded from GitHub, not HuggingFace"
+        )
 
     cache_dir = None
     try:
-        from huggingface_hub import snapshot_download # type: ignore[import-untyped]
-        from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found,import-untyped]
+
+        try:
+            from huggingface_hub.errors import (  # type: ignore[import-not-found,import-untyped]
+                RepositoryNotFoundError,
+                RevisionNotFoundError,
+            )
+        except ImportError:
+            # Fallback for older versions or missing stubs
+            RepositoryNotFoundError = Exception  # type: ignore[assignment,misc]
+            RevisionNotFoundError = Exception  # type: ignore[assignment,misc]
 
         # Parse model ID from URL
         parts = source_url.rstrip("/").split("huggingface.co/")
@@ -63,12 +73,12 @@ def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type:
         model_id = "/".join(model_id.split("/")[:2])  # Keep only owner/repo
 
         logger.debug(f"Parsed HuggingFace model ID: {model_id}")
-        
+
         # Download with specific error handling
         cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
         snapshot_path = snapshot_download(
             repo_id=model_id,
-            repo_type=artifact_type, # "model" or "dataset"
+            repo_type=artifact_type,  # "model" or "dataset"
             cache_dir=cache_dir,
             local_dir=cache_dir,
             local_dir_use_symlinks=False,
@@ -76,12 +86,15 @@ def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type:
 
         # Create a tar archive of the snapshot
         import tarfile
+
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
-        
+
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(snapshot_path, arcname=os.path.basename(snapshot_path))
 
-        logger.info(f"Successfully downloaded HuggingFace artifact {artifact_id} to {tar_path}")
+        logger.info(
+            f"Successfully downloaded HuggingFace artifact {artifact_id} to {tar_path}"
+        )
         return tar_path
 
     except ImportError:
@@ -106,13 +119,18 @@ def _download_from_huggingface(source_url: str, artifact_id: str, artifact_type:
         if cache_dir and os.path.exists(cache_dir):
             try:
                 import shutil
+
                 shutil.rmtree(cache_dir)
                 logger.debug(f"Cleaned up HuggingFace cache directory: {cache_dir}")
             except Exception as cleanup_error:
-                logger.warning(f"Failed to clean up cache directory {cache_dir}: {cleanup_error}")
+                logger.warning(
+                    f"Failed to clean up cache directory {cache_dir}: {cleanup_error}"
+                )
 
 
-def _download_from_github(source_url: str, artifact_id: str, artifact_type: ArtifactType) -> str:
+def _download_from_github(
+    source_url: str, artifact_id: str, artifact_type: ArtifactType
+) -> str:
     """
     Download artifact from GitHub.
     Clones the repository and creates a tar archive.
@@ -168,22 +186,27 @@ def _download_from_github(source_url: str, artifact_id: str, artifact_type: Arti
 
         # Create tar archive directly from clone
         import tarfile
+
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
-        
+
         with tarfile.open(tar_path, "w:gz") as tar:
             # Add files but exclude .git directory for efficiency
             for root, dirs, files in os.walk(clone_path):
                 # Skip .git directory entirely
-                if '.git' in dirs:
-                    dirs.remove('.git')
-                
+                if ".git" in dirs:
+                    dirs.remove(".git")
+
                 for file in files:
                     file_path = os.path.join(root, file)
                     # Calculate archive name relative to clone_path
-                    archive_name = os.path.join(repo, os.path.relpath(file_path, clone_path))
+                    archive_name = os.path.join(
+                        repo, os.path.relpath(file_path, clone_path)
+                    )
                     tar.add(file_path, arcname=archive_name)
 
-        logger.info(f"Successfully downloaded GitHub artifact {artifact_id} to {tar_path}")
+        logger.info(
+            f"Successfully downloaded GitHub artifact {artifact_id} to {tar_path}"
+        )
         return tar_path
 
     except subprocess.TimeoutExpired:
@@ -197,13 +220,18 @@ def _download_from_github(source_url: str, artifact_id: str, artifact_type: Arti
         if temp_dir and os.path.exists(temp_dir):
             try:
                 import shutil
+
                 shutil.rmtree(temp_dir)
                 logger.debug(f"Cleaned up temp directory: {temp_dir}")
             except Exception as cleanup_error:
-                logger.warning(f"Failed to clean up temp directory {temp_dir}: {cleanup_error}")
+                logger.warning(
+                    f"Failed to clean up temp directory {temp_dir}: {cleanup_error}"
+                )
 
 
-def upload_artifact_to_s3(artifact_id: str, artifact_type: ArtifactType, s3_key: str, source_url: str) -> None:
+def upload_artifact_to_s3(
+    artifact_id: str, artifact_type: ArtifactType, s3_key: str, source_url: str
+) -> None:
     """
     Download artifact from source URL and upload to S3.
     Automatically detects platform (HuggingFace, GitHub, direct URL) and uses appropriate download method.
@@ -230,13 +258,16 @@ def upload_artifact_to_s3(artifact_id: str, artifact_type: ArtifactType, s3_key:
     try:
         # Detect platform and download
         if "huggingface.co" in source_url:
-            tmp_path = _download_from_huggingface(source_url, artifact_id, artifact_type)
+            tmp_path = _download_from_huggingface(
+                source_url, artifact_id, artifact_type
+            )
         elif "github.com" in source_url:
             tmp_path = _download_from_github(source_url, artifact_id, artifact_type)
         else:
-            # TODO: Add support for direct URL downloads (HTTP/HTTPS)
             logger.error(f"Unsupported source URL: {source_url}")
-            raise FileDownloadError(f"Unsupported source URL format: {source_url}. Only HuggingFace and GitHub URLs are supported.")
+            raise FileDownloadError(
+                f"Unsupported source URL format: {source_url}. Only HuggingFace and GitHub URLs are supported."
+            )
 
         logger.debug(f"Uploading artifact {artifact_id} to s3://{bucket_name}/{s3_key}")
 
@@ -299,19 +330,21 @@ def download_artifact_from_s3(artifact_id: str, s3_key: str, local_path: str) ->
         raise
 
 
-def generate_s3_download_url(artifact_id: str, s3_key: str, expiration: int = 3600) -> str:
+def generate_s3_download_url(
+    artifact_id: str, s3_key: str, expiration: int = 3600
+) -> str:
     """
     Generate a presigned URL for downloading an artifact from S3.
     This allows API users to download artifacts directly without going through Lambda.
-    
+
     Args:
         artifact_id: Artifact ID for logging
         s3_key: S3 key to generate URL for
         expiration: URL expiration time in seconds (default: 1 hour)
-    
+
     Returns:
         Presigned URL string
-        
+
     Raises:
         ValueError: If ARTIFACTS_BUCKET env var not set
         ClientError: If presigned URL generation fails
@@ -321,17 +354,24 @@ def generate_s3_download_url(artifact_id: str, s3_key: str, expiration: int = 36
         logger.error("ARTIFACTS_BUCKET env var not set")
         raise ValueError("ARTIFACTS_BUCKET env var must be set")
 
-    logger.debug(f"Generating download URL for artifact {artifact_id}: s3://{bucket_name}/{s3_key}")
+    logger.debug(
+        f"Generating download URL for artifact {artifact_id}: s3://{bucket_name}/{s3_key}"
+    )
 
     try:
         s3 = boto3.client("s3")
         presigned_url = s3.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': bucket_name, 'Key': s3_key},
-            ExpiresIn=expiration
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": s3_key},
+            ExpiresIn=expiration,
         )
-        logger.info(f"Generated presigned URL for artifact {artifact_id} (expires in {expiration}s)")
+        logger.info(
+            f"Generated presigned URL for artifact {artifact_id} (expires in {expiration}s)"
+        )
         return presigned_url
     except ClientError as e:
-        logger.error(f"Failed to generate presigned URL for artifact {artifact_id}: {e}", exc_info=True)
+        logger.error(
+            f"Failed to generate presigned URL for artifact {artifact_id}: {e}",
+            exc_info=True,
+        )
         raise

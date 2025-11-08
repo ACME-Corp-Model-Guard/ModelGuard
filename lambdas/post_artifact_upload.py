@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 
 try:
     import boto3  # type: ignore
-    from botocore.exceptions import ClientError
+    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
@@ -19,6 +19,7 @@ except ImportError:
 from src.model import Model  # type: ignore[import-not-found]
 from src.logger import logger
 from src.artifacts import BaseArtifact
+from src.artifacts.utils.types import ArtifactType
 from src.artifacts.utils.file_storage import upload_artifact_to_s3
 from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
 from src.artifacts.utils.api_ingestion import IngestionError
@@ -216,7 +217,7 @@ def _save_model_to_dynamodb(model: Model) -> None:
         raise RuntimeError(f"Failed to save to DynamoDB: {str(e)}")
 
 
-def _handle_url_ingestion(artifact_type: str, url: str) -> Dict[str, Any]:
+def _handle_url_ingestion(artifact_type: ArtifactType, url: str) -> Dict[str, Any]:
     """
     Handle URL-based artifact ingestion using the new artifact system.
 
@@ -237,7 +238,9 @@ def _handle_url_ingestion(artifact_type: str, url: str) -> Dict[str, Any]:
 
         # Upload artifact file to S3 (downloads from source and uploads)
         try:
-            upload_artifact_to_s3(artifact.artifact_id, artifact.s3_key, url)
+            upload_artifact_to_s3(
+                artifact.artifact_id, artifact_type, artifact.s3_key, url
+            )
             logger.info(f"Successfully uploaded artifact {artifact.artifact_id} to S3")
         except Exception as e:
             logger.error(f"Failed to upload artifact to S3: {e}", exc_info=True)
@@ -330,16 +333,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     logger.info(
         f"Processing POST /artifact/{path_params.get('artifact_type', 'unknown')}"
     )
-    artifact_type = path_params.get("artifact_type", "").lower()
+    artifact_type_str = path_params.get("artifact_type", "").lower()
 
     valid_types = {"model", "code", "dataset"}
-    if artifact_type not in valid_types:
-        logger.warning(f"Invalid artifact_type: {artifact_type}")
+    if artifact_type_str not in valid_types:
+        logger.warning(f"Invalid artifact_type: {artifact_type_str}")
         return _error_response(
             400,
             f"Invalid artifact_type. Must be one of: {', '.join(valid_types)}",
             "INVALID_ARTIFACT_TYPE",
         )
+
+    # Cast to proper type after validation
+    artifact_type: ArtifactType = artifact_type_str  # type: ignore[assignment]
 
     body_bytes, content_type = _parse_body(event)
     if not body_bytes:
