@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'ModelGuard MVP - Core Artifact Management API'
 
+Parameters:
+  DeploymentRegion:
+    Type: String
+    Default: us-east-2
+    Description: AWS region for deployment
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+
 Globals:
   Function:
     Runtime: python3.12
@@ -55,6 +64,57 @@ Resources:
         - Key: Project
           Value: ModelGuard
 
+  # Cognito User Pool
+  ModelGuardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ModelGuard-Users
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      UserPoolTags:
+        Project: ModelGuard
+
+  # Cognito User Pool Client
+  ModelGuardUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      ClientName: ModelGuard-Web-Client
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+
+  # Cognito User Pool Domain
+  ModelGuardUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      Domain: !Sub 'modelguard-${AWS::AccountId}'
+
+  # User Groups
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      GroupName: Admin
+      Description: Full access to all artifacts and operations
+      Precedence: 1
+
+  UserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      GroupName: User
+      Description: Standard user access to artifacts
+      Precedence: 2
+
   # API Gateway
   ModelGuardApi:
     Type: AWS::Serverless::Api
@@ -65,6 +125,11 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Authorization'"
         AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
   # POST /artifacts - Enumerate artifacts
   PostArtifactsFunction:
@@ -178,35 +243,10 @@ Resources:
             Path: /artifact/model/{id}/rate
             Method: GET
 
-  # Web Interface
-  WebUIFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: web.app.handler
-      Runtime: python3.12
-      CodeUri: .
-      Timeout: 10
-      MemorySize: 256
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Environment:
-        Variables:
-          API_BASE: "https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/"
-      Events:
-        Root:
-          Type: Api
-          Properties:
-            Path: /
-            Method: ANY
-        Web:
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
-
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
-    Value: !Sub 'https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/'
+    Value: !Sub 'https://${ModelGuardApi}.execute-api.${DeploymentRegion}.amazonaws.com/dev/'
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
 
@@ -221,3 +261,21 @@ Outputs:
     Value: !Ref ArtifactsBucket
     Export:
       Name: !Sub '${AWS::StackName}-BucketName'
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref ModelGuardUserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref ModelGuardUserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  CognitoDomain:
+    Description: Cognito Domain for authentication
+    Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${DeploymentRegion}.amazoncognito.com'
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoDomain'
