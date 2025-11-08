@@ -109,7 +109,9 @@ class ModelArtifact(BaseArtifact):
         Uses ThreadPoolExecutor since metrics may involve I/O (HTTP, S3, etc.).
         Falls back gracefully if any metric raises an exception.
         """
-        logger.info(f"Computing scores (parallel) for model artifact: {self.artifact_id}")
+        logger.info(
+            f"Computing scores (parallel) for model artifact: {self.artifact_id}"
+        )
         scores: Dict[str, Union[float, Dict[str, float]]] = {}
         latencies: Dict[str, float] = {}
 
@@ -129,7 +131,9 @@ class ModelArtifact(BaseArtifact):
                 return metric_name, 0.0, 0.0
 
         # Run all metrics concurrently
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(METRICS))) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(8, len(METRICS))
+        ) as executor:
             futures = {executor.submit(run_metric, m): m for m in METRICS}
             for future in concurrent.futures.as_completed(futures):
                 metric_name, value, elapsed_ms = future.result()
