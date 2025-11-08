@@ -1,5 +1,6 @@
 import { useAuth as useOidcAuth } from 'react-oidc-context'
 import { cognitoAuthConfig } from '@/auth/oidc-config'
+import { cognitoConfig } from '@/auth/generated-config'
 
 export const useAuth = () => {
   const auth = useOidcAuth()
@@ -7,9 +8,16 @@ export const useAuth = () => {
   const signOutRedirect = () => {
     const clientId = cognitoAuthConfig.client_id
     const logoutUri = cognitoAuthConfig.redirect_uri
-    const cognitoDomain = 'https://us-east-2br7vq0h06.auth.us-east-2.amazoncognito.com'
+    const cognitoDomain = cognitoConfig.domain
     window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
   }
 
-  return { ...auth, signOutRedirect }
+  const getAuthHeader = () => {
+    if (auth.user?.access_token) {
+      return { 'X-Authorization': `Bearer ${auth.user.access_token}` }
+    }
+    return {}
+  }
+
+  return { ...auth, signOutRedirect, getAuthHeader }
 }

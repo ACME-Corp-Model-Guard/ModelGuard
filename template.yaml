@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'ModelGuard MVP - Core Artifact Management API'
 
+Parameters:
+  DeploymentRegion:
+    Type: String
+    Default: us-east-2
+    Description: AWS region for deployment
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+
 Globals:
   Function:
     Runtime: python3.12
@@ -237,7 +246,7 @@ Resources:
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
-    Value: !Sub 'https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/'
+    Value: !Sub 'https://${ModelGuardApi}.execute-api.${DeploymentRegion}.amazonaws.com/dev/'
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
 
@@ -267,6 +276,6 @@ Outputs:
 
   CognitoDomain:
     Description: Cognito Domain for authentication
-    Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com'
+    Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${DeploymentRegion}.amazoncognito.com'
     Export:
       Name: !Sub '${AWS::StackName}-CognitoDomain'
