@@ -234,55 +234,6 @@ Resources:
             Path: /artifact/model/{id}/rate
             Method: GET
 
-  # GET /config - Frontend configuration
-  GetConfigFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ./
-      Handler: lambdas.get_config.lambda_handler
-      Description: Return frontend configuration (Cognito settings)
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Environment:
-        Variables:
-          USER_POOL_ID: !Ref ModelGuardUserPool
-          USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
-          COGNITO_DOMAIN: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com'
-          AWS_REGION_VAR: !Ref AWS::Region
-      Events:
-        GetConfig:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ModelGuardApi
-            Path: /config
-            Method: GET
-            Auth:
-              Authorizer: NONE
-
-  # Web Interface
-  WebUIFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: web.app.handler
-      Runtime: python3.12
-      CodeUri: .
-      Timeout: 10
-      MemorySize: 256
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Environment:
-        Variables:
-          API_BASE: "https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/"
-      Events:
-        Root:
-          Type: Api
-          Properties:
-            Path: /
-            Method: ANY
-        Web:
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
-
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
