@@ -29,7 +29,7 @@ JWT_SECRET_PARAM = os.environ.get("JWT_SECRET_PARAM", "/modelguard/jwt-secret")
 dynamodb_resource = None
 
 
-def _get_users_table():
+def _get_users_table() -> Any:
     """Get Users DynamoDB table resource."""
     global dynamodb_resource
     if boto3 is None:

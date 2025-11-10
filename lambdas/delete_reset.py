@@ -29,7 +29,7 @@ dynamodb_resource = None
 s3_client = None
 
 
-def _get_dynamodb_table():
+def _get_dynamodb_table() -> Any:
     """Get DynamoDB table resource."""
     global dynamodb_resource
     if boto3 is None:
@@ -42,7 +42,7 @@ def _get_dynamodb_table():
         return None
 
 
-def _get_users_table():
+def _get_users_table() -> Any:
     """Get Users DynamoDB table resource."""
     global dynamodb_resource
     if boto3 is None:
@@ -55,7 +55,7 @@ def _get_users_table():
         return None
 
 
-def _get_s3_client():
+def _get_s3_client() -> Any:
     """Get S3 client."""
     global s3_client
     if boto3 is None:

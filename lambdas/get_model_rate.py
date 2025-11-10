@@ -25,7 +25,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 dynamodb_resource = None
 
 
-def _get_dynamodb_table():
+def _get_dynamodb_table() -> Any:
     """Get DynamoDB table resource."""
     global dynamodb_resource
     if boto3 is None:
