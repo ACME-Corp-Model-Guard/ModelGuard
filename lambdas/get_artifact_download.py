@@ -15,7 +15,6 @@ except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
 
-from src.model import Model  # type: ignore[import-not-found]
 from src.logger import logger
 
 # Environment variables
@@ -24,20 +23,31 @@ DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadat
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 
 # Initialize AWS clients
+dynamodb_resource = None
 s3_client = None
-dynamodb_client = None
 
 
-def _get_aws_clients() -> Tuple[Any, Any]:
-    """Initialize AWS clients if boto3 is available."""
-    global s3_client, dynamodb_client
+def _get_dynamodb_table() -> Any:
+    """Get DynamoDB table resource."""
+    global dynamodb_resource
     if boto3 is None:
-        return None, None  # type: ignore[return-value]
+        return None  # type: ignore[return-value]
+    if dynamodb_resource is None:
+        dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)  # type: ignore
+    try:
+        return dynamodb_resource.Table(DYNAMODB_TABLE)  # type: ignore
+    except Exception:
+        return None
+
+
+def _get_s3_client() -> Any:
+    """Get S3 client."""
+    global s3_client
+    if boto3 is None:
+        return None  # type: ignore[return-value]
     if s3_client is None:
         s3_client = boto3.client("s3", region_name=AWS_REGION)  # type: ignore
-    if dynamodb_client is None:
-        dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)  # type: ignore
-    return s3_client, dynamodb_client
+    return s3_client
 
 
 def _create_response(
@@ -97,12 +107,12 @@ def _create_binary_response(
 
 def _download_from_s3(s3_key: str) -> Tuple[bytes, Optional[str]]:
     """Download artifact file from S3."""
-    s3_client, _ = _get_aws_clients()
-    if s3_client is None:
+    s3 = _get_s3_client()
+    if s3 is None:
         raise RuntimeError("S3 client not available. boto3 required for S3 operations.")
 
     try:
-        response = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
+        response = s3.get_object(Bucket=S3_BUCKET, Key=s3_key)
         file_content = response["Body"].read()
         content_type = response.get("ContentType", "application/octet-stream")
         return file_content, content_type
@@ -113,48 +123,84 @@ def _download_from_s3(s3_key: str) -> Tuple[bytes, Optional[str]]:
         raise RuntimeError(f"Failed to download from S3: {str(e)}")
 
 
-def _load_model_from_dynamodb(model_name: str) -> Optional[Model]:
-    """Load model metadata from DynamoDB."""
-    _, dynamodb = _get_aws_clients()
-    if dynamodb is None:
+def _load_artifact_from_dynamodb(artifact_id: str) -> Optional[Dict[str, Any]]:
+    """Load artifact metadata from DynamoDB."""
+    table = _get_dynamodb_table()
+    if table is None:
+        logger.error("DynamoDB table not available")
         return None
 
     try:
-        response = dynamodb.get_item(
-            TableName=DYNAMODB_TABLE, Key={"artifact_id": {"S": model_name}}
-        )
+        response = table.get_item(Key={"artifact_id": artifact_id})
         if "Item" not in response:
             return None
 
-        item = response["Item"]
-        model_dict = {
-            "name": item.get("name", {}).get("S", model_name),
-            "size": float(item.get("size", {}).get("N", "0")),
-            "license": item.get("license", {}).get("S", "unknown"),
-            "model_key": item.get("model_key", {}).get("S", ""),
-            "code_key": item.get("code_key", {}).get("S", ""),
-            "dataset_key": item.get("dataset_key", {}).get("S", ""),
-        }
+        artifact_dict = response["Item"]
 
-        if "parent_model_key" in item:
-            model_dict["parent_model_key"] = item["parent_model_key"]["S"]
+        # Ensure JSON fields are parsed
+        if "scores" in artifact_dict and isinstance(artifact_dict["scores"], str):
+            try:
+                artifact_dict["scores"] = json.loads(artifact_dict["scores"])
+            except json.JSONDecodeError:
+                artifact_dict["scores"] = {}
 
-        if "scores" in item:
-            model_dict["scores"] = json.loads(item["scores"]["S"])
+        if "scores_latency" in artifact_dict and isinstance(
+            artifact_dict["scores_latency"], str
+        ):
+            try:
+                artifact_dict["scores_latency"] = json.loads(
+                    artifact_dict["scores_latency"]
+                )
+            except json.JSONDecodeError:
+                artifact_dict["scores_latency"] = {}
 
-        if "scores_latency" in item:
-            model_dict["scores_latency"] = json.loads(item["scores_latency"]["S"])
+        if "metadata" in artifact_dict and isinstance(artifact_dict["metadata"], str):
+            try:
+                artifact_dict["metadata"] = json.loads(artifact_dict["metadata"])
+            except json.JSONDecodeError:
+                artifact_dict["metadata"] = {}
 
-        return Model.create_with_scores(model_dict)
-    except (ClientError, KeyError, json.JSONDecodeError):
+        return artifact_dict
+    except (ClientError, KeyError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load artifact from DynamoDB: {e}", exc_info=True)
         return None
+
+
+def _get_s3_key_for_artifact_type(
+    artifact_dict: Dict[str, Any], artifact_type: str
+) -> Optional[str]:
+    """
+    Get S3 key for the requested artifact type.
+
+    For model artifacts, supports model_key, code_key, dataset_key.
+    For other artifact types, uses s3_key field.
+    """
+    artifact_dict_type = artifact_dict.get("artifact_type", "").lower()
+
+    # If this is a model artifact, check for specific keys
+    if artifact_dict_type == "model":
+        if artifact_type == "model":
+            return artifact_dict.get("model_key") or artifact_dict.get("s3_key")
+        elif artifact_type == "code":
+            return artifact_dict.get("code_key")
+        elif artifact_type == "dataset":
+            return artifact_dict.get("dataset_key")
+
+    # For non-model artifacts or if s3_key is used
+    # Check if the artifact_type matches
+    if artifact_dict_type == artifact_type:
+        return artifact_dict.get("s3_key")
+
+    # Fallback: return s3_key if available
+    return artifact_dict.get("s3_key")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for GET /artifacts/{artifact_type}/{id}.
 
-    Retrieves artifacts (model, code, or dataset) from S3 based on model ID.
+    Retrieves artifacts (model, code, or dataset) from S3 based on artifact ID.
+    Supports metadata_only query parameter to return metadata without file content.
     """
     path_params = event.get("pathParameters") or {}
     logger.info(
@@ -184,39 +230,39 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if metadata_only:
         logger.info(f"Requesting metadata only for {artifact_id}")
 
-    model = _load_model_from_dynamodb(artifact_id)
-    if model is None:
-        logger.warning(f"Model not found: {artifact_id}")
+    # Load artifact from DynamoDB
+    artifact_dict = _load_artifact_from_dynamodb(artifact_id)
+    if artifact_dict is None:
+        logger.warning(f"Artifact not found: {artifact_id}")
         return _error_response(
-            404, f"Model not found: {artifact_id}", "MODEL_NOT_FOUND"
+            404, f"Artifact not found: {artifact_id}", "ARTIFACT_NOT_FOUND"
         )
 
-    s3_key = None
-    if artifact_type == "model":
-        s3_key = model.model_key
-    elif artifact_type == "code":
-        s3_key = model.code_key
-    elif artifact_type == "dataset":
-        s3_key = model.dataset_key
+    # Get S3 key for the requested artifact type
+    s3_key = _get_s3_key_for_artifact_type(artifact_dict, artifact_type)
 
     if not s3_key:
-        logger.warning(f"{artifact_type} artifact not found for model: {artifact_id}")
+        logger.warning(
+            f"{artifact_type} artifact not found for artifact: {artifact_id}"
+        )
         return _error_response(
             404,
-            f"{artifact_type.capitalize()} artifact not found for model: {artifact_id}",
+            f"{artifact_type.capitalize()} artifact not found for artifact: {artifact_id}",
             "ARTIFACT_NOT_FOUND",
         )
 
+    # If metadata_only, return metadata without downloading file
     if metadata_only:
         logger.info(f"Returning metadata for {artifact_id}, type: {artifact_type}")
         artifact_info = {
             "artifact_type": artifact_type,
-            "model_name": artifact_id,
+            "artifact_id": artifact_id,
             "s3_key": s3_key,
-            "model": model.to_dict(),
+            "artifact": artifact_dict,
         }
         return _create_response(200, artifact_info)
 
+    # Download file from S3
     try:
         file_content, content_type = _download_from_s3(s3_key)
         logger.info(f"Downloaded from S3: {s3_key}, size: {len(file_content)} bytes")
@@ -224,6 +270,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         logger.error(f"S3 download failed: {e}")
         return _error_response(500, str(e), "S3_DOWNLOAD_ERROR")
 
+    # Determine content type based on file extension if not set
     if not content_type or content_type == "application/octet-stream":
         file_ext = os.path.splitext(s3_key)[1].lower()
         content_type_map = {
