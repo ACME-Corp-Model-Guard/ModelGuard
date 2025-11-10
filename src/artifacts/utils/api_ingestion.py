@@ -6,6 +6,7 @@ Supports HuggingFace Hub (models/datasets) and GitHub (code).
 from typing import Dict, Any, Optional
 import requests
 from src.logger import logger
+from .types import ArtifactType
 
 
 class IngestionError(Exception):
@@ -296,7 +297,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         raise IngestionError(f"Failed to fetch repository metadata from GitHub: {e}")
 
 
-def fetch_artifact_metadata(url: str, artifact_type: str) -> Dict[str, Any]:
+def fetch_artifact_metadata(url: str, artifact_type: ArtifactType) -> Dict[str, Any]:
     """
     Fetch artifact metadata from URL based on artifact type.
     Delegates to appropriate fetcher function.

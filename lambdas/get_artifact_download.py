@@ -9,8 +9,8 @@ import os
 from typing import Any, Dict, Optional, Tuple
 
 try:
-    import boto3  # type: ignore
-    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+    import boto3  # type: ignore[import-untyped]
+    from botocore.exceptions import ClientError  # type: ignore[import-not-found,import-untyped]
 except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
@@ -21,7 +21,7 @@ from src.logger import logger
 # Environment variables
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
 DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 
 # Initialize AWS clients
 s3_client = None

@@ -12,6 +12,7 @@ import boto3  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from src.logger import logger
+from .utils.types import ArtifactType
 
 
 class BaseArtifact(ABC):
@@ -29,7 +30,7 @@ class BaseArtifact(ABC):
 
     def __init__(
         self,
-        artifact_type: str,
+        artifact_type: ArtifactType,
         name: str,
         source_url: str,
         artifact_id: Optional[str] = None,
@@ -65,7 +66,7 @@ class BaseArtifact(ABC):
         )
 
     @staticmethod
-    def create(artifact_type: str, **kwargs: Any) -> "BaseArtifact":
+    def create(artifact_type: ArtifactType, **kwargs: Any) -> "BaseArtifact":
         """
         Factory method to create the appropriate artifact subclass.
 
@@ -104,7 +105,7 @@ class BaseArtifact(ABC):
         return artifact
 
     @classmethod
-    def from_url(cls, url: str, artifact_type: str) -> "BaseArtifact":
+    def from_url(cls, url: str, artifact_type: ArtifactType) -> "BaseArtifact":
         """
         Create an artifact by fetching metadata from external source (HuggingFace or GitHub).
 

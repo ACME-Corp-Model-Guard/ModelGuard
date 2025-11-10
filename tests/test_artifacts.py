@@ -4,6 +4,7 @@ Simple tests for artifact classes and utilities.
 
 import pytest
 from unittest.mock import patch, MagicMock
+from typing import Any
 from src.artifacts import (
     BaseArtifact,
     ModelArtifact,
@@ -52,7 +53,7 @@ class TestBaseArtifact:
         """Test invalid artifact type raises error."""
         with pytest.raises(ValueError, match="Invalid artifact_type"):
             BaseArtifact.create(
-                artifact_type="invalid", name="test", source_url="https://example.com"
+                artifact_type="invalid", name="test", source_url="https://example.com"  # type: ignore[arg-type]
             )
 
     def test_to_dict_includes_source_url(self) -> None:
@@ -236,6 +237,7 @@ class TestFileStorage:
 
         upload_artifact_to_s3(
             artifact_id="test-id",
+            artifact_type="model",
             s3_key="models/test-id",
             source_url="https://huggingface.co/bert-base-uncased",
         )

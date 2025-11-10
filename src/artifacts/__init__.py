@@ -7,6 +7,7 @@ from .base_artifact import BaseArtifact
 from .model_artifact import ModelArtifact
 from .dataset_artifact import DatasetArtifact
 from .code_artifact import CodeArtifact
+from .utils.types import ArtifactType
 from .utils import (
     fetch_artifact_metadata,
     fetch_huggingface_model_metadata,
@@ -23,6 +24,7 @@ __all__ = [
     "ModelArtifact",
     "DatasetArtifact",
     "CodeArtifact",
+    "ArtifactType",
     "fetch_artifact_metadata",
     "fetch_huggingface_model_metadata",
     "fetch_huggingface_dataset_metadata",
