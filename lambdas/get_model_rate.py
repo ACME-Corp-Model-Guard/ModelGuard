@@ -8,8 +8,8 @@ import os
 from typing import Any, Dict, Optional
 
 try:
-    import boto3  # type: ignore
-    from botocore.exceptions import ClientError
+    import boto3  # type: ignore[import-untyped]
+    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
