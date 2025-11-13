@@ -53,7 +53,7 @@ class TestMetadataStorage:
         mock_boto3.resource.return_value.Table.return_value = mock_table
 
         mock_artifact = Mock()
-        with patch("src.artifacts.utils.metadata_storage.BaseArtifact") as mock_base:
+        with patch("src.artifacts.base_artifact.BaseArtifact") as mock_base:
             mock_base.create.return_value = mock_artifact
 
             # Test
