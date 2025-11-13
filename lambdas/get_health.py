@@ -15,15 +15,13 @@ def lambda_handler(event, context):
     body = {
         "status": "ok",
         "checked_at": now_utc,
-        "message": "Registry API is reachable"
+        "message": "Registry API is reachable",
     }
 
     response = {
         "statusCode": 200,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "body": json.dumps(body)
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(body),
     }
 
     return response
