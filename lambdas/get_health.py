@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 
-def lambda_handler(event, context) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for the /health endpoint.
 
@@ -19,6 +19,7 @@ def lambda_handler(event, context) -> Dict[str, Any]:
         "message": "Registry API is reachable",
     }
 
+    # Construct Response
     response = {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
