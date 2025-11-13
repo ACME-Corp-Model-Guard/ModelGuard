@@ -250,7 +250,7 @@ def _handle_url_ingestion(artifact_type: ArtifactType, url: str) -> Dict[str, An
 
         # Save artifact metadata to DynamoDB
         try:
-            save_artifact_to_dynamodb(artifact.to_dict())
+            save_artifact_to_dynamodb(artifact)
             logger.info(
                 f"Successfully saved artifact {artifact.artifact_id} to DynamoDB"
             )

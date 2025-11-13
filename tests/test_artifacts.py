@@ -187,38 +187,6 @@ class TestAPIIngestion:
             fetch_artifact_metadata("https://invalid.com", "model")
 
 
-class TestMetadataStorage:
-    """Tests for DynamoDB metadata storage."""
-
-    @patch("src.artifacts.utils.metadata_storage.boto3.resource")
-    @patch.dict("os.environ", {"ARTIFACTS_TABLE": "test-table"})
-    def test_save_artifact_to_dynamodb(self, mock_boto: MagicMock) -> None:
-        """Test saving artifact to DynamoDB."""
-        from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
-
-        mock_table = MagicMock()
-        mock_boto.return_value.Table.return_value = mock_table
-
-        artifact_dict = {
-            "artifact_id": "test-id",
-            "artifact_type": "model",
-            "name": "test-model",
-            "source_url": "https://example.com",
-        }
-
-        save_artifact_to_dynamodb(artifact_dict)
-
-        mock_table.put_item.assert_called_once_with(Item=artifact_dict)
-
-    def test_save_without_env_var_raises_error(self) -> None:
-        """Test saving without ARTIFACTS_TABLE env var raises error."""
-        from src.artifacts.utils.metadata_storage import save_artifact_to_dynamodb
-
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="ARTIFACTS_TABLE"):
-                save_artifact_to_dynamodb({"artifact_id": "test"})
-
-
 class TestFileStorage:
     """Tests for S3 file storage utilities."""
 

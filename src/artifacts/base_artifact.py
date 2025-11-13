@@ -99,6 +99,7 @@ class BaseArtifact(ABC):
                 f"Invalid artifact_type: {artifact_type}. Must be one of {BaseArtifact.VALID_TYPES}"
             )
 
+        # Create and return the appropriate artifact instance
         artifact_class = artifact_map[artifact_type]
         artifact = artifact_class(**kwargs)
         logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
