@@ -1,8 +1,9 @@
 import json
 from datetime import datetime, timezone
+from typing import Any, Dict
 
 
-def lambda_handler(event, context):
+def lambda_handler(event, context) -> Dict[str, Any]:
     """
     Lambda handler for the /health endpoint.
 
