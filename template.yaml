@@ -23,6 +23,8 @@ Globals:
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
         # USERS_TABLE: !Ref UsersTable
+        BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
+        BEDROCK_REGION: !Ref DeploymentRegion
     Tracing: Active
 
 Resources:
