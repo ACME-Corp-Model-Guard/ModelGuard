@@ -4,38 +4,10 @@ Get ratings for model artifacts
 """
 
 import json
-import os
 from typing import Any, Dict, Optional
 
-try:
-    import boto3  # type: ignore[import-untyped]
-    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
-except ImportError:
-    boto3 = None  # type: ignore[assignment]
-    ClientError = Exception  # type: ignore[assignment, misc]
-
-from src.artifacts import ModelArtifact  # type: ignore[import-not-found]
+from src.artifacts.utils.metadata_storage import load_artifact_from_dynamodb  # type: ignore[import-not-found]
 from src.logger import logger
-
-# Environment variables
-DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-
-# Initialize AWS clients
-dynamodb_resource = None
-
-
-def _get_dynamodb_table() -> Any:
-    """Get DynamoDB table resource."""
-    global dynamodb_resource
-    if boto3 is None:
-        return None  # type: ignore[return-value]
-    if dynamodb_resource is None:
-        dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)  # type: ignore
-    try:
-        return dynamodb_resource.Table(DYNAMODB_TABLE)  # type: ignore
-    except Exception:
-        return None
 
 
 def _create_response(
@@ -68,50 +40,16 @@ def _error_response(
 
 
 def _load_artifact_from_dynamodb(artifact_id: str) -> Optional[Dict[str, Any]]:
-    """Load artifact metadata from DynamoDB."""
-    table = _get_dynamodb_table()
-    if table is None:
-        logger.error("DynamoDB table not available")
-        return None
-
+    """Load artifact metadata from DynamoDB using metadata_storage.py."""
     try:
-        response = table.get_item(Key={"artifact_id": artifact_id})
-        if "Item" not in response:
+        artifact = load_artifact_from_dynamodb(artifact_id)
+        if artifact is None:
             return None
 
-        artifact_dict = response["Item"]
-
-        # Ensure scores and scores_latency are dicts (they might be stored as JSON strings)
-        if "scores" in artifact_dict and isinstance(artifact_dict["scores"], str):
-            try:
-                artifact_dict["scores"] = json.loads(artifact_dict["scores"])
-            except json.JSONDecodeError:
-                artifact_dict["scores"] = {}
-        elif "scores" not in artifact_dict:
-            artifact_dict["scores"] = {}
-
-        if "scores_latency" in artifact_dict and isinstance(
-            artifact_dict["scores_latency"], str
-        ):
-            try:
-                artifact_dict["scores_latency"] = json.loads(
-                    artifact_dict["scores_latency"]
-                )
-            except json.JSONDecodeError:
-                artifact_dict["scores_latency"] = {}
-        elif "scores_latency" not in artifact_dict:
-            artifact_dict["scores_latency"] = {}
-
-        if "metadata" in artifact_dict and isinstance(artifact_dict["metadata"], str):
-            try:
-                artifact_dict["metadata"] = json.loads(artifact_dict["metadata"])
-            except json.JSONDecodeError:
-                artifact_dict["metadata"] = {}
-        elif "metadata" not in artifact_dict:
-            artifact_dict["metadata"] = {}
-
+        # Convert artifact to dictionary
+        artifact_dict = artifact.to_dict()
         return artifact_dict
-    except (ClientError, KeyError, json.JSONDecodeError) as e:
+    except Exception as e:
         logger.error(f"Failed to load artifact from DynamoDB: {e}", exc_info=True)
         return None
 
@@ -145,6 +83,7 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
 
     # Map metric names to API format (camelCase with underscores)
     metric_mapping = {
+        "Availability": ("availability", "availability_latency"),
         "RampUp": ("ramp_up_time", "ramp_up_time_latency"),
         "BusFactor": ("bus_factor", "bus_factor_latency"),
         "PerformanceClaims": ("performance_claims", "performance_claims_latency"),

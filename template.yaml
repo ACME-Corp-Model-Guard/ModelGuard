@@ -22,9 +22,9 @@ Globals:
         PYTHONPATH: /var/task:/var/task/src
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
-        # USERS_TABLE: !Ref UsersTable
         BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
         BEDROCK_REGION: !Ref DeploymentRegion
+        USER_POOL_ID: !Ref ModelGuardUserPool
     Tracing: Active
 
 Resources:
@@ -247,23 +247,20 @@ Resources:
             Method: GET
 
   # DELETE /reset - Reset system
-  # DeleteResetFunction:
-    # Type: AWS::Serverless::Function
-    # Properties:
-      # CodeUri: ./
-      # Handler: lambdas.delete_reset.lambda_handler
-      # Description: Reset system to default state and create superuser
-      # Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      # Environment:
-        # Variables:
-          # USERS_TABLE: !Ref UsersTable
-      # Events:
-        # Reset:
-          # Type: Api
-          # Properties:
-            # RestApiId: !Ref ModelGuardApi
-            # Path: /reset
-            # Method: DELETE
+  DeleteResetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.delete_reset.lambda_handler
+      Description: Reset system to default state
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        Reset:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /reset
+            Method: DELETE
 
 Outputs:
   ModelGuardApiUrl:
