@@ -22,7 +22,7 @@ Globals:
         PYTHONPATH: /var/task:/var/task/src
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
-        USERS_TABLE: !Ref UsersTable
+        USER_POOL_ID: !Ref ModelGuardUserPool
     Tracing: Active
 
 Resources:
@@ -250,11 +250,8 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: lambdas.delete_reset.lambda_handler
-      Description: Reset system to default state and create superuser
+      Description: Reset system to default state
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Environment:
-        Variables:
-          USERS_TABLE: !Ref UsersTable
       Events:
         Reset:
           Type: Api

@@ -1,12 +1,10 @@
 """
 Lambda function for DELETE /reset endpoint
-Reset the system to default state and create superuser
+Reset the system to default state
 """
 
 import json
 import os
-import hashlib
-import secrets
 from typing import Any, Dict, Optional
 
 try:
@@ -21,7 +19,6 @@ from src.logger import logger
 # Environment variables
 DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
-USERS_TABLE = os.environ.get("USERS_TABLE", "ModelGuard-Users")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 # Initialize AWS clients
@@ -38,19 +35,6 @@ def _get_dynamodb_table() -> Any:
         dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)  # type: ignore
     try:
         return dynamodb_resource.Table(DYNAMODB_TABLE)  # type: ignore
-    except Exception:
-        return None
-
-
-def _get_users_table() -> Any:
-    """Get Users DynamoDB table resource."""
-    global dynamodb_resource
-    if boto3 is None:
-        return None  # type: ignore[return-value]
-    if dynamodb_resource is None:
-        dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)  # type: ignore
-    try:
-        return dynamodb_resource.Table(USERS_TABLE)  # type: ignore
     except Exception:
         return None
 
@@ -92,42 +76,6 @@ def _error_response(
     if error_code:
         body["error_code"] = error_code
     return _create_response(status_code, body)
-
-
-def _hash_password(password: str) -> str:
-    """Hash password using SHA-256 (for MVP - use bcrypt in production)."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
-def _create_superuser() -> None:
-    """Create a default superuser/admin account internally."""
-    users_table = _get_users_table()
-    if users_table is None:
-        logger.warning("Users table not available, skipping superuser creation")
-        return
-
-    # Default superuser credentials
-    superuser_name = "admin"
-    superuser_password = "admin123"  # Should be changed in production
-    hashed_password = _hash_password(superuser_password)
-
-    try:
-        users_table.put_item(
-            Item={
-                "username": superuser_name,
-                "password_hash": hashed_password,
-                "is_admin": True,
-                "permissions": {
-                    "upload": True,
-                    "search": True,
-                    "download": True,
-                },
-            }
-        )
-        logger.info(f"Created superuser: {superuser_name}")
-    except Exception as e:
-        logger.error(f"Failed to create superuser: {e}", exc_info=True)
-        raise
 
 
 def _reset_dynamodb() -> None:
@@ -185,7 +133,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Resets the system to default state:
     - Clears all artifacts from DynamoDB
     - Clears all objects from S3
-    - Creates a default superuser/admin account internally
     """
     logger.info("Processing DELETE /reset")
 
@@ -197,10 +144,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Reset S3
         logger.info("Resetting S3...")
         _reset_s3()
-
-        # Create superuser
-        logger.info("Creating superuser...")
-        _create_superuser()
 
         logger.info("System reset completed successfully")
         return _create_response(
