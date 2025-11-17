@@ -16,7 +16,8 @@ from src.logger import logger
 _bedrock_client = None
 
 
-def _get_bedrock_client() -> boto3.client:
+# Return value should be more specific once we have boto3 stubs setup with MyPy
+def _get_bedrock_client() -> Any:
     """Get or create singleton Bedrock runtime client."""
     global _bedrock_client
     if _bedrock_client is None:
