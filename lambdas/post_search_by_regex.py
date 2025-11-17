@@ -144,3 +144,57 @@ def search_artifacts_by_regex(
     return results
 
 
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """
+    Handler for POST /artifact/byRegEx - Search by regex
+    Search for artifacts using regular expression over names and metadata.
+    """
+    logger.info("Received POST /artifact/byRegEx request")  
+
+    # Extract auth header (same pattern as GET /artifact/byName/{name})  
+    headers = event.get("headers") or {}  
+    auth_token = headers.get("X-Authorization")  
+    if not auth_token or not validate_token(auth_token):  
+        return {  
+            "statusCode": 403,  
+            "headers": {"Content-Type": "application/json"},  
+            "body": json.dumps({"error": "Authentication failed"}),  
+        }  
+
+    body = _parse_body(event)  
+
+    # Get regex pattern from body  
+    pattern = body.get("pattern") or body.get("regex")  
+    if not pattern:  
+        return {  
+            "statusCode": 400,  
+            "headers": {"Content-Type": "application/json"},  
+            "body": json.dumps({"error": "Missing regex pattern in request body"}),  
+        }  
+
+    artifact_type_filter = body.get("artifact_type") or body.get("type")  
+
+    # Parse optional limit  
+    limit_raw = body.get("limit", 50)  
+    try:  
+        limit = int(limit_raw)  
+    except (TypeError, ValueError):  
+        limit = 50  
+
+    try:  
+        artifacts = search_artifacts_by_regex(  
+            str(pattern), artifact_type_filter=artifact_type_filter, limit=limit  
+        )  
+    except ValueError as ve:  
+        # Invalid regular expression  
+        return {  
+            "statusCode": 400,  
+            "headers": {"Content-Type": "application/json"},  
+            "body": json.dumps({"error": str(ve)}),  
+        }  
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(artifacts),
+    }
