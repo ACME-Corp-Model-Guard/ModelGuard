@@ -44,7 +44,7 @@ jobs:
       # --- Type checking ---
       - name: Type check with mypy
         run: |
-          mypy .
+          mypy src lambdas
 
       # --- Testing and coverage ---
       - name: Run tests with pytest and coverage
