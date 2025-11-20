@@ -15,7 +15,7 @@ from typing import Iterable, Optional
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 
-from src.artifacts.base_artifact import ArtifactType
+from src.artifacts.types import ArtifactType
 from src.aws.clients import get_s3
 from src.logger import logger
 from src.settings import ARTIFACTS_BUCKET

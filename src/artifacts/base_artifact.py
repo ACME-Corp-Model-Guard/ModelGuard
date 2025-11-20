@@ -4,13 +4,11 @@ Base artifact class providing common functionality for all artifact types.
 
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 
 from src.logger import logger
 from src.storage.downloaders.dispatchers import fetch_artifact_metadata
-
-# Strictly define allowed artifact types
-ArtifactType = Literal["model", "dataset", "code"]
+from src.artifacts.types import ArtifactType
 
 
 class BaseArtifact(ABC):

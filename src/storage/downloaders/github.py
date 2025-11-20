@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 
-from src.artifacts.base_artifact import ArtifactType
+from src.artifacts.types import ArtifactType
 from src.logger import logger
 
 
