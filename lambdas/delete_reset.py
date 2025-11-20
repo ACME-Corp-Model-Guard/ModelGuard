@@ -205,7 +205,7 @@ def _reset_default_admin_user() -> None:
 
 
 # ====================================================================================
-# Lambda Handler — FULLY SPEC-COMPLIANT
+# Lambda Handler
 # ====================================================================================
 def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
