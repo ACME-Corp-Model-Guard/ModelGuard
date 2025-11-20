@@ -24,3 +24,4 @@ repos:
       - id: mypy
         args: ["--config-file=pyproject.toml"]
         additional_dependencies: [types-requests]
+        exclude: ^tests/
