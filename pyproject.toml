@@ -29,3 +29,12 @@ addopts = "-v"
 testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = "test_*.py"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+]
