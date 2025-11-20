@@ -5,7 +5,7 @@ Used by all Lambda functions to avoid repeating boilerplate.
 
 from __future__ import annotations
 
-from typing import Optional, Any
+from typing import Any, Optional
 
 import boto3
 from botocore.client import BaseClient
@@ -13,18 +13,17 @@ from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource
 
 from src.settings import AWS_REGION
 
-
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 # Lazy-initialized client caches
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 _dynamodb_resource: Optional[DynamoDBServiceResource] = None
 _s3_client: Optional[BaseClient] = None
 _cognito_client: Optional[BaseClient] = None
 
 
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 # DynamoDB
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 def get_dynamodb() -> DynamoDBServiceResource:
     """
     Returns a cached DynamoDB resource.
@@ -49,9 +48,9 @@ def get_ddb_table(table_name: str) -> Any:
     return dynamo.Table(table_name)  # type: ignore[no-any-return]
 
 
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 # S3
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 def get_s3() -> BaseClient:
     """
     Returns a cached S3 client.
@@ -67,11 +66,19 @@ def get_s3() -> BaseClient:
     return _s3_client
 
 
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 # Cognito
-# -------------------------------------------------------------------------------------
+# =====================================================================================
 def get_cognito() -> BaseClient:
     """
     Returns a cached Cognito Identity Provider client.
     """
-    global _cognito_cli
+    global _cognito_client
+
+    if boto3 is None:
+        raise RuntimeError("boto3 is not available in this environment")
+
+    if _cognito_client is None:
+        _cognito_client = boto3.client("cognito-idp", region_name=AWS_REGION)
+
+    return _cognito_client
