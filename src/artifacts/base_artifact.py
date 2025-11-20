@@ -2,17 +2,14 @@
 Base artifact class providing common functionality for all artifact types.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from datetime import datetime
 import uuid
-import os
-
-import boto3  # type: ignore[import-untyped]
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Literal, Optional
 
 from src.logger import logger
-from .utils.types import ArtifactType
+
+# Strictly define allowed artifact types
+ArtifactType = Literal["model", "dataset", "code"]
 
 
 class BaseArtifact(ABC):
@@ -83,9 +80,9 @@ class BaseArtifact(ABC):
         logger.debug(f"Creating artifact of type: {artifact_type}")
 
         # Import here to avoid circular imports
-        from .model_artifact import ModelArtifact
-        from .dataset_artifact import DatasetArtifact
         from .code_artifact import CodeArtifact
+        from .dataset_artifact import DatasetArtifact
+        from .model_artifact import ModelArtifact
 
         artifact_map = {
             "model": ModelArtifact,
