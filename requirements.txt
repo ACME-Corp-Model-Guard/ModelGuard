@@ -26,7 +26,7 @@ loguru==0.7.3
 mangum==0.19.0
 MarkupSafe==3.0.3
 mccabe==0.7.0
--e git+https://github.com/ACME-Corp-Model-Guard/ModelGuard@92892d2d0c28b8cd9859bf1601730e7c6365c0db#egg=ModelGuard
+-e git+https://github.com/ACME-Corp-Model-Guard/ModelGuard@d8529112f9763aa229fb8d123cc6638ba690f655#egg=ModelGuard
 mypy==1.18.2
 mypy_extensions==1.1.0
 nodeenv==1.9.1
@@ -54,6 +54,8 @@ six==1.17.0
 sniffio==1.3.1
 starlette==0.49.1
 types-awscrt==0.28.2
+types-pyasn1==0.6.0.20250914
+types-python-jose==3.5.0.20250531
 types-requests==2.32.4.20250913
 types-s3transfer==0.14.0
 typing-inspection==0.4.2
