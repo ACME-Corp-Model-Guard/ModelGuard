@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Literal, Optional
 
 from src.logger import logger
+from src.storage.downloaders.dispatchers import fetch_artifact_metadata
 
 # Strictly define allowed artifact types
 ArtifactType = Literal["model", "dataset", "code"]
@@ -125,8 +126,6 @@ class BaseArtifact(ABC):
             ... )
         """
         logger.info(f"Creating {artifact_type} artifact from URL: {url}")
-
-        from .utils.api_ingestion import fetch_artifact_metadata
 
         # Fetch metadata from external source
         metadata = fetch_artifact_metadata(url, artifact_type)
