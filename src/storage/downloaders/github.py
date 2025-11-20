@@ -27,10 +27,8 @@ class FileDownloadError(Exception):
 
 
 # ==============================================================================
-# Small helper functions (flake8-compliant)
+# Helper Functions
 # ==============================================================================
-
-
 def _parse_github_url(source_url: str) -> Tuple[str, str]:
     """Extract (owner, repo) from a GitHub URL."""
     parts = source_url.rstrip("/").split("github.com/")
@@ -91,10 +89,8 @@ def _cleanup_temp_dir(temp_dir: Optional[str]) -> None:
 
 
 # ==============================================================================
-# Main GitHub download function (now simple + flake8-compliant)
+# Code Repository
 # ==============================================================================
-
-
 def download_from_github(
     source_url: str,
     artifact_id: str,
