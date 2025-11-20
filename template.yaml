@@ -25,10 +25,14 @@ Globals:
         BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
         BEDROCK_REGION: !Ref DeploymentRegion
         USER_POOL_ID: !Ref ModelGuardUserPool
+        USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
+        TOKENS_TABLE: !Ref TokensTable
     Tracing: Active
 
 Resources:
-  # DynamoDB Table - Model Metadata
+  ###########################################################
+  # DynamoDB Tables
+  ###########################################################
   ArtifactsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -53,7 +57,24 @@ Resources:
         - Key: Project
           Value: ModelGuard
 
-  # S3 Bucket - Model/Code/Dataset Storage
+  TokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Tokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  ###########################################################
+  # S3 Artifact Storage
+  ###########################################################
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -67,7 +88,9 @@ Resources:
         - Key: Project
           Value: ModelGuard
 
-  # Cognito User Pool
+  ###########################################################
+  # Cognito User Pool + Client + Domain + Groups
+  ###########################################################
   ModelGuardUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -82,7 +105,6 @@ Resources:
       UserPoolTags:
         Project: ModelGuard
 
-  # Cognito User Pool Client
   ModelGuardUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
@@ -94,14 +116,12 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
 
-  # Cognito User Pool Domain
   ModelGuardUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
       UserPoolId: !Ref ModelGuardUserPool
       Domain: !Sub 'modelguard-${AWS::AccountId}'
 
-  # User Groups
   AdminGroup:
     Type: AWS::Cognito::UserPoolGroup
     Properties:
@@ -118,7 +138,9 @@ Resources:
       Description: Standard user access to artifacts
       Precedence: 2
 
-  # API Gateway
+  ###########################################################
+  # API Gateway + Cognito Authorizer
+  ###########################################################
   ModelGuardApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -126,7 +148,7 @@ Resources:
       Description: ModelGuard MVP API
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Authorization'"
+        AllowHeaders: "'Content-Type,X-Authorization,Authorization'"
         AllowOrigin: "'*'"
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
@@ -134,6 +156,29 @@ Resources:
           CognitoAuthorizer:
             UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
+  ###########################################################
+  # Lambda: /authenticate (no authorizer)
+  ###########################################################
+  AuthenticateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.authenticate.lambda_handler
+      Description: Login with username/password → return JWTs
+      Role: arn:aws:iam::<YOUR_ACCOUNT_ID>:role/BasicLambdaRole
+      Events:
+        AuthenticateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /authenticate
+            Method: POST
+            Auth:
+              Authorizer: NONE
+
+  ###########################################################
+  # Lambda Functions for Artifact Endpoints
+  ###########################################################
   # POST /artifacts - Enumerate artifacts
   PostArtifactsFunction:
     Type: AWS::Serverless::Function
