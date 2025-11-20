@@ -1,11 +1,11 @@
 """
 Lambda function for DELETE /reset endpoint
-Reset the system to default state
+Resets the system state to initial baseline and recreates default admin user.
 """
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypedDict
 
 try:
     import boto3  # type: ignore[import-untyped]
@@ -14,49 +14,50 @@ except ImportError:
     boto3 = None  # type: ignore[assignment]
     ClientError = Exception  # type: ignore[assignment, misc]
 
+from src.auth import authorize
 from src.logger import logger
 
-# Environment variables
+# ====================================================================================
+# Environment Variables
+# ====================================================================================
 DYNAMODB_TABLE = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
+TOKENS_TABLE = os.environ.get("TOKENS_TABLE", "ModelGuard-Tokens")
 S3_BUCKET = os.environ.get("ARTIFACTS_BUCKET", "modelguard-artifacts-files")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+USER_POOL_ID = os.environ["USER_POOL_ID"]  # MUST exist
 
-# Initialize AWS clients
+# Default admin user required after reset
+DEFAULT_USERNAME = "ece30861defaultadminuser"
+DEFAULT_PASSWORD = "correcthorsebatterystaple123(!__+@**(A;DROP TABLE packages"
+DEFAULT_GROUP = "Admin"
+
+# Lazy init AWS clients
 dynamodb_resource = None
 s3_client = None
+cognito_client = None
 
 
-def _get_dynamodb_table() -> Any:
-    """Get DynamoDB table resource."""
-    global dynamodb_resource
-    if boto3 is None:
-        return None  # type: ignore[return-value]
-    if dynamodb_resource is None:
-        dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)  # type: ignore
-    try:
-        return dynamodb_resource.Table(DYNAMODB_TABLE)  # type: ignore
-    except Exception:
-        return None
+# ====================================================================================
+# Response typing for mypy
+# ====================================================================================
+class LambdaResponse(TypedDict):
+    statusCode: int
+    headers: Dict[str, str]
+    body: str
 
 
-def _get_s3_client() -> Any:
-    """Get S3 client."""
-    global s3_client
-    if boto3 is None:
-        return None  # type: ignore[return-value]
-    if s3_client is None:
-        s3_client = boto3.client("s3", region_name=AWS_REGION)  # type: ignore
-    return s3_client
-
-
+# ====================================================================================
+# HTTP Helpers
+# ====================================================================================
 def _create_response(
-    status_code: int, body: Dict[str, Any], headers: Optional[Dict[str, str]] = None
-) -> Dict[str, Any]:
-    """Create a standardized API Gateway response."""
+    status_code: int,
+    body: Dict[str, Any],
+    headers: Optional[Dict[str, str]] = None,
+) -> LambdaResponse:
     default_headers = {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+        "Access-Control-Allow-Headers": "Content-Type, X-Authorization, Authorization",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     }
     if headers:
@@ -68,91 +69,201 @@ def _create_response(
     }
 
 
-def _error_response(
-    status_code: int, message: str, error_code: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create an error response."""
-    body = {"error": message}
-    if error_code:
-        body["error_code"] = error_code
-    return _create_response(status_code, body)
+def _error_response(status: int, message: str) -> LambdaResponse:
+    return _create_response(status, {"error": message})
 
 
+# ====================================================================================
+# AWS Helpers
+# ====================================================================================
+def _get_dynamodb_resource() -> Any:
+    """Lazy init DynamoDB resource."""
+    global dynamodb_resource
+    if boto3 is None:
+        return None
+    if dynamodb_resource is None:
+        dynamodb_resource = boto3.resource("dynamodb", region_name=AWS_REGION)
+    return dynamodb_resource
+
+
+def _get_s3_client() -> Any:
+    """Lazy init S3."""
+    global s3_client
+    if boto3 is None:
+        return None
+    if s3_client is None:
+        s3_client = boto3.client("s3", region_name=AWS_REGION)
+    return s3_client
+
+
+def _get_cognito_client() -> Any:
+    """Lazy init Cognito."""
+    global cognito_client
+    if boto3 is None:
+        return None
+    if cognito_client is None:
+        cognito_client = boto3.client("cognito-idp", region_name=AWS_REGION)
+    return cognito_client
+
+
+# ====================================================================================
+# Core Reset Logic
+# ====================================================================================
 def _reset_dynamodb() -> None:
-    """Clear all artifacts from DynamoDB."""
-    table = _get_dynamodb_table()
-    if table is None:
-        logger.warning("DynamoDB table not available")
+    """Clear ARTIFACTS_TABLE."""
+    dynamo = _get_dynamodb_resource()
+    if dynamo is None:
+        logger.warning("DynamoDB unavailable")
         return
 
-    try:
-        # Scan and delete all items
-        response = table.scan()
-        items = response.get("Items", [])
+    table = dynamo.Table(DYNAMODB_TABLE)
+    response = table.scan()
+    items = response.get("Items", [])
 
-        with table.batch_writer() as batch:
-            for item in items:
-                batch.delete_item(Key={"artifact_id": item["artifact_id"]})
+    with table.batch_writer() as batch:
+        for item in items:
+            batch.delete_item(Key={"artifact_id": item["artifact_id"]})
 
-        logger.info(f"Deleted {len(items)} items from DynamoDB")
-    except Exception as e:
-        logger.error(f"Failed to reset DynamoDB: {e}", exc_info=True)
-        raise
+    logger.info(f"Deleted {len(items)} items from DynamoDB")
+
+
+def _reset_tokens_table() -> None:
+    """Clear TOKENS_TABLE (Security track requirement)."""
+    dynamo = _get_dynamodb_resource()
+    if dynamo is None:
+        logger.warning("DynamoDB unavailable")
+        return
+
+    table = dynamo.Table(TOKENS_TABLE)
+    response = table.scan()
+    items = response.get("Items", [])
+
+    with table.batch_writer() as batch:
+        for item in items:
+            batch.delete_item(Key={"token": item["token"]})
+
+    logger.info(f"Deleted {len(items)} tokens from DynamoDB token table")
 
 
 def _reset_s3() -> None:
-    """Clear all objects from S3 bucket."""
+    """Clear S3 artifact bucket."""
     s3 = _get_s3_client()
     if s3 is None:
-        logger.warning("S3 client not available")
+        logger.warning("S3 unavailable")
         return
 
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=S3_BUCKET)
+
+    deleted = 0
+    for page in pages:
+        if "Contents" in page:
+            objs = [{"Key": obj["Key"]} for obj in page["Contents"]]
+            s3.delete_objects(Bucket=S3_BUCKET, Delete={"Objects": objs})
+            deleted += len(objs)
+
+    logger.info(f"Deleted {deleted} objects from S3")
+
+
+def _reset_default_admin_user() -> None:
+    """Recreate required default admin Cognito user."""
+    cognito = _get_cognito_client()
+    if cognito is None:
+        logger.warning("Cognito unavailable")
+        return
+
+    # Delete user if present
     try:
-        # List and delete all objects
-        paginator = s3.get_paginator("list_objects_v2")
-        pages = paginator.paginate(Bucket=S3_BUCKET)
+        cognito.admin_delete_user(UserPoolId=USER_POOL_ID, Username=DEFAULT_USERNAME)
+    except ClientError:
+        pass  # user didn't exist
 
-        delete_count = 0
-        for page in pages:
-            if "Contents" in page:
-                objects = [{"Key": obj["Key"]} for obj in page["Contents"]]
-                if objects:
-                    s3.delete_objects(Bucket=S3_BUCKET, Delete={"Objects": objects})
-                    delete_count += len(objects)
+    # Create user with temporary password
+    cognito.admin_create_user(
+        UserPoolId=USER_POOL_ID,
+        Username=DEFAULT_USERNAME,
+        TemporaryPassword=DEFAULT_PASSWORD,
+        MessageAction="SUPPRESS",
+    )
 
-        logger.info(f"Deleted {delete_count} objects from S3")
-    except Exception as e:
-        logger.error(f"Failed to reset S3: {e}", exc_info=True)
-        raise
+    # Set permanent password
+    cognito.admin_set_user_password(
+        UserPoolId=USER_POOL_ID,
+        Username=DEFAULT_USERNAME,
+        Password=DEFAULT_PASSWORD,
+        Permanent=True,
+    )
+
+    # Add to Admin group
+    cognito.admin_add_user_to_group(
+        UserPoolId=USER_POOL_ID,
+        Username=DEFAULT_USERNAME,
+        GroupName=DEFAULT_GROUP,
+    )
+
+    logger.info("Default admin user recreated successfully")
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+# ====================================================================================
+# Lambda Handler — FULLY SPEC-COMPLIANT
+# ====================================================================================
+def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
-    Lambda handler for DELETE /reset.
-
-    Resets the system to default state:
-    - Clears all artifacts from DynamoDB
-    - Clears all objects from S3
+    DELETE /reset
+    Spec:
+      200 — reset completed
+      401 — authenticated but forbidden (not admin)
+      403 — authentication failure
     """
     logger.info("Processing DELETE /reset")
 
+    # Step 1: Authenticate and enforce Admin role
     try:
-        # Reset DynamoDB
+        authorize(event, allowed_roles=["Admin"])
+    except Exception as e:
+        msg = str(e).lower()
+
+        # 403 — Authentication failure (invalid, missing, expired token, etc.)
+        auth_failures = [
+            "missing x-authorization",
+            "malformed token",
+            "invalid token",
+            "expired",
+        ]
+        if any(x in msg for x in auth_failures):
+            return _error_response(
+                403,
+                "Authentication failed due to invalid or missing AuthenticationToken",
+            )
+
+        # 401 — Authenticated but not in Admin group
+        if "permission denied" in msg:
+            return _error_response(
+                401, "You do not have permission to reset the registry."
+            )
+
+        # Default to 403
+        return _error_response(403, "Authentication failed.")
+
+    # Step 2: Perform reset
+    try:
         logger.info("Resetting DynamoDB...")
         _reset_dynamodb()
 
-        # Reset S3
+        logger.info("Resetting token table...")
+        _reset_tokens_table()
+
         logger.info("Resetting S3...")
         _reset_s3()
 
-        logger.info("System reset completed successfully")
+        logger.info("Recreating default admin user...")
+        _reset_default_admin_user()
+
+        logger.info("System reset successfully completed.")
         return _create_response(
-            200,
-            {
-                "message": "System reset successfully",
-                "status": "ok",
-            },
+            200, {"message": "System reset successfully", "status": "ok"}
         )
+
     except Exception as e:
-        logger.error(f"Failed to reset system: {e}", exc_info=True)
-        return _error_response(500, f"Failed to reset system: {str(e)}", "RESET_ERROR")
+        logger.error(f"Failure during reset: {e}", exc_info=True)
+        return _error_response(500, f"Failed to reset system: {str(e)}")
