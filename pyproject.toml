@@ -23,7 +23,6 @@ disallow_incomplete_defs = true
 follow_imports = "silent"
 show_error_codes = true
 exclude = "tests/"
-mypy_path = ["src", "lambdas"]
 
 [tool.pytest.ini_options]
 addopts = "-v"
