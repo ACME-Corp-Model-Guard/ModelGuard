@@ -26,7 +26,6 @@ loguru==0.7.3
 mangum==0.19.0
 MarkupSafe==3.0.3
 mccabe==0.7.0
--e git+https://github.com/ACME-Corp-Model-Guard/ModelGuard@d8529112f9763aa229fb8d123cc6638ba690f655#egg=ModelGuard
 mypy==1.18.2
 mypy_extensions==1.1.0
 nodeenv==1.9.1
