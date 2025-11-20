@@ -1,29 +1,29 @@
-import json
+"""
+Lambda handler for GET /health
+Provides a lightweight heartbeat/liveness response.
+"""
+
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+from src.utils.decorators import translate_exceptions, with_logging
+from src.utils.http import LambdaResponse, json_response
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Lambda handler for the /health endpoint.
 
-    Returns a lightweight heartbeat/liveness response.
+@with_logging
+@translate_exceptions
+def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
-    # Generate Current UTC Timestamp
+    Returns a standardized health/liveness response.
+    """
     now_utc = datetime.now(timezone.utc).isoformat()
 
-    # Response Payload
     body = {
         "status": "ok",
         "checked_at": now_utc,
         "message": "Registry API is reachable",
     }
 
-    # Construct Response
-    response = {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
-
-    return response
+    return json_response(200, body)
