@@ -45,7 +45,6 @@ jobs:
       - name: Type check with mypy
         run: |
           mypy .
-        working-directory: ${{ github.workspace }}
 
       # --- Testing and coverage ---
       - name: Run tests with pytest and coverage
