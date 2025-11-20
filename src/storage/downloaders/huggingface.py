@@ -97,7 +97,6 @@ def download_from_huggingface(
             repo_type=artifact_type,  # "model" or "dataset"
             cache_dir=cache_dir,
             local_dir=cache_dir,
-            local_dir_use_symlinks=False,
         )
 
         # Package into tar archive
