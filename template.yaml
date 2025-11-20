@@ -164,15 +164,15 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: lambdas.authenticate.lambda_handler
-      Description: Login with username/password → return JWTs
-      Role: arn:aws:iam::<YOUR_ACCOUNT_ID>:role/BasicLambdaRole
+      Description: User authentication
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         AuthenticateUser:
           Type: Api
           Properties:
             RestApiId: !Ref ModelGuardApi
             Path: /authenticate
-            Method: POST
+            Method: PUT
             Auth:
               Authorizer: NONE
 
