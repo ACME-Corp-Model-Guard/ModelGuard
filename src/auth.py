@@ -242,12 +242,7 @@ def authorize(
     # Step 1: Extract token header
     headers = event.get("headers", {}) or {}
 
-    token_header = (
-        headers.get("X-Authorization")
-        or headers.get("x-authorization")
-        or headers.get("Authorization")
-        or headers.get("authorization")
-    )
+    token_header = headers.get("X-Authorization")
 
     if not token_header:
         raise Exception("Missing X-Authorization header")
