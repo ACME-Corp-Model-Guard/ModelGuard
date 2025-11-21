@@ -45,6 +45,7 @@ http = urllib3.PoolManager()
 API_TOKEN_TIME_TO_LIVE = 60 * 60 * 10  # 10 hours
 API_TOKEN_CALL_LIMIT = 1000  # 1000 requests per token
 
+
 # ====================================================================================
 # JWKS LOADING (COLD START)
 # ====================================================================================
@@ -58,6 +59,22 @@ JWKS_URL = (
 )
 
 jwks = http.request("GET", JWKS_URL).json()["keys"]
+
+
+# ====================================================================================
+# DYNAMODB TOKEN RECORD TYPE (ADDED FOR STRICT TYPING)
+# ====================================================================================
+# DynamoDB stores arbitrary JSON-like types, which causes mypy to explode when doing
+# arithmetic (e.g., now - record["issued_at"]). We define a precise TypedDict so that
+# Mypy knows these fields are integers.
+# ------------------------------------------------------------------------------------
+
+
+class TokenRecord(TypedDict):
+    token: str
+    username: str
+    issued_at: int
+    uses: int
 
 
 # ====================================================================================
@@ -149,9 +166,12 @@ def verify_token(token: str) -> dict:
         raise Exception("Token expired (JWT exp claim)")
 
     # Step 3: TTL Enforcement
-    record = tokens_table.get_item(Key={"token": token}).get("Item")
-    if not record:
+    raw_item = tokens_table.get_item(Key={"token": token}).get("Item")
+    if raw_item is None:
         raise Exception("Token not registered or invalid")
+
+    # Precise typed cast (DynamoDB returns Dict[str, Any])
+    record: TokenRecord = raw_item  # type: ignore[assignment]
 
     if now - record["issued_at"] > API_TOKEN_TIME_TO_LIVE:
         raise Exception("Token expired (time-to-live exceeded)")
