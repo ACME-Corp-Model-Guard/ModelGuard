@@ -9,7 +9,8 @@ import re
 from typing import Any, Dict, List, Optional
 
 import boto3 # type: ignore[import-untyped]
-from loguru import logger
+# from loguru import logger
+from src.logger import logger
 
 # DynamoDB table configuration
 TABLE_NAME = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")

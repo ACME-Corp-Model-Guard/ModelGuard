@@ -8,8 +8,8 @@ import os
 from typing import Any, Dict, List
 
 import boto3  # type: ignore[import-untyped]
-from loguru import logger
-
+# from loguru import logger
+from src.logger import logger
 
 
 # DynamoDB table configuration <- comes from template.yaml
