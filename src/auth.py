@@ -1,7 +1,9 @@
-import logging
+from __future__ import annotations
+
 import os
 import time
-from typing import Any, Dict, List, Optional, TypedDict
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, TypedDict
 
 import boto3
 import urllib3
@@ -9,13 +11,12 @@ from botocore.exceptions import ClientError
 from jose import jwk, jwt
 from jose.utils import base64url_decode
 
+from src.logger import logger
+from src.utils.http import LambdaResponse, error_response
+
 # ====================================================================================
-# ENVIRONMENT CONFIGURATION
+# ENVIRONMENT CONFIG
 # ====================================================================================
-# These environment variables are injected through template.yaml and provide
-# all configuration parameters required for Cognito, AWS region, and the
-# DDB table storing token-lifetime metadata.
-# ------------------------------------------------------------------------------------
 
 REGION = os.environ["AWS_REGION"]
 USER_POOL_ID = os.environ["USER_POOL_ID"]
@@ -26,48 +27,31 @@ ddb = boto3.resource("dynamodb")
 tokens_table = ddb.Table(TOKENS_TABLE)
 
 cognito = boto3.client("cognito-idp")
-
-log = logging.getLogger()
-log.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-
 http = urllib3.PoolManager()
 
 # ====================================================================================
 # SECURITY TRACK CONSTANTS
 # ====================================================================================
-# These constants implement the required access-token restrictions for the
-# ModelGuard "Other Security Track":
-#   - Tokens expire after 10 hours from issuance
-#   - Tokens are valid for only 1000 API interactions total
-#   These rules override Cognito defaults while still using Cognito JWTs.
-# ------------------------------------------------------------------------------------
 
 API_TOKEN_TIME_TO_LIVE = 60 * 60 * 10  # 10 hours
-API_TOKEN_CALL_LIMIT = 1000  # 1000 requests per token
-
+API_TOKEN_CALL_LIMIT = 1000  # 1000 API calls per token
 
 # ====================================================================================
 # JWKS LOADING (COLD START)
 # ====================================================================================
-# Cognito publishes JSON Web Key Sets (JWKS) for verifying access-token signatures.
-# These keys rarely rotate, so we fetch them once at Lambda cold start.
-# ------------------------------------------------------------------------------------
 
 JWKS_URL = (
     f"https://cognito-idp.{REGION}.amazonaws.com/"
     f"{USER_POOL_ID}/.well-known/jwks.json"
 )
 
+logger.info(f"[auth] Loading JWKS keys from {JWKS_URL}")
 jwks = http.request("GET", JWKS_URL).json()["keys"]
 
 
 # ====================================================================================
-# DYNAMODB TOKEN RECORD TYPE (ADDED FOR STRICT TYPING)
+# PRECISE TYPING FOR TOKEN RECORD
 # ====================================================================================
-# DynamoDB stores arbitrary JSON-like types, which causes mypy to explode when doing
-# arithmetic (e.g., now - record["issued_at"]). We define a precise TypedDict so that
-# Mypy knows these fields are integers.
-# ------------------------------------------------------------------------------------
 
 
 class TokenRecord(TypedDict):
@@ -78,32 +62,25 @@ class TokenRecord(TypedDict):
 
 
 # ====================================================================================
-# AUTHENTICATION: USERNAME + PASSWORD → COGNITO → ACCESS TOKEN
+# AUTHENTICATE USER (for /authenticate endpoint)
 # ====================================================================================
-# This function is used *only* by the /authenticate endpoint.
-# It performs a USER_PASSWORD_AUTH flow against Cognito, then stores token
-# metadata in DynamoDB so that our custom TTL + usage-limit rules can be enforced
-# later in verify_token().
-# ------------------------------------------------------------------------------------
 
 
 def authenticate_user(username: str, password: str) -> dict:
-    """
-    Authenticate a user via Cognito USER_PASSWORD_AUTH and record issuance
-    in DynamoDB for custom lifetime and usage rules.
-    """
+    """Authenticate via Cognito USER_PASSWORD_AUTH and record token issuance."""
     try:
+        logger.info(f"[auth] Authenticating user {username} via Cognito")
+
         resp = cognito.initiate_auth(
             AuthFlow="USER_PASSWORD_AUTH",
             ClientId=USER_POOL_CLIENT_ID,
             AuthParameters={"USERNAME": username, "PASSWORD": password},
         )
 
-        # Pull tokens from Cognito response
         auth = resp["AuthenticationResult"]
         access_token = auth["AccessToken"]
 
-        # Record token issuance time + usage count in DynamoDB
+        # Store token for TTL + usage-limit rules
         tokens_table.put_item(
             Item={
                 "token": access_token,
@@ -121,30 +98,22 @@ def authenticate_user(username: str, password: str) -> dict:
         }
 
     except ClientError as e:
-        log.error(f"Cognito authentication failed: {e}")
+        logger.error(f"[auth] Cognito authentication failed: {e}", exc_info=True)
         raise
 
 
 # ====================================================================================
-# TOKEN VERIFICATION: SIGNATURE • EXPIRATION • TTL • USAGE COUNT
+# VERIFY TOKEN (signature, exp, TTL, usage count)
 # ====================================================================================
-# This is the heart of ModelGuard’s token security mechanism. We:
-#   1. Validate the JWT signature using JWKS (Cognito public keys)
-#   2. Validate the Cognito `exp` claim
-#   3. Enforce the 10-hour ModelGuard TTL
-#   4. Enforce the 1000-call usage maximum
-#   5. Increment the token's "uses" counter in DynamoDB
-# ------------------------------------------------------------------------------------
 
 
 def verify_token(token: str) -> dict:
-    """Validate Cognito JWT + custom ModelGuard token lifecycle rules."""
+    """Validate Cognito JWT + ModelGuard token-lifecycle rules."""
 
-    # Step 1: Signature Validation
+    # Step 1 — Signature validation
     headers = jwt.get_unverified_header(token)
     kid = headers.get("kid")
 
-    # Find the matching JWKS key by Key ID
     key = next((k for k in jwks if k["kid"] == kid), None)
     if not key:
         raise Exception("Invalid token: unknown kid")
@@ -157,30 +126,28 @@ def verify_token(token: str) -> dict:
     if not public_key.verify(message.encode(), decoded_sig):
         raise Exception("Invalid token signature")
 
-    # Step 2: Decode Claims
+    # Step 2 — Decode claims
     claims = jwt.get_unverified_claims(token)
-
-    # Cognito's own expiration check
     now = time.time()
+
     if now > claims["exp"]:
         raise Exception("Token expired (JWT exp claim)")
 
-    # Step 3: TTL Enforcement
+    # Step 3 — TTL enforcement
     raw_item = tokens_table.get_item(Key={"token": token}).get("Item")
     if raw_item is None:
         raise Exception("Token not registered or invalid")
 
-    # Precise typed cast (DynamoDB returns Dict[str, Any])
     record: TokenRecord = raw_item  # type: ignore[assignment]
 
     if now - record["issued_at"] > API_TOKEN_TIME_TO_LIVE:
         raise Exception("Token expired (time-to-live exceeded)")
 
-    # Step 4: Usage Limit
+    # Step 4 — Usage limit
     if record["uses"] >= API_TOKEN_CALL_LIMIT:
         raise Exception("Token expired (call limit exceeded)")
 
-    # Step 5: Increment token usage
+    # Step 5 — Increment usage counter
     tokens_table.update_item(
         Key={"token": token},
         UpdateExpression="SET uses = uses + :inc",
@@ -191,35 +158,23 @@ def verify_token(token: str) -> dict:
 
 
 # ====================================================================================
-# ROLE-BASED ACCESS CONTROL (RBAC)
+# RBAC Helpers
 # ====================================================================================
-# Cognito groups are used to implement per-endpoint RBAC. This function enforces
-# that the caller belongs to at least one of the required groups.
-# ------------------------------------------------------------------------------------
 
 
 def require_roles(claims: dict, allowed_roles: list) -> None:
-    """Raise if JWT does not contain at least one allowed Cognito group."""
+    """Raise if the caller does not have one of the required roles."""
     groups = claims.get("cognito:groups", [])
 
     if not groups:
         raise Exception("User has no assigned roles/groups")
 
-    for r in allowed_roles:
-        if r in groups:
-            return  # Authorized
+    if any(role in groups for role in allowed_roles):
+        return
 
     raise Exception(
-        f"Permission denied. Required: {allowed_roles}, user groups: {groups}"
+        f"Permission denied — required={allowed_roles}, user_groups={groups}"
     )
-
-
-# ====================================================================================
-# USERNAME EXTRACTION
-# ====================================================================================
-# Cognito may provide "username" or "cognito:username" depending on flow.
-# This helper normalizes those differences.
-# ------------------------------------------------------------------------------------
 
 
 def get_username(claims: dict) -> str | None:
@@ -227,24 +182,8 @@ def get_username(claims: dict) -> str | None:
 
 
 # ====================================================================================
-# SHARED AUTH EXTRACTOR (MAIN INTERFACE FOR ALL ENDPOINTS)
+# AUTHORIZE()
 # ====================================================================================
-# This is the central function the Lambda handlers will call:
-#
-#     auth = authorize(event, allowed_roles=["Admin"])
-#
-# It performs:
-#   1. Header extraction (X-Authorization preferred by spec)
-#   2. Bearer-token parsing
-#   3. JWT verification + ModelGuard custom rules
-#   4. Optional role enforcement
-#   5. Returns a normalized auth context
-#
-# This ensures:
-#   - consistent behavior across ALL endpoints
-#   - spec compliance
-#   - zero duplication across Lambdas
-# ------------------------------------------------------------------------------------
 
 
 class AuthContext(TypedDict):
@@ -257,11 +196,8 @@ class AuthContext(TypedDict):
 def authorize(
     event: Dict[str, Any], allowed_roles: Optional[List[str]] = None
 ) -> AuthContext:
-    "Authenticate + authorize this request using headers and custom rules."
-
-    # Step 1: Extract token header
+    """Authenticate + authorize request via headers and custom rules."""
     headers = event.get("headers", {}) or {}
-
     token_header = headers.get("X-Authorization")
 
     if not token_header:
@@ -272,17 +208,101 @@ def authorize(
 
     raw_token = token_header.split(" ", 1)[1].strip()
 
-    # Step 2: Verify JWT + custom rules
     claims = verify_token(raw_token)
 
-    # Step 3: Optional RBAC enforcement
     if allowed_roles:
         require_roles(claims, allowed_roles)
 
-    # Step 4: Return unified auth context
     return {
         "username": get_username(claims),
         "claims": claims,
         "groups": claims.get("cognito:groups", []),
         "token": raw_token,
     }
+
+
+# ====================================================================================
+# AUTH REQUIRED DECORATOR
+# ====================================================================================
+# Enforces authentication (no RBAC).
+#
+# This decorator wraps any Lambda handler and:
+#   1. Extracts the Bearer token from the X-Authorization header
+#   2. Verifies signature, expiration, TTL, and usage rules via authorize()
+#   3. Injects `auth` into the handler
+#
+# If verification fails:
+#   - Logs the failure
+#   - Returns a 401 Unauthorized error response
+#
+# Usage:
+#     @auth_required
+#     def lambda_handler(event, context, auth):
+#         ...
+# ------------------------------------------------------------------------------------
+
+def auth_required(
+    func: Callable[..., Any],
+) -> Callable[[Dict[str, Any], Any], LambdaResponse]:
+    """Require authentication only."""
+
+    @wraps(func)
+    def wrapper(event: Dict[str, Any], context: Any) -> LambdaResponse:
+        try:
+            auth: AuthContext = authorize(event)
+            return func(event, context, auth=auth)
+        except Exception as e:
+            logger.error(f"[auth_required] Unauthorized: {e}", exc_info=True)
+            return error_response(
+                401,
+                f"Unauthorized: {e}",
+                error_code="UNAUTHORIZED",
+            )
+
+    return wrapper
+
+
+# ====================================================================================
+# ROLES REQUIRED DECORATOR (AUTH + RBAC)
+# ====================================================================================
+# Enforces authentication AND Cognito RBAC.
+#
+# This decorator wraps any Lambda handler and:
+#   1. Extracts the Bearer token from X-Authorization
+#   2. Verifies the JWT signature + ModelGuard TTL/usage rules
+#   3. Ensures the caller belongs to at least one of the allowed Cognito groups
+#   4. Injects `auth` into the handler
+#
+# If authentication fails → returns 401 Unauthorized
+# If role check fails     → returns 403 Forbidden
+#
+# Usage:
+#     @roles_required(["Admin"])
+#     def lambda_handler(event, context, auth):
+#         ...
+# ------------------------------------------------------------------------------------
+
+def roles_required(
+    allowed_roles: List[str],
+) -> Callable[[Callable[..., Any]], Callable[[Dict[str, Any], Any], LambdaResponse]]:
+    """Require authentication + explicit RBAC roles."""
+
+    def decorator(
+        func: Callable[..., Any],
+    ) -> Callable[[Dict[str, Any], Any], LambdaResponse]:
+        @wraps(func)
+        def wrapper(event: Dict[str, Any], context: Any) -> LambdaResponse:
+            try:
+                auth: AuthContext = authorize(event, allowed_roles=allowed_roles)
+                return func(event, context, auth=auth)
+            except Exception as e:
+                logger.error(f"[roles_required] Forbidden: {e}", exc_info=True)
+                return error_response(
+                    403,
+                    f"Forbidden: {e}",
+                    error_code="FORBIDDEN",
+                )
+
+        return wrapper
+
+    return decorator
