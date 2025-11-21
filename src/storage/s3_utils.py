@@ -12,15 +12,18 @@ from __future__ import annotations
 import os
 from typing import Iterable, Optional
 
-from botocore.client import BaseClient
+from mypy_boto3_s3 import S3Client
+from mypy_boto3_s3.type_defs import ObjectIdentifierTypeDef
 from botocore.exceptions import ClientError
 
 from src.artifacts.types import ArtifactType
 from src.aws.clients import get_s3
 from src.logger import logger
 from src.settings import ARTIFACTS_BUCKET
-from storage.downloaders.dispatchers import FileDownloadError as SourceDownloadError
-from storage.downloaders.dispatchers import download_artifact
+from src.storage.downloaders.dispatchers import (
+    FileDownloadError as SourceDownloadError,
+    download_artifact,
+)
 
 
 # =====================================================================================
@@ -29,15 +32,8 @@ from storage.downloaders.dispatchers import download_artifact
 def upload_file(s3_key: str, local_path: str) -> None:
     """
     Upload a local file to the configured S3 bucket.
-
-    Args:
-        s3_key: Destination key inside the bucket.
-        local_path: Local filesystem path to upload.
-
-    Raises:
-        ClientError: If S3 upload fails.
     """
-    s3: BaseClient = get_s3()
+    s3: S3Client = get_s3()
 
     try:
         logger.debug(f"Uploading file to s3://{ARTIFACTS_BUCKET}/{s3_key}")
@@ -51,15 +47,8 @@ def upload_file(s3_key: str, local_path: str) -> None:
 def download_file(s3_key: str, local_path: str) -> None:
     """
     Download an S3 object to the local filesystem.
-
-    Args:
-        s3_key: S3 key to download.
-        local_path: Local path to write the file to.
-
-    Raises:
-        ClientError: If S3 download fails.
     """
-    s3: BaseClient = get_s3()
+    s3: S3Client = get_s3()
 
     logger.debug(f"Downloading s3://{ARTIFACTS_BUCKET}/{s3_key} -> {local_path}")
 
@@ -77,18 +66,8 @@ def download_file(s3_key: str, local_path: str) -> None:
 def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
     """
     Generate a presigned URL for accessing an S3 object.
-
-    Args:
-        s3_key: The S3 object key.
-        expiration: Lifetime of the URL in seconds (default 1 hour).
-
-    Returns:
-        str: The presigned URL.
-
-    Raises:
-        ClientError: If URL generation fails.
     """
-    s3: BaseClient = get_s3()
+    s3: S3Client = get_s3()
 
     logger.debug(
         f"Generating presigned URL for s3://{ARTIFACTS_BUCKET}/{s3_key} "
@@ -121,18 +100,7 @@ def upload_artifact_to_s3(
     source_url: str,
 ) -> None:
     """
-    Download an artifact from its original source (HuggingFace/GitHub)
-    using the unified dispatcher, then upload the resulting tarball to S3.
-
-    Args:
-        artifact_id: ID of the artifact being stored
-        artifact_type: model/dataset/code
-        s3_key: Path in your artifacts bucket
-        source_url: Upstream source URL (HF/GitHub)
-
-    Raises:
-        SourceDownloadError: if downloading fails
-        ClientError: if S3 upload fails
+    Download an artifact from its original source and upload to S3.
     """
 
     if not ARTIFACTS_BUCKET:
@@ -146,16 +114,17 @@ def upload_artifact_to_s3(
     tmp_path: Optional[str] = None
 
     try:
-        # 1. Download from source → tmp tar.gz file
+        # 1. Source download → temp tarball
         tmp_path = download_artifact(
             source_url=source_url,
             artifact_id=artifact_id,
             artifact_type=artifact_type,
         )
 
-        # 2. Upload to S3
         if tmp_path is None:
             raise RuntimeError("download_artifact() returned None unexpectedly")
+
+        # 2. Upload to S3
         upload_file(s3_key, tmp_path)
         logger.info(
             f"[s3_utils] Uploaded artifact {artifact_id} "
@@ -174,7 +143,6 @@ def upload_artifact_to_s3(
         )
         raise
     finally:
-        # 3. Cleanup temporary file
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.unlink(tmp_path)
@@ -193,13 +161,7 @@ def download_artifact_from_s3(
 ) -> None:
     """
     Download an artifact from S3 into a local file.
-
-    Args:
-        artifact_id: ID being fetched (for logging)
-        s3_key: Key in S3 bucket
-        local_path: Destination filepath on local disk
     """
-
     if not ARTIFACTS_BUCKET:
         raise ValueError("ARTIFACTS_BUCKET environment variable not set")
 
@@ -221,13 +183,7 @@ def generate_s3_download_url(
 ) -> str:
     """
     Generate a pre-signed URL that gives temporary access to an artifact.
-
-    Args:
-        artifact_id: ID being downloaded (for logging)
-        s3_key: Key in S3 bucket
-        expiration: URL lifetime in seconds
     """
-
     if not ARTIFACTS_BUCKET:
         raise ValueError("ARTIFACTS_BUCKET environment variable not set")
 
@@ -244,10 +200,10 @@ def generate_s3_download_url(
 # =====================================================================================
 def clear_bucket(bucket_name: str) -> int:
     """
-    Delete all objects in an S3 bucket.
+    Delete *all* objects in an S3 bucket.
     Returns the number of objects deleted.
     """
-    s3: BaseClient = get_s3()
+    s3: S3Client = get_s3()
     paginator = s3.get_paginator("list_objects_v2")
     pages = paginator.paginate(Bucket=bucket_name)
 
@@ -258,7 +214,9 @@ def clear_bucket(bucket_name: str) -> int:
         if not contents:
             continue
 
-        objects = [{"Key": obj["Key"]} for obj in contents]
+        objects: list[ObjectIdentifierTypeDef] = [
+            ObjectIdentifierTypeDef(Key=obj["Key"]) for obj in contents
+        ]
 
         s3.delete_objects(Bucket=bucket_name, Delete={"Objects": objects})
         delete_count += len(objects)
@@ -268,9 +226,9 @@ def clear_bucket(bucket_name: str) -> int:
 
 def delete_prefix(bucket_name: str, prefix: str) -> int:
     """
-    Delete all objects in a bucket under the given prefix.
+    Delete all objects under a given prefix.
     """
-    s3: BaseClient = get_s3()
+    s3: S3Client = get_s3()
 
     paginator = s3.get_paginator("list_objects_v2")
     pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
@@ -282,7 +240,9 @@ def delete_prefix(bucket_name: str, prefix: str) -> int:
         if not contents:
             continue
 
-        objects = [{"Key": obj["Key"]} for obj in contents]
+        objects: list[ObjectIdentifierTypeDef] = [
+            ObjectIdentifierTypeDef(Key=obj["Key"]) for obj in contents
+        ]
 
         s3.delete_objects(Bucket=bucket_name, Delete={"Objects": objects})
         delete_count += len(objects)
@@ -292,11 +252,13 @@ def delete_prefix(bucket_name: str, prefix: str) -> int:
 
 def delete_objects(bucket_name: str, keys: Iterable[str]) -> int:
     """
-    Delete a list of S3 object keys.
-    Returns number of objects deleted.
+    Delete a specific list of S3 object keys.
     """
-    s3: BaseClient = get_s3()
-    key_list = [{"Key": key} for key in keys]
+    s3: S3Client = get_s3()
+
+    key_list: list[ObjectIdentifierTypeDef] = [
+        ObjectIdentifierTypeDef(Key=key) for key in keys
+    ]
 
     if not key_list:
         return 0
