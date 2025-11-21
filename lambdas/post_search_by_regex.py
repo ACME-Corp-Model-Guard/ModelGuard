@@ -1,5 +1,3 @@
-
-
 """
 Lambda function for POST /artifact/byRegEx endpoint
 Search artifacts using regular expressions.
@@ -10,7 +8,8 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-import boto3 # type: ignore[import-untyped]
+import boto3  # type: ignore[import-untyped]
+
 # from loguru import logger
 from src.logger import logger
 
@@ -44,30 +43,30 @@ def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
     # Some integrations may give a dict already
     if isinstance(raw_body, dict):
         return raw_body
-    
+
     if isinstance(raw_body, str):
         try:
             return json.loads(raw_body or "{}")
         except json.JSONDecodeError:
-            logger.warning("Invalid JSON body for /artifact/byRegEx; using empty body instead")
+            logger.warning(
+                "Invalid JSON body for /artifact/byRegEx; using empty body instead"
+            )
 
     return {}
 
 
 def search_artifacts_by_regex(
-        pattern: str,
-        artifact_type_filter: Optional[str] = None,
-        limit: int = 50
+    pattern: str, artifact_type_filter: Optional[str] = None, limit: int = 50
 ) -> List[ArtifactMetadata]:
     """
-    Scan the DynamoDB table and return artifacts whose name/metadata 
+    Scan the DynamoDB table and return artifacts whose name/metadata
     match the provided information/regular expression
     """
     try:
         regex = re.compile(pattern, flags=re.IGNORECASE)
     except re.error as exc:
         raise ValueError(f"Invalid regular expression: {exc}") from exc
-    
+
     results: List[ArtifactMetadata] = []
     scan_kwargs: Dict[str, Any] = {}
 
@@ -101,24 +100,19 @@ def search_artifacts_by_regex(
             if not regex.search(searchable_text):
                 continue
 
-            results.append(
-                {
-                    "name": name,
-                    "id": artifact_id,
-                    "type": artifact_type
-                }
-            )
+            results.append({"name": name, "id": artifact_id, "type": artifact_type})
 
             if len(results) >= limit:
                 return results
-        
+
         last_key = response.get("LastEvaluatedKey")
         if not last_key:
             break
         scan_kwargs["ExclusiveStartKey"] = last_key
 
     return results
-    
+
+
 def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
     """
     Handler for POST /artifact/byRegEx - Search for artifacts by regex.
@@ -132,9 +126,9 @@ def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
         return {
             "statusCCode": 403,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Authentication failed"})
+            "body": json.dumps({"error": "Authentication failed"}),
         }
-    
+
     body = _parse_body(event)
 
     pattern = body.get("pattern") or body.get("regex")
@@ -142,14 +136,14 @@ def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
         return {
             "statusCode": 400,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Missing regex pattern in request body"})
+            "body": json.dumps({"error": "Missing regex pattern in request body"}),
         }
-    
+
     artifact_type_filter = body.get("artifact_type") or body.get("type")
 
-
-
-    #### OPTIONAL LIMIT PARAMETER - REMOVE IF NOT NECESSARY ####
+    """
+    OPTIONAL LIMIT PARAMETER - REMOVE IF NOT NECESSARY ####
+    """
     limit_raw = body.get("limit", 50)
     try:
         limit = int(limit_raw)
@@ -158,27 +152,18 @@ def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
 
     try:
         artifacts = search_artifacts_by_regex(
-            str(pattern),
-            artifact_type_filter = artifact_type_filter,
-            limit = limit
+            str(pattern), artifact_type_filter=artifact_type_filter, limit=limit
         )
     except ValueError as exc:
         # Invalid regex pattern
         return {
             "statusCode": 400,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": str(exc)})
+            "body": json.dumps({"error": str(exc)}),
         }
-    
+
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(artifacts)
+        "body": json.dumps(artifacts),
     }
-
-
-
-
-
-
-
