@@ -203,10 +203,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Supports metadata_only query parameter to return metadata without file content.
     """
     path_params = event.get("pathParameters") or {}
-    logger.info(
-        f"Processing GET /artifacts/{path_params.get('artifact_type', 'unknown')}/{path_params.get('id', 'unknown')}"
-    )
-    artifact_type = path_params.get("artifact_type", "").lower()
+    artifact_type_str = path_params.get("artifact_type", "unknown")
+    artifact_id_str = path_params.get("id", "unknown")
+    logger.info(f"Processing GET /artifacts/{artifact_type_str}/{artifact_id_str}")
+    artifact_type = artifact_type_str.lower()
     artifact_id = path_params.get("id", "")
 
     valid_types = {"model", "code", "dataset"}
@@ -293,6 +293,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
     logger.info(
-        f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type}, size: {len(file_content)} bytes"
+        f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type},
+        size: {len(file_content)} bytes"
     )
     return _create_binary_response(200, file_content, content_type)
