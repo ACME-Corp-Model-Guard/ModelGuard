@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import boto3
 from botocore.exceptions import ClientError
+from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 
 from src.logger import logger
 from src.settings import (
-    USER_POOL_ID,
-    DEFAULT_ADMIN_USERNAME,
-    DEFAULT_ADMIN_PASSWORD,
     DEFAULT_ADMIN_GROUP,
+    DEFAULT_ADMIN_PASSWORD,
+    DEFAULT_ADMIN_USERNAME,
+    USER_POOL_ID,
 )
 
 
@@ -33,8 +34,7 @@ from src.settings import (
 # Helpers
 # =====================================================================================
 
-
-def _ensure_cognito_group_exists(cognito, group_name: str) -> None:
+def _ensure_cognito_group_exists(cognito: CognitoIdentityProviderClient, group_name: str) -> None:
     """
     Ensure a Cognito group exists. Creates it if missing.
     """
@@ -51,7 +51,7 @@ def _ensure_cognito_group_exists(cognito, group_name: str) -> None:
 
 
 def _ensure_user_exists(
-    cognito,
+    cognito: CognitoIdentityProviderClient,
     username: str,
     password: str,
     admin_group: str,
@@ -109,7 +109,6 @@ def _ensure_user_exists(
 # =====================================================================================
 # Public Bootstrap Entry Point
 # =====================================================================================
-
 
 def bootstrap_system() -> None:
     """
