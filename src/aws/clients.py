@@ -8,8 +8,9 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import boto3
-from botocore.client import BaseClient
+from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource
+from mypy_boto3_s3 import S3Client
 
 from src.settings import AWS_REGION
 
@@ -17,8 +18,8 @@ from src.settings import AWS_REGION
 # Lazy-initialized client caches
 # =====================================================================================
 _dynamodb_resource: Optional[DynamoDBServiceResource] = None
-_s3_client: Optional[BaseClient] = None
-_cognito_client: Optional[BaseClient] = None
+_s3_client: Optional[S3Client] = None
+_cognito_client: Optional[CognitoIdentityProviderClient] = None
 
 
 # =====================================================================================
@@ -51,7 +52,7 @@ def get_ddb_table(table_name: str) -> Any:
 # =====================================================================================
 # S3
 # =====================================================================================
-def get_s3() -> BaseClient:
+def get_s3() -> S3Client:
     """
     Returns a cached S3 client.
     """
@@ -69,7 +70,7 @@ def get_s3() -> BaseClient:
 # =====================================================================================
 # Cognito
 # =====================================================================================
-def get_cognito() -> BaseClient:
+def get_cognito() -> CognitoIdentityProviderClient:
     """
     Returns a cached Cognito Identity Provider client.
     """
