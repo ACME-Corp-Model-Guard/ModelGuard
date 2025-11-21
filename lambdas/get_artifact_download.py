@@ -293,7 +293,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
     logger.info(
-        f"Successfully downloaded artifact: {artifact_id}, type: {artifact_type},
-        size: {len(file_content)} bytes"
+        "Successfully downloaded artifact: %s, type: %s, size: %d bytes",
+        artifact_id,
+        artifact_type,
+        len(file_content),
     )
     return _create_binary_response(200, file_content, content_type)
