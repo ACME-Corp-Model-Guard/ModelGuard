@@ -43,6 +43,7 @@ from src.utils.http import json_response, error_response, translate_exceptions
 #   500 - internal errors (handled by @translate_exceptions)
 # =============================================================================
 
+
 @translate_exceptions
 @with_logging
 @auth_required
@@ -106,14 +107,18 @@ def lambda_handler(
         artifact = BaseArtifact.from_url(url, artifact_type)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
-        logger.error(f"[post_artifact] Upstream metadata fetch failed: {e}", exc_info=True)
+        logger.error(
+            f"[post_artifact] Upstream metadata fetch failed: {e}", exc_info=True
+        )
         return error_response(
             404,
             "Artifact metadata could not be retrieved from upstream source",
             error_code="SOURCE_NOT_FOUND",
         )
     except Exception as e:
-        logger.error(f"[post_artifact] Unexpected metadata ingestion failure: {e}", exc_info=True)
+        logger.error(
+            f"[post_artifact] Unexpected metadata ingestion failure: {e}", exc_info=True
+        )
         return error_response(
             500,
             "Unexpected error during metadata ingestion",

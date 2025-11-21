@@ -35,6 +35,7 @@ from src.utils.http import (
 # Helper: Fetch GitHub License
 # =============================================================================
 
+
 def fetch_github_license(github_url: str) -> Optional[str]:
     """
     Retrieve SPDX license ID for the given GitHub repository.
@@ -89,6 +90,7 @@ def fetch_github_license(github_url: str) -> Optional[str]:
 #   404 - artifact or GitHub repo not found
 #   502 - GitHub API errors
 # =============================================================================
+
 
 @translate_exceptions
 @with_logging

@@ -17,6 +17,7 @@ from src.utils.http import json_response, error_response, translate_exceptions
 # Helpers
 # =============================================================================
 
+
 def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
     Format artifact rating data into the response structure expected by the spec.
@@ -26,7 +27,9 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     scores_latency = artifact_dict.get("scores_latency", {})
     metadata = artifact_dict.get("metadata", {})
 
-    category = metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
+    category = (
+        metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
+    )
 
     response: Dict[str, Any] = {
         "name": artifact_dict.get("name", "unknown"),
@@ -100,6 +103,7 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
 #   404 - artifact not found
 #   500 - unexpected errors (handled by @translate_exceptions)
 # =============================================================================
+
 
 @translate_exceptions
 @with_logging

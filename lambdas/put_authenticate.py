@@ -33,6 +33,7 @@ from src.auth import authenticate_user
 #   500 - unexpected server error (handled by @translate_exceptions)
 # =============================================================================
 
+
 @translate_exceptions
 @with_logging
 def lambda_handler(

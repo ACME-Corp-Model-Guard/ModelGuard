@@ -241,6 +241,7 @@ def authorize(
 #         ...
 # ------------------------------------------------------------------------------------
 
+
 def auth_required(
     func: Callable[..., Any],
 ) -> Callable[[Dict[str, Any], Any], LambdaResponse]:
@@ -281,6 +282,7 @@ def auth_required(
 #     def lambda_handler(event, context, auth):
 #         ...
 # ------------------------------------------------------------------------------------
+
 
 def roles_required(
     allowed_roles: List[str],

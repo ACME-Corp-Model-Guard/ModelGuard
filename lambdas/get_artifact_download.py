@@ -34,6 +34,7 @@ from src.utils.http import error_response, json_response, translate_exceptions
 #   500 - catchall (handled by @translate_exceptions)
 # =============================================================================
 
+
 @translate_exceptions
 @with_logging
 @auth_required
@@ -66,7 +67,9 @@ def lambda_handler(
             error_code="INVALID_ARTIFACT_TYPE",
         )
 
-    logger.debug(f"[get_artifact] artifact_type={artifact_type}, artifact_id={artifact_id}")
+    logger.debug(
+        f"[get_artifact] artifact_type={artifact_type}, artifact_id={artifact_id}"
+    )
 
     # Load metadata from DynamoDB
     artifact = load_artifact_metadata(artifact_id)
@@ -84,8 +87,12 @@ def lambda_handler(
     try:
         download_url = generate_s3_download_url(artifact_id, s3_key=s3_key)
     except Exception as e:
-        logger.error(f"[get_artifact] Failed to generate presigned URL: {e}", exc_info=True)
-        return error_response(500, "Failed to generate download URL", error_code="S3_ERROR")
+        logger.error(
+            f"[get_artifact] Failed to generate presigned URL: {e}", exc_info=True
+        )
+        return error_response(
+            500, "Failed to generate download URL", error_code="S3_ERROR"
+        )
 
     # Build the returned Artifact object per OpenAPI spec
     response_body = {
@@ -95,8 +102,8 @@ def lambda_handler(
             "type": artifact.artifact_type,
         },
         "data": {
-            "url": artifact.source_url,         # original ingest URL
-            "download_url": download_url,       # presigned S3 URL
+            "url": artifact.source_url,  # original ingest URL
+            "download_url": download_url,  # presigned S3 URL
         },
     }
 
