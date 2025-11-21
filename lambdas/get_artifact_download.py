@@ -1,3 +1,9 @@
+"""
+GET /artifacts/{artifact_type}/{id}
+Retrieve an artifact's metadata and return a presigned S3 URL for downloading
+the stored artifact bundle.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict
