@@ -32,13 +32,7 @@ def validate_token(token: str) -> bool:
 def list_artifacts() -> List[ArtifactMetadata]:
     """
     Scan the DynamoDB table and return all artifacts in the
-    simplified OpenAPI response shape:
-
-        {
-            "name": <artifact name>,
-            "id": <artifact_id>,
-            "type": "model" | "dataset" | "code"
-        }
+    simplified OpenAPI response shape.
     """
     artifacts: List[ArtifactMetadata] = []
     scan_kwargs: Dict[str, Any] = {}
@@ -51,29 +45,33 @@ def list_artifacts() -> List[ArtifactMetadata]:
             for item in items:
                 name = item.get("name")
                 artifact_id = item.get("artifact_id")
-                artifact_type = (item.get("artifact_type") or "").lower()
+                artifact_type_value = item.get("artifact_type")
 
-                # Basic Validation
-                if not (name and artifact_id and artifact_type):
+                # Only accept proper strings
+                if not isinstance(name, str) or not isinstance(artifact_id, str):
                     continue
 
+                if not isinstance(artifact_type_value, str):
+                    continue
+
+                artifact_type = artifact_type_value.lower()
+
                 if artifact_type not in {"model", "dataset", "code"}:
-                    # Ignore unknown/unsupported artifact types
                     continue
 
                 artifacts.append(
                     {
                         "name": name,
-                        "id": artifact_id,  # Map artifact_id ---> id
+                        "id": artifact_id,
                         "type": artifact_type,
                     }
                 )
-            # Handle pagination when scan result is larger than 1 MB
+
             last_key = response.get("LastEvaluatedKey")
             if not last_key:
                 break
             scan_kwargs["ExclusiveStartKey"] = last_key
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except Exception as exc:
         logger.warning(f"DynamoDB scan failed in POST /artifacts: {exc}")
 
     return artifacts

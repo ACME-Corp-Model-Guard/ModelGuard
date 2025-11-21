@@ -42,16 +42,18 @@ def _get_dynamodb_table() -> Any:
 
 
 def _create_response(
-    status_code: int, body: Dict[str, Any], headers: Optional[Dict[str, str]] = None
+    status_code: int,
+    body: Dict[str, Any],
+    headers: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Create a standardized API Gateway response.
     """
     default_headers: Dict[str, str] = {
-        "Content-Type": "application.json",
+        "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, X-Amz-Date, Authorization, X-Api-key",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     }
 
     if headers:

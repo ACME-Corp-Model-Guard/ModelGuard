@@ -7,7 +7,6 @@ import json
 import os
 import re
 from typing import Any, Dict, List, Optional
-
 import boto3  # type: ignore[import-untyped]
 
 # from loguru import logger
@@ -22,11 +21,8 @@ ArtifactMetadata = Dict[str, Any]
 
 
 def validate_token(token: str) -> bool:
-    """
-    Stub AuthenticationToken validator.
-    Just checks that the header is present and looks like a bearer token.
-    """
-    return bool(token) and token.lower().startwith("bearer: ")
+    """Stub AuthenticationToken validator."""
+    return bool(token) and token.lower().startswith("bearer ")
 
 
 def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
@@ -55,12 +51,17 @@ def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
+ArtifactMetadata = Dict[str, Any]
+
+
 def search_artifacts_by_regex(
-    pattern: str, artifact_type_filter: Optional[str] = None, limit: int = 50
+    pattern: str,
+    artifact_type_filter: Optional[str] = None,
+    limit: int = 50,
 ) -> List[ArtifactMetadata]:
     """
     Scan the DynamoDB table and return artifacts whose name/metadata
-    match the provided information/regular expression
+    match the provided regular expression.
     """
     try:
         regex = re.compile(pattern, flags=re.IGNORECASE)
@@ -75,21 +76,26 @@ def search_artifacts_by_regex(
         items = response.get("Items", [])
 
         for item in items:
+            # Safely pull and type-check fields
             name = item.get("name")
             artifact_id = item.get("artifact_id")
-            artifact_type = (item.get("artifact_type") or "").lower()
+            artifact_type_value = item.get("artifact_type")
 
-            if not (name and artifact_id and artifact_type):
+            if not isinstance(name, str) or not isinstance(artifact_id, str):
                 continue
 
-            if artifact_type_filter:
-                if artifact_type != artifact_type_filter.lower():
-                    continue
+            if not isinstance(artifact_type_value, str):
+                continue
 
-            # Create a searchable string from name + metadata values
-            searchable_parts = [name]
+            artifact_type = artifact_type_value.lower()
+
+            if artifact_type_filter and artifact_type != artifact_type_filter.lower():
+                continue
+
+            # Build searchable text from strings only
+            searchable_parts: List[str] = [name]
+
             metadata = item.get("metadata")
-
             if isinstance(metadata, dict):
                 for value in metadata.values():
                     if isinstance(value, str):
@@ -100,7 +106,13 @@ def search_artifacts_by_regex(
             if not regex.search(searchable_text):
                 continue
 
-            results.append({"name": name, "id": artifact_id, "type": artifact_type})
+            results.append(
+                {
+                    "name": name,
+                    "id": artifact_id,
+                    "type": artifact_type,
+                }
+            )
 
             if len(results) >= limit:
                 return results
