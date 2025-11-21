@@ -67,7 +67,7 @@ def list_artifacts() -> List[ArtifactMetadata]:
                         "type": artifact_type
                     }
                 )
-            # Handle pagination when scan result is larger than 1 MB                        <------ ASK ABOUT THIS LINE THEN DELETE THIS COMMENT
+            # Handle pagination when scan result is larger than 1 MB                       
             last_key = response.get("LastEvaluatedKey")
             if not last_key:
                 break
