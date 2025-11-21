@@ -1,111 +1,76 @@
-"""
-Lambda function for PUT /authenticate endpoint
-Verify Cognito authentication token from request header
-"""
-
 import json
-from typing import Any, Dict, Optional
+import logging
+from typing import Any, Dict, TypedDict
 
-from src.logger import logger
+from src.auth import authenticate_user
+
+logger = logging.getLogger()
+logger.setLevel("INFO")
 
 
-def _create_response(
-    status_code: int, body: Dict[str, Any], headers: Optional[Dict[str, str]] = None
-) -> Dict[str, Any]:
-    """Create a standardized API Gateway response."""
-    default_headers = {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-    }
-    if headers:
-        default_headers.update(headers)
+class LambdaResponse(TypedDict):
+    statusCode: int
+    headers: Dict[str, str]
+    body: str
+
+
+def _response(status: int, body: Any) -> LambdaResponse:
+    """Utility for building JSON responses."""
     return {
-        "statusCode": status_code,
-        "headers": default_headers,
+        "statusCode": status,
+        "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body),
     }
 
 
-def _error_response(
-    status_code: int, message: str, error_code: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create an error response."""
-    body = {"error": message}
-    if error_code:
-        body["error_code"] = error_code
-    return _create_response(status_code, body)
-
-
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
-    Lambda handler for PUT /authenticate.
-
-    Verifies Cognito authentication token from request header.
-    With API Gateway Cognito authorizer, the token is already verified.
-    This endpoint extracts and returns user information from the authenticated request.
+    /authenticate  (PUT)
+    Spec compliance:
+      - RequestBody must contain AuthenticationRequest:
+          {
+            "user": { "name": "...", "is_admin": true },
+            "secret": { "password": "..." }
+          }
+      - Return: a JSON string: "bearer <token>"
+      - 400 on malformed request
+      - 401 on invalid credentials
+      - 501 if auth disabled (not the case here)
     """
-    logger.info("Processing PUT /authenticate")
 
     try:
-        # Extract authentication token from request header
-        headers = event.get("headers", {}) or {}
-        # Check multiple possible header names
-        auth_token = (
-            headers.get("Authorization")
-            or headers.get("authorization")
-            or headers.get("X-Authorization")
-            or headers.get("x-authorization")
-        )
+        raw_body = event.get("body", "{}")
+        data = json.loads(raw_body)
 
-        # Remove "Bearer " prefix if present
-        if auth_token and auth_token.startswith("Bearer "):
-            auth_token = auth_token[7:]
-        elif auth_token and auth_token.startswith("bearer "):
-            auth_token = auth_token[7:]
+        # Validate request schema
+        if (
+            "user" not in data
+            or "secret" not in data
+            or "name" not in data["user"]
+            or "password" not in data["secret"]
+        ):
+            return _response(400, "Malformed AuthenticationRequest")
 
-        if not auth_token:
-            logger.warning("No authentication token in request header")
-            return _error_response(
-                401, "Authentication token required in header", "MISSING_TOKEN"
-            )
+        username = data["user"]["name"]
+        password = data["secret"]["password"]
 
-        # Verify token (with API Gateway Cognito authorizer, token is already verified)
-        # Extract user info from request context if available
-        request_context = event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
+        if not username or not password:
+            return _response(400, "Missing username or password")
 
-        # Get user information from Cognito claims
-        username = authorizer.get("claims", {}).get(
-            "cognito:username"
-        ) or authorizer.get("claims", {}).get("sub", "")
-        groups = authorizer.get("claims", {}).get("cognito:groups", [])
-        is_admin = "Admin" in groups if isinstance(groups, list) else False
+        # Authenticate via Cognito
+        try:
+            tokens = authenticate_user(username, password)
+        except Exception:
+            # Cognito rejected user/password
+            return _response(401, "Invalid username or password")
 
-        if not username:
-            # If no user info in context, token was still verified by API Gateway
-            logger.info("Token verified but no user info in context")
-            return _create_response(
-                200,
-                {
-                    "authenticated": True,
-                    "message": "Token verified successfully",
-                },
-            )
+        # Extract access token for spec
+        access_token = tokens["access_token"]
 
-        logger.info(f"Successfully verified token for user: {username}")
-        return _create_response(
-            200,
-            {
-                "authenticated": True,
-                "username": username,
-                "is_admin": is_admin,
-                "groups": groups if isinstance(groups, list) else [],
-            },
-        )
+        # Return response
+        bearer_string = f"bearer {access_token}"
+        return _response(200, bearer_string)
+
     except Exception as e:
-        logger.error(f"Failed to verify authentication: {e}", exc_info=True)
-        return _error_response(
-            500, f"Authentication verification failed: {str(e)}", "INTERNAL_ERROR"
-        )
+        logger.error(f"Unexpected error in /authenticate: {e}", exc_info=True)
+        return _response(500, "Internal Server Error")

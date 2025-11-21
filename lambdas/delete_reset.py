@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from src.auth import authorize
 from src.logger import logger
 from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
