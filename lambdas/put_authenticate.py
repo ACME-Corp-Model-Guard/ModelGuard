@@ -1,76 +1,103 @@
-import json
-import logging
-from typing import Any, Dict, TypedDict
+"""
+PUT /authenticate
+Create an access token for a user via Cognito authentication.
+"""
 
+from __future__ import annotations
+
+import json
+from typing import Any, Dict
+
+from src.logger import logger, with_logging
+from src.utils.http import (
+    LambdaResponse,
+    json_response,
+    error_response,
+    translate_exceptions,
+)
 from src.auth import authenticate_user
 
-logger = logging.getLogger()
-logger.setLevel("INFO")
 
+# =============================================================================
+# Lambda Handler: PUT /authenticate
+# =============================================================================
+#
+# Responsibilities:
+#   1. Parse and validate AuthenticationRequest
+#   2. Authenticate user via Cognito (USER_PASSWORD_AUTH)
+#   3. Return spec-compliant bearer token string
+#
+# Error codes:
+#   400 - malformed request body or missing fields
+#   401 - invalid username/password
+#   500 - unexpected server error (handled by @translate_exceptions)
+# =============================================================================
 
-class LambdaResponse(TypedDict):
-    statusCode: int
-    headers: Dict[str, str]
-    body: str
+@translate_exceptions
+@with_logging
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+) -> LambdaResponse:
+    logger.info("[/authenticate] Handling PUT /authenticate")
 
-
-def _response(status: int, body: Any) -> LambdaResponse:
-    """Utility for building JSON responses."""
-    return {
-        "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
-
-
-def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
-    """
-    /authenticate  (PUT)
-    Spec compliance:
-      - RequestBody must contain AuthenticationRequest:
-          {
-            "user": { "name": "...", "is_admin": true },
-            "secret": { "password": "..." }
-          }
-      - Return: a JSON string: "bearer <token>"
-      - 400 on malformed request
-      - 401 on invalid credentials
-      - 501 if auth disabled (not the case here)
-    """
-
+    # ---------------------------------------------------------------------
+    # Step 1 — Parse JSON body
+    # ---------------------------------------------------------------------
+    raw_body = event.get("body", "{}")
     try:
-        raw_body = event.get("body", "{}")
         data = json.loads(raw_body)
+    except Exception:
+        return error_response(
+            400,
+            "Malformed JSON body",
+            error_code="INVALID_REQUEST",
+        )
 
-        # Validate request schema
-        if (
-            "user" not in data
-            or "secret" not in data
-            or "name" not in data["user"]
-            or "password" not in data["secret"]
-        ):
-            return _response(400, "Malformed AuthenticationRequest")
+    # Request must be an object
+    if not isinstance(data, dict):
+        return error_response(400, "Malformed AuthenticationRequest")
 
-        username = data["user"]["name"]
-        password = data["secret"]["password"]
+    # ---------------------------------------------------------------------
+    # Step 2 — Validate AuthenticationRequest fields
+    # ---------------------------------------------------------------------
+    user = data.get("user")
+    secret = data.get("secret")
 
-        if not username or not password:
-            return _response(400, "Missing username or password")
+    if (
+        not isinstance(user, dict)
+        or not isinstance(secret, dict)
+        or "name" not in user
+        or "password" not in secret
+    ):
+        return error_response(400, "Malformed AuthenticationRequest")
 
-        # Authenticate via Cognito
-        try:
-            tokens = authenticate_user(username, password)
-        except Exception:
-            # Cognito rejected user/password
-            return _response(401, "Invalid username or password")
+    username = user.get("name")
+    password = secret.get("password")
 
-        # Extract access token for spec
-        access_token = tokens["access_token"]
+    if not username or not password:
+        return error_response(400, "Missing username or password")
 
-        # Return response
-        bearer_string = f"bearer {access_token}"
-        return _response(200, bearer_string)
+    # ---------------------------------------------------------------------
+    # Step 3 — Authenticate via Cognito
+    # ---------------------------------------------------------------------
+    try:
+        tokens = authenticate_user(username, password)
+    except Exception:
+        return error_response(401, "Invalid username or password")
 
-    except Exception as e:
-        logger.error(f"Unexpected error in /authenticate: {e}", exc_info=True)
-        return _response(500, "Internal Server Error")
+    access_token = tokens.get("access_token")
+    if not access_token:
+        logger.error("[/authenticate] Missing 'access_token' from Cognito response")
+        return error_response(
+            500,
+            "Internal Server Error",
+            error_code="AUTH_ERROR",
+        )
+
+    # ---------------------------------------------------------------------
+    # Step 4 — Construct spec-compliant response
+    # Returned value must be a JSON *string*, not an object.
+    # ---------------------------------------------------------------------
+    bearer_string = f"bearer {access_token}"
+    return json_response(200, bearer_string)
