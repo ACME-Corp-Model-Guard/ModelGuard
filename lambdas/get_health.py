@@ -8,8 +8,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from src.utils.decorators import translate_exceptions, with_logging
-from src.utils.http import LambdaResponse, json_response
+from src.logger import with_logging
+from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 
 @with_logging
