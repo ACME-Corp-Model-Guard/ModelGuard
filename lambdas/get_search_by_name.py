@@ -1,108 +1,123 @@
 """
-Lambda function for GET /artifact/byName/{name} endpoint
-Search artifacts by name
+GET /artifact/byName/{name}
+Look up an artifact by its human-readable name and return its metadata
+along with its S3 download URL.
 """
 
-import json
-from typing import Any, Dict, List
+from __future__ import annotations
 
-import boto3  # type: ignore[import-untyped]
-from boto3.dynamodb.conditions import Key  # type: ignore[import-untyped]
-from loguru import logger
+from typing import Any, Dict, Optional
 
-# DynamoDB Table
-TABLE_NAME = "ModelGuard-Artifacts-Metadata"
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(TABLE_NAME)
-
-ArtifactMetadata = Dict[
-    str, Any
-]  # TODO: Decide type: could be a TypedDict or Pydantic model
+from src.auth import AuthContext, auth_required
+from src.logger import logger, with_logging
+from src.settings import ARTIFACTS_TABLE
+from src.storage.dynamo_utils import load_artifact_metadata, scan_table
+from src.storage.s3_utils import generate_s3_download_url
+from src.utils.http import error_response, json_response, translate_exceptions
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Lambda handler for GET /artifact/byName/{name}.
-    Returns artifact metadata entries that match the provided name.
-    """
-    # Extract Path Parameters
+# =============================================================================
+# Lambda Handler: GET /artifact/byName/{name}
+# =============================================================================
+#
+# Responsibilities:
+#   1. Authenticate caller
+#   2. Look up artifact by name via table scan
+#   3. Load full artifact metadata using artifact_id
+#   4. Generate presigned S3 download URL
+#   5. Return Artifact response per spec
+#
+# Error codes:
+#   400 - missing name parameter
+#   403 - auth failure (handled by @auth_required)
+#   404 - artifact not found
+#   500 - unexpected errors (handled by @translate_exceptions)
+# =============================================================================
+
+@translate_exceptions
+@with_logging
+@auth_required
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+    auth: AuthContext,
+):
+    logger.info("[get_artifact_by_name] Handling artifact lookup")
+
+    # ------------------------------------------------------------------
+    # Extract name parameter
+    # ------------------------------------------------------------------
     path_params = event.get("pathParameters") or {}
     name = path_params.get("name")
+
     if not name:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Missing or invalid artifact name"}),
-        }
+        return error_response(
+            400,
+            "Missing required path parameter: name",
+            error_code="INVALID_REQUEST",
+        )
 
-    # Extract Headers
-    headers = event.get("headers") or {}
-    auth_token = headers.get("X-Authorization")
-    if not auth_token or not validate_token(auth_token):
-        return {
-            "statusCode": 403,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Authentication failed"}),
-        }
+    logger.debug(f"[get_artifact_by_name] Searching for artifact with name={name}")
 
-    # Query DynamoDB
-    artifacts: List[ArtifactMetadata] = query_artifacts_by_name(name)
+    # ------------------------------------------------------------------
+    # Scan DynamoDB for an item with this name
+    # ------------------------------------------------------------------
+    rows = scan_table(ARTIFACTS_TABLE)
+    match: Optional[Dict[str, Any]] = None
 
-    if not artifacts:
-        return {
-            "statusCode": 404,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "No such artifact"}),
-        }
+    for row in rows:
+        if row.get("name") == name:
+            match = row
+            break
 
-    # Successful Response
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(artifacts),
+    if not match:
+        return error_response(
+            404,
+            f"Artifact with name '{name}' does not exist",
+            error_code="NOT_FOUND",
+        )
+
+    artifact_id = match["artifact_id"]
+    logger.info(f"[get_artifact_by_name] Found artifact_id={artifact_id}")
+
+    # ------------------------------------------------------------------
+    # Load the artifact
+    # ------------------------------------------------------------------
+    artifact = load_artifact_metadata(artifact_id)
+    if artifact is None:
+        return error_response(
+            404,
+            f"Artifact '{name}' exists but metadata is corrupted/missing",
+            error_code="NOT_FOUND",
+        )
+
+    # ------------------------------------------------------------------
+    # Construct S3 key and presigned download URL
+    # ------------------------------------------------------------------
+    s3_key = artifact.s3_key
+
+    try:
+        download_url = generate_s3_download_url(artifact.artifact_id, s3_key=s3_key)
+    except Exception as e:
+        logger.error(
+            f"[get_artifact_by_name] Failed to generate presigned URL: {e}",
+            exc_info=True,
+        )
+        return error_response(500, "Failed to generate download URL", "S3_ERROR")
+
+    # ------------------------------------------------------------------
+    # Build response
+    # ------------------------------------------------------------------
+    response_body = {
+        "metadata": {
+            "name": artifact.name,
+            "id": artifact.artifact_id,
+            "type": artifact.artifact_type,
+        },
+        "data": {
+            "url": artifact.source_url,
+            "download_url": download_url,
+        },
     }
 
-
-def validate_token(token: str) -> bool:
-    """
-    Validate the AuthenticationToken (stub implementation)
-    """
-    # TODO: Replace with real Cognito / JWT validation
-    return token.startswith("bearer ")
-
-
-def query_artifacts_by_name(name: str) -> List[ArtifactMetadata]:
-    """
-    Query DynamoDB table for artifacts matching the given name.
-    Returns a list of ArtifactMetadata dicts matching the OpenAPI schema.
-    Assumes `id` is stored as a string.
-    """
-    try:
-        response = table.query(
-            IndexName="NameIndex",  # Specify the GSI
-            KeyConditionExpression=Key("name").eq(name),
-        )
-        items = response.get("Items", [])
-        artifacts: List[ArtifactMetadata] = []
-
-        for item in items:
-            # Validate Required Fields
-            if "name" in item and "artifact_id" in item and "artifact_type" in item:
-                artifact_type = item["artifact_type"]
-                if artifact_type not in {"model", "dataset", "code"}:
-                    continue  # Skip Invalid Type
-                artifacts.append(
-                    {
-                        "name": item["name"],
-                        "id": item[
-                            "artifact_id"
-                        ],  # Map artifact_id to id for API response
-                        "type": artifact_type,
-                    }
-                )
-
-        return artifacts
-
-    except Exception as e:
-        logger.warning(f"DynamoDB query failed: {e}")
-        return []
+    return json_response(200, response_body)
