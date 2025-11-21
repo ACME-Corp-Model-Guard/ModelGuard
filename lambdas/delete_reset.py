@@ -1,11 +1,3 @@
-"""
-DELETE /reset
-Reset the system to default state:
-- Clear all items from the DynamoDB artifacts table
-- Clear all objects from the S3 artifacts bucket
-- Reinitialize required bootstrap state (default admin user, etc.)
-"""
-
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -19,32 +11,53 @@ from src.utils.bootstrap import bootstrap_system
 from src.utils.http import json_response, translate_exceptions
 
 
-# ======================================================================
-# Lambda Handler
-# ======================================================================
-@with_logging
-@translate_exceptions
-@auth_required
-def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> Dict[str, Any]:
-    """
-    DELETE /reset
-    Reset all system state (DynamoDB + S3), then run bootstrap initialization.
-    """
-    logger.info("[/reset] Processing DELETE /reset")
+# =============================================================================
+# Lambda Handler: DELETE /reset
+# =============================================================================
+#
+# Responsibilities:
+#   1. Authenticate caller
+#   2. Clear DynamoDB artifacts table
+#   3. Clear S3 bucket of all stored artifacts
+#   4. Reinitialize system bootstrap state
+#   5. Return status response
+#
+# Error codes:
+#   401 - authentication failure (handled by @auth_required)
+#   500 - catch-all for unexpected errors (handled by @translate_exceptions)
+# =============================================================================
 
-    # 1 — Reset DynamoDB
+@translate_exceptions
+@with_logging
+@auth_required
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+    auth: AuthContext,
+):
+    logger.info("[/reset] Handling DELETE /reset")
+
+    # ---------------------------------------------------------------------
+    # Step 1 — Clear DynamoDB artifacts table
+    # ---------------------------------------------------------------------
     logger.info(f"[/reset] Clearing DynamoDB table: {ARTIFACTS_TABLE}")
     clear_table(ARTIFACTS_TABLE, key_name="artifact_id")
 
-    # 2 — Reset S3
+    # ---------------------------------------------------------------------
+    # Step 2 — Clear S3 artifacts bucket
+    # ---------------------------------------------------------------------
     logger.info(f"[/reset] Clearing S3 bucket: {ARTIFACTS_BUCKET}")
     clear_bucket(ARTIFACTS_BUCKET)
 
-    # 3 — Run system bootstrap initialization
+    # ---------------------------------------------------------------------
+    # Step 3 — Run system bootstrap initialization
+    # ---------------------------------------------------------------------
     logger.info("[/reset] Running system bootstrap...")
     bootstrap_system()
 
-    # 4 — Success response
+    # ---------------------------------------------------------------------
+    # Step 4 — Success response
+    # ---------------------------------------------------------------------
     return json_response(
         status_code=200,
         body={
