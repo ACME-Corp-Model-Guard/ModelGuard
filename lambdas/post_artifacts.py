@@ -45,7 +45,7 @@ def list_artifacts() -> List[ArtifactMetadata]:
     try:
         while True:
             response = table.scan(**scan_kwargs)
-            items = response.get("Items",j [])
+            items = response.get("Items", [])
 
             for item in items:
                 name = item.get("name")
