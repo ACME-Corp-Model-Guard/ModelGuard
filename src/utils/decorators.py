@@ -15,33 +15,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 # -----------------------------------------------------------------------------
-# Logging decorator
-# -----------------------------------------------------------------------------
-def with_logging(func: F) -> F:
-    """
-    Decorator that logs entry, exit, and errors for any Lambda handler.
-    """
-
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        logger.info(f"Entering {func.__name__}")
-
-        try:
-            result = func(*args, **kwargs)
-            logger.info(f"Exiting {func.__name__}")
-            return result
-
-        except Exception as e:
-            logger.error(
-                f"Unhandled exception in {func.__name__}: {e}",
-                exc_info=True,
-            )
-            raise
-
-    return wrapper  # type: ignore[return-value]
-
-
-# -----------------------------------------------------------------------------
 # Exception → API Gateway response translator
 # -----------------------------------------------------------------------------
 def translate_exceptions(func: F) -> Callable[[Dict[str, Any], Any], LambdaResponse]:
