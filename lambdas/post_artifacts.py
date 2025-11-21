@@ -8,6 +8,7 @@ import os
 from typing import Any, Dict, List
 
 import boto3  # type: ignore[import-untyped]
+
 # from loguru import logger
 from src.logger import logger
 
@@ -64,18 +65,18 @@ def list_artifacts() -> List[ArtifactMetadata]:
                     {
                         "name": name,
                         "id": artifact_id,  # Map artifact_id ---> id
-                        "type": artifact_type
+                        "type": artifact_type,
                     }
                 )
-            # Handle pagination when scan result is larger than 1 MB                       
+            # Handle pagination when scan result is larger than 1 MB
             last_key = response.get("LastEvaluatedKey")
             if not last_key:
                 break
             scan_kwargs["ExclusiveStartKey"] = last_key
-    except Exception as exc:    # pragma: no cover - defensive logging
+    except Exception as exc:  # pragma: no cover - defensive logging
         logger.warning(f"DynamoDB scan failed in POST /artifacts: {exc}")
 
-    return artifacts 
+    return artifacts
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -94,15 +95,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             "statusCode": 403,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Authentication failed"})
+            "body": json.dumps({"error": "Authentication failed"}),
         }
-    
 
     # Ignore the request body, only enumerate all artifacts
     artifacts = list_artifacts()
 
-    return{
+    return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(artifacts)
+        "body": json.dumps(artifacts),
     }
