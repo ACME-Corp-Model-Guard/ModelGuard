@@ -3,19 +3,20 @@ DELETE /reset
 Reset the system to default state:
 - Clear all items from the DynamoDB artifacts table
 - Clear all objects from the S3 artifacts bucket
+- Reinitialize required bootstrap state (default admin user, etc.)
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.auth import authorize
-from src.logger import logger
+from src.auth import auth_required
+from src.logger import with_logging, logger
 from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
-from src.utils.decorators import translate_exceptions, with_logging
-from src.utils.http import LambdaResponse, json_response
+from src.utils.http import json_response, translate_exceptions
+from src.utils.bootstrap import bootstrap_system
 
 
 # ======================================================================
@@ -23,26 +24,31 @@ from src.utils.http import LambdaResponse, json_response
 # ======================================================================
 @with_logging
 @translate_exceptions
-def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
+@auth_required
+def lambda_handler(event: Dict[str, Any], context: Any, auth: Dict[str, Any]) -> Dict[str, Any]:
     """
     DELETE /reset
-    Reset all system state (DynamoDB + S3).
+    Reset all system state (DynamoDB + S3), then run bootstrap initialization.
     """
     logger.info("[/reset] Processing DELETE /reset")
 
-    # Reset DynamoDB
+    # 1 — Reset DynamoDB
     logger.info(f"[/reset] Clearing DynamoDB table: {ARTIFACTS_TABLE}")
     clear_table(ARTIFACTS_TABLE, key_name="artifact_id")
 
-    # Reset S3
+    # 2 — Reset S3
     logger.info(f"[/reset] Clearing S3 bucket: {ARTIFACTS_BUCKET}")
     clear_bucket(ARTIFACTS_BUCKET)
 
-    # Build success response
+    # 3 — Run system bootstrap initialization
+    logger.info("[/reset] Running system bootstrap...")
+    bootstrap_system()
+
+    # 4 — Success response
     return json_response(
         status_code=200,
         body={
-            "message": "System reset successfully",
+            "message": "System reset and bootstrapped successfully",
             "status": "ok",
         },
     )
