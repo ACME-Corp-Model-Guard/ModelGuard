@@ -1,10 +1,14 @@
 repos:
   # --- Code formatting (Black) ---
   - repo: https://github.com/psf/black
-    rev: 24.8.0  # match the version you use in CI
+    rev: 23.7.0
     hooks:
       - id: black
+        name: black
         language_version: python3
+        args:
+          - --check
+          - src/
 
   # --- Linting (Flake8) ---
   - repo: https://github.com/pycqa/flake8

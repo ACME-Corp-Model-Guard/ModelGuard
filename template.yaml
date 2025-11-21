@@ -2,19 +2,145 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'ModelGuard MVP - Core Artifact Management API'
 
+Parameters:
+  DeploymentRegion:
+    Type: String
+    Default: us-east-2
+    Description: AWS region for deployment
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+
 Globals:
   Function:
     Runtime: python3.12
     Timeout: 15
-    MemorySize: 128
+    MemorySize: 512  # MB of RAM (also sets /tmp to 512MB)
     Environment:
       Variables:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
         PYTHONPATH: /var/task:/var/task/src
+        ARTIFACTS_TABLE: !Ref ArtifactsTable
+        ARTIFACTS_BUCKET: !Ref ArtifactsBucket
+        BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
+        BEDROCK_REGION: !Ref DeploymentRegion
+        USER_POOL_ID: !Ref ModelGuardUserPool
+        USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
+        TOKENS_TABLE: !Ref TokensTable
     Tracing: Active
 
 Resources:
-  # API Gateway
+  ###########################################################
+  # DynamoDB Tables
+  ###########################################################
+  ArtifactsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Artifacts-Metadata
+      BillingMode: PAY_PER_REQUEST  # On-demand pricing
+      AttributeDefinitions:
+        - AttributeName: artifact_id
+          AttributeType: S
+        - AttributeName: name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: artifact_id
+          KeyType: HASH  # Primary key
+      GlobalSecondaryIndexes:
+        - IndexName: NameIndex
+          KeySchema:
+            - AttributeName: name
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  TokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Tokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  ###########################################################
+  # S3 Artifact Storage
+  ###########################################################
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'modelguard-artifacts-files'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  ###########################################################
+  # Cognito User Pool + Client + Domain + Groups
+  ###########################################################
+  ModelGuardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ModelGuard-Users
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      UserPoolTags:
+        Project: ModelGuard
+
+  ModelGuardUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      ClientName: ModelGuard-Web-Client
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+
+  ModelGuardUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      Domain: !Sub 'modelguard-${AWS::AccountId}'
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      GroupName: Admin
+      Description: Full access to all artifacts and operations
+      Precedence: 1
+
+  UserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
+      GroupName: User
+      Description: Standard user access to artifacts
+      Precedence: 2
+
+  ###########################################################
+  # API Gateway + Cognito Authorizer
+  ###########################################################
   ModelGuardApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -22,9 +148,37 @@ Resources:
       Description: ModelGuard MVP API
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Authorization'"
+        AllowHeaders: "'Content-Type,X-Authorization,Authorization'"
         AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
+  ###########################################################
+  # Lambda: /authenticate (no authorizer)
+  ###########################################################
+  AuthenticateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.authenticate.lambda_handler
+      Description: User authentication
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        AuthenticateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /authenticate
+            Method: PUT
+            Auth:
+              Authorizer: NONE
+
+  ###########################################################
+  # Lambda Functions for Artifact Endpoints
+  ###########################################################
   # POST /artifacts - Enumerate artifacts
   PostArtifactsFunction:
     Type: AWS::Serverless::Function
@@ -137,33 +291,55 @@ Resources:
             Path: /artifact/model/{id}/rate
             Method: GET
 
-  # Web Interface
-  WebUIFunction:
+  # DELETE /reset - Reset system
+  DeleteResetFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: web.app.handler
-      Runtime: python3.12
-      CodeUri: .
-      Timeout: 10
-      MemorySize: 256
-      Environment:
-        Variables:
-          API_BASE: "https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/"
+      CodeUri: ./
+      Handler: lambdas.delete_reset.lambda_handler
+      Description: Reset system to default state
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
-        Root:
+        Reset:
           Type: Api
           Properties:
-            Path: /
-            Method: ANY
-        Web:
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
+            RestApiId: !Ref ModelGuardApi
+            Path: /reset
+            Method: DELETE
 
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
-    Value: !Sub 'https://${ModelGuardApi}.execute-api.${AWS::Region}.amazonaws.com/dev/'
+    Value: !Sub 'https://${ModelGuardApi}.execute-api.${DeploymentRegion}.amazonaws.com/dev/'
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
+
+  ArtifactsTableName:
+    Description: DynamoDB table for model metadata
+    Value: !Ref ArtifactsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-TableName'
+
+  ArtifactsBucketName:
+    Description: S3 bucket for model/code/dataset storage
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref ModelGuardUserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref ModelGuardUserPoolClient
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientId'
+
+  CognitoDomain:
+    Description: Cognito Domain for authentication
+    Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${DeploymentRegion}.amazoncognito.com'
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoDomain'

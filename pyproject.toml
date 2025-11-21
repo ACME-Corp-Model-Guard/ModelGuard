@@ -22,6 +22,7 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 follow_imports = "silent"
 show_error_codes = true
+exclude = "tests/"
 
 [tool.pytest.ini_options]
 addopts = "-v"

@@ -42,4 +42,55 @@ jobs:
         run: sam build
         
       - name: Deploy SAM application
-        run: sam deploy --no-confirm-changeset
+        run: sam deploy --no-confirm-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+        
+      - name: Extract Cognito config from CloudFormation
+        run: |
+          # Get stack name from samconfig.toml or use default
+          STACK_NAME=$(grep -A 10 "\[default.deploy.parameters\]" samconfig.toml | grep "stack_name" | cut -d'"' -f2 || echo "modelguard-api")
+          
+          # Extract Cognito values from CloudFormation outputs
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' \
+            --output text)
+          
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolClientId`].OutputValue' \
+            --output text)
+          
+          COGNITO_DOMAIN=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CognitoDomain`].OutputValue' \
+            --output text)
+          
+          # Validate that we got real values (not empty)
+          if [ -z "$USER_POOL_ID" ] || [ -z "$USER_POOL_CLIENT_ID" ] || [ -z "$COGNITO_DOMAIN" ]; then
+            echo "❌ ERROR: Failed to extract Cognito values from CloudFormation!"
+            echo "USER_POOL_ID: '$USER_POOL_ID'"
+            echo "USER_POOL_CLIENT_ID: '$USER_POOL_CLIENT_ID'"
+            echo "COGNITO_DOMAIN: '$COGNITO_DOMAIN'"
+            exit 1
+          fi
+          
+          # Create generated config file
+          cat > frontend/src/auth/generated-config.ts << EOF
+          // Auto-generated from CloudFormation outputs - DO NOT EDIT MANUALLY
+          export const cognitoConfig = {
+            userPoolId: "$USER_POOL_ID",
+            clientId: "$USER_POOL_CLIENT_ID", 
+            domain: "$COGNITO_DOMAIN",
+            region: "${{ env.AWS_REGION }}",
+            authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/$USER_POOL_ID"
+          }
+          EOF
+          
+          echo "✅ Generated Cognito config with User Pool ID: $USER_POOL_ID"
+          
+          # Double-check the generated file doesn't contain PLACEHOLDER
+          if grep -q "PLACEHOLDER" frontend/src/auth/generated-config.ts; then
+            echo "❌ ERROR: Generated config still contains PLACEHOLDER values!"
+            cat frontend/src/auth/generated-config.ts
+            exit 1
+          fi

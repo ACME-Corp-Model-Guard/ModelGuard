@@ -4,50 +4,171 @@ Get ratings for model artifacts
 """
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from src.artifacts.utils.metadata_storage import load_artifact_from_dynamodb  # type: ignore[import-not-found]
+from src.logger import logger
+
+
+def _create_response(
+    status_code: int, body: Dict[str, Any], headers: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]:
+    """Create a standardized API Gateway response."""
+    default_headers = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    }
+    if headers:
+        default_headers.update(headers)
+    return {
+        "statusCode": status_code,
+        "headers": default_headers,
+        "body": json.dumps(body),
+    }
+
+
+def _error_response(
+    status_code: int, message: str, error_code: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create an error response."""
+    body = {"error": message}
+    if error_code:
+        body["error_code"] = error_code
+    return _create_response(status_code, body)
+
+
+def _load_artifact_from_dynamodb(artifact_id: str) -> Optional[Dict[str, Any]]:
+    """Load artifact metadata from DynamoDB using metadata_storage.py."""
+    try:
+        artifact = load_artifact_from_dynamodb(artifact_id)
+        if artifact is None:
+            return None
+
+        # Convert artifact to dictionary
+        artifact_dict = artifact.to_dict()
+        return artifact_dict
+    except Exception as e:
+        logger.error(f"Failed to load artifact from DynamoDB: {e}", exc_info=True)
+        return None
+
+
+def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Format artifact data into the rate response structure.
+
+    Maps scores and scores_latency to the expected API format.
+    """
+    scores = artifact_dict.get("scores", {})
+    scores_latency = artifact_dict.get("scores_latency", {})
+
+    # Extract category from metadata if available
+    metadata = artifact_dict.get("metadata", {})
+    category = (
+        metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
+    )
+
+    # Build response with all metric scores
+    response: Dict[str, Any] = {
+        "name": artifact_dict.get("name", "unknown"),
+        "category": category,
+    }
+
+    # Add NetScore
+    if "NetScore" in scores:
+        response["net_score"] = scores["NetScore"]
+    if "NetScore" in scores_latency:
+        response["net_score_latency"] = scores_latency["NetScore"]
+
+    # Map metric names to API format (camelCase with underscores)
+    metric_mapping = {
+        "Availability": ("availability", "availability_latency"),
+        "RampUp": ("ramp_up_time", "ramp_up_time_latency"),
+        "BusFactor": ("bus_factor", "bus_factor_latency"),
+        "PerformanceClaims": ("performance_claims", "performance_claims_latency"),
+        "License": ("license", "license_latency"),
+        "DatasetQuality": ("dataset_quality", "dataset_quality_latency"),
+        "CodeQuality": ("code_quality", "code_quality_latency"),
+        "Reproducibility": ("reproducibility", "reproducibility_latency"),
+        "Reviewedness": ("reviewedness", "reviewedness_latency"),
+        "Treescore": ("tree_score", "tree_score_latency"),
+    }
+
+    # Add individual metric scores
+    for metric_name, (score_key, latency_key) in metric_mapping.items():
+        if metric_name in scores:
+            response[score_key] = scores[metric_name]
+        if metric_name in scores_latency:
+            response[latency_key] = scores_latency[metric_name]
+
+    # Handle Size metric (special case - can be a dict)
+    if "Size" in scores:
+        size_score = scores["Size"]
+        if isinstance(size_score, dict):
+            # Map platform names to API format
+            size_dict: Dict[str, float] = {}
+            platform_mapping = {
+                "raspberry_pi": "raspberry_pi",
+                "jetson_nano": "jetson_nano",
+                "desktop_pc": "desktop_pc",
+                "aws_server": "aws_server",
+            }
+            for platform, api_name in platform_mapping.items():
+                if platform in size_score:
+                    size_dict[api_name] = size_score[platform]
+            response["size_score"] = size_dict if size_dict else size_score
+        else:
+            response["size_score"] = size_score
+
+    if "Size" in scores_latency:
+        response["size_score_latency"] = scores_latency["Size"]
+
+    # Handle dataset_and_code_score (if available)
+    if "DatasetAndCode" in scores:
+        response["dataset_and_code_score"] = scores["DatasetAndCode"]
+    if "DatasetAndCode" in scores_latency:
+        response["dataset_and_code_score_latency"] = scores_latency["DatasetAndCode"]
+
+    return response
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Stub handler for GET /artifact/model/{id}/rate - Rate model
-    Return model rating with all required metrics from the OpenAPI spec
+    Lambda handler for GET /artifact/model/{id}/rate.
+
+    Returns model rating with all metric scores and latencies.
     """
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(
-            {
-                "name": "stub-model",
-                "category": "nlp",
-                "net_score": 0.8,
-                "net_score_latency": 1.5,
-                "ramp_up_time": 0.7,
-                "ramp_up_time_latency": 0.5,
-                "bus_factor": 0.6,
-                "bus_factor_latency": 0.3,
-                "performance_claims": 0.9,
-                "performance_claims_latency": 2.1,
-                "license": 0.8,
-                "license_latency": 0.2,
-                "dataset_and_code_score": 0.7,
-                "dataset_and_code_score_latency": 1.8,
-                "dataset_quality": 0.6,
-                "dataset_quality_latency": 1.2,
-                "code_quality": 0.8,
-                "code_quality_latency": 0.9,
-                "reproducibility": 0.5,
-                "reproducibility_latency": 3.2,
-                "reviewedness": 0.4,
-                "reviewedness_latency": 0.7,
-                "tree_score": 0.7,
-                "tree_score_latency": 1.1,
-                "size_score": {
-                    "raspberry_pi": 0.2,
-                    "jetson_nano": 0.5,
-                    "desktop_pc": 0.8,
-                    "aws_server": 0.9,
-                },
-                "size_score_latency": 0.8,
-            }
-        ),
-    }
+    path_params = event.get("pathParameters") or {}
+    model_id = path_params.get("id", "")
+
+    logger.info(f"Processing GET /artifact/model/{model_id}/rate")
+
+    if not model_id:
+        logger.warning("Model ID is missing")
+        return _error_response(400, "Model ID is required", "MISSING_ID")
+
+    # Load artifact from DynamoDB
+    artifact_dict = _load_artifact_from_dynamodb(model_id)
+    if artifact_dict is None:
+        logger.warning(f"Model not found: {model_id}")
+        return _error_response(404, f"Model not found: {model_id}", "MODEL_NOT_FOUND")
+
+    # Verify it's a model artifact
+    artifact_type = artifact_dict.get("artifact_type", "")
+    if artifact_type != "model":
+        logger.warning(f"Artifact {model_id} is not a model (type: {artifact_type})")
+        return _error_response(
+            400, f"Artifact {model_id} is not a model", "INVALID_ARTIFACT_TYPE"
+        )
+
+    # Format and return rate response
+    try:
+        rate_data = _format_rate_response(artifact_dict)
+        logger.info(f"Successfully retrieved rate for model: {model_id}")
+        return _create_response(200, rate_data)
+    except Exception as e:
+        logger.error(f"Failed to format rate response: {e}", exc_info=True)
+        return _error_response(
+            500, f"Failed to format rate data: {str(e)}", "INTERNAL_ERROR"
+        )
