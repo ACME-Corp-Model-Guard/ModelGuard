@@ -2,17 +2,13 @@
 Base artifact class providing common functionality for all artifact types.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from datetime import datetime
 import uuid
-import os
-
-import boto3  # type: ignore[import-untyped]
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
 
 from src.logger import logger
-from .utils.types import ArtifactType
+from src.storage.downloaders.dispatchers import fetch_artifact_metadata
+from src.artifacts.types import ArtifactType
 
 
 class BaseArtifact(ABC):
@@ -83,9 +79,9 @@ class BaseArtifact(ABC):
         logger.debug(f"Creating artifact of type: {artifact_type}")
 
         # Import here to avoid circular imports
-        from .model_artifact import ModelArtifact
-        from .dataset_artifact import DatasetArtifact
         from .code_artifact import CodeArtifact
+        from .dataset_artifact import DatasetArtifact
+        from .model_artifact import ModelArtifact
 
         artifact_map = {
             "model": ModelArtifact,
@@ -128,8 +124,6 @@ class BaseArtifact(ABC):
             ... )
         """
         logger.info(f"Creating {artifact_type} artifact from URL: {url}")
-
-        from .utils.api_ingestion import fetch_artifact_metadata
 
         # Fetch metadata from external source
         metadata = fetch_artifact_metadata(url, artifact_type)

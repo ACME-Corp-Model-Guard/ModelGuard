@@ -21,6 +21,7 @@ python_version = "3.12"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 follow_imports = "silent"
+ignore_missing_imports = true
 show_error_codes = true
 exclude = "tests/"
 
@@ -29,3 +30,12 @@ addopts = "-v"
 testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = "test_*.py"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "__init__.py", "src/settings.py", "src/logger.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+]
