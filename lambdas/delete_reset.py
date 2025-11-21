@@ -1,3 +1,11 @@
+"""
+DELETE /reset
+Reset the system to default state:
+- Clear all items from the DynamoDB artifacts table
+- Clear all objects from the S3 artifacts bucket
+- Reinitialize required bootstrap state (default admin user, etc.)
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict
