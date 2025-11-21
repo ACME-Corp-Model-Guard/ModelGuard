@@ -1,0 +1,54 @@
+"""
+Global application settings loaded from environment variables.
+Used throughout the Lambda functions and shared utility modules.
+"""
+
+from __future__ import annotations
+
+import os
+
+
+# -----------------------------------------------------------------------------
+# Helper: Fetch required environment variables
+# -----------------------------------------------------------------------------
+def _require_env(name: str) -> str:
+    """
+    Fetch an environment variable or raise a descriptive error.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+# -----------------------------------------------------------------------------
+# Core AWS & Application Settings
+# -----------------------------------------------------------------------------
+AWS_REGION: str = _require_env("AWS_REGION")
+
+# DynamoDB tables
+ARTIFACTS_TABLE: str = _require_env("ARTIFACTS_TABLE")
+TOKENS_TABLE: str = _require_env("TOKENS_TABLE")
+
+# S3 bucket
+ARTIFACTS_BUCKET: str = _require_env("ARTIFACTS_BUCKET")
+
+# Cognito
+USER_POOL_ID: str = _require_env("USER_POOL_ID")
+USER_POOL_CLIENT_ID: str = _require_env("USER_POOL_CLIENT_ID")
+
+# Logging configuration (optional)
+LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+
+# Anthropic/BEDROCK settings (if needed globally)
+BEDROCK_MODEL_ID: str = os.environ.get("BEDROCK_MODEL_ID", "")
+BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
+
+# -----------------------------------------------------------------------------
+# Default admin user settings for /reset
+# -----------------------------------------------------------------------------
+DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
+DEFAULT_ADMIN_PASSWORD: str = (
+    "correcthorsebatterystaple123(!__+@**(A;DROP TABLE packages"
+)
+DEFAULT_ADMIN_GROUP: str = "Admin"
