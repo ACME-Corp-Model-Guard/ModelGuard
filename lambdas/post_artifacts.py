@@ -4,6 +4,7 @@ Enumerate/List artifacts from the registry
 """
 
 import json
+import os
 from typing import Any, Dict, List
 
 import boto3  # type: ignore[import-untyped]
