@@ -6,10 +6,9 @@ Search artifacts using regular expressions.
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional
-import boto3  # type: ignore[import-untyped]
+from typing import Any, Dict, List, Optional, TypeAlias
 
-# from loguru import logger
+import boto3  # type: ignore[import-untyped]
 from src.logger import logger
 
 # DynamoDB table configuration
@@ -17,7 +16,8 @@ TABLE_NAME = os.environ.get("ARTIFACTS_TABLE", "ModelGuard-Artifacts-Metadata")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
-ArtifactMetadata = Dict[str, Any]
+# Single, explicit type alias (only defined once)
+ArtifactMetadata: TypeAlias = Dict[str, Any]
 
 
 def validate_token(token: str) -> bool:
@@ -49,9 +49,6 @@ def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
             )
 
     return {}
-
-
-ArtifactMetadata = Dict[str, Any]
 
 
 def search_artifacts_by_regex(
@@ -89,7 +86,7 @@ def search_artifacts_by_regex(
 
             artifact_type = artifact_type_value.lower()
 
-            if artifact_type_filter and artifact_type != artifact_type_filter.lower():
+            if artifact_type_filter and artifact_type != artifact_type_filter:
                 continue
 
             # Build searchable text from strings only
@@ -125,7 +122,7 @@ def search_artifacts_by_regex(
     return results
 
 
-def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handler for POST /artifact/byRegEx - Search for artifacts by regex.
     """
@@ -136,26 +133,27 @@ def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
 
     if not auth_token or not validate_token(auth_token):
         return {
-            "statusCCode": 403,
+            "statusCode": 403,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Authentication failed"}),
         }
 
     body = _parse_body(event)
 
-    pattern = body.get("pattern") or body.get("regex")
-    if not pattern:
+    pattern_value = body.get("pattern") or body.get("regex")
+    if not isinstance(pattern_value, str) or not pattern_value:
         return {
             "statusCode": 400,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Missing regex pattern in request body"}),
         }
 
-    artifact_type_filter = body.get("artifact_type") or body.get("type")
+    raw_type = body.get("artifact_type") or body.get("type")
+    artifact_type_filter: Optional[str] = None
+    if isinstance(raw_type, str):
+        artifact_type_filter = raw_type.lower()
 
-    """
-    OPTIONAL LIMIT PARAMETER - REMOVE IF NOT NECESSARY ####
-    """
+    # OPTIONAL LIMIT PARAMETER
     limit_raw = body.get("limit", 50)
     try:
         limit = int(limit_raw)
@@ -164,7 +162,9 @@ def lambda_handler(event: Dict[str, Any], contect: Any) -> Dict[str, Any]:
 
     try:
         artifacts = search_artifacts_by_regex(
-            str(pattern), artifact_type_filter=artifact_type_filter, limit=limit
+            pattern_value,
+            artifact_type_filter=artifact_type_filter,
+            limit=limit,
         )
     except ValueError as exc:
         # Invalid regex pattern
