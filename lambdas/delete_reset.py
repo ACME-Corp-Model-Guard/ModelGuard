@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.auth import auth_required
-from src.logger import with_logging, logger
+from src.auth import AuthContext, auth_required
+from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
-from src.utils.http import json_response, translate_exceptions
 from src.utils.bootstrap import bootstrap_system
+from src.utils.http import json_response, translate_exceptions
 
 
 # ======================================================================
@@ -25,7 +25,7 @@ from src.utils.bootstrap import bootstrap_system
 @with_logging
 @translate_exceptions
 @auth_required
-def lambda_handler(event: Dict[str, Any], context: Any, auth: Dict[str, Any]) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> Dict[str, Any]:
     """
     DELETE /reset
     Reset all system state (DynamoDB + S3), then run bootstrap initialization.
