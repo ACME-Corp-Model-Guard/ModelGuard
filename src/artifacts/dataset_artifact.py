@@ -5,7 +5,6 @@ Dataset artifact class.
 from typing import Dict, Any, Optional
 
 from .base_artifact import BaseArtifact
-from src.logger import logger
 
 
 class DatasetArtifact(BaseArtifact):

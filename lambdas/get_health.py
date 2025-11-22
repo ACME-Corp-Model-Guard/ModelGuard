@@ -8,8 +8,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from src.utils.decorators import translate_exceptions, with_logging
-from src.utils.http import LambdaResponse, json_response
+from src.logger import with_logging
+from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 
 @with_logging
@@ -18,8 +18,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
     Returns a standardized health/liveness response.
     """
+    # ---------------------------------------------------------------------
+    # Step 1 — Get the current datetime
+    # ---------------------------------------------------------------------
     now_utc = datetime.now(timezone.utc).isoformat()
 
+    # ---------------------------------------------------------------------
+    # Step 2 — Construct the response
+    # ---------------------------------------------------------------------
     body = {
         "status": "ok",
         "checked_at": now_utc,

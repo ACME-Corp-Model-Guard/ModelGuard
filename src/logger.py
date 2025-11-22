@@ -1,9 +1,16 @@
 import os
 import sys
+from functools import wraps
+from typing import Any, Callable, TypeVar
 
 from loguru import logger
 
+F = TypeVar("F", bound=Callable[..., Any])
 
+
+# -----------------------------------------------------------------------------
+# Logging Setup
+# -----------------------------------------------------------------------------
 def setup_logging() -> None:
     """
     Configure Loguru logging for both local development and AWS Lambda.
@@ -69,3 +76,30 @@ setup_logging()
 
 # Export the main logger for convenience
 __all__ = ["logger"]
+
+
+# -----------------------------------------------------------------------------
+# Logging decorator
+# -----------------------------------------------------------------------------
+def with_logging(func: F) -> F:
+    """
+    Decorator that logs entry, exit, and errors for any Lambda handler.
+    """
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        logger.info(f"Entering {func.__name__}")
+
+        try:
+            result = func(*args, **kwargs)
+            logger.info(f"Exiting {func.__name__}")
+            return result
+
+        except Exception as e:
+            logger.error(
+                f"Unhandled exception in {func.__name__}: {e}",
+                exc_info=True,
+            )
+            raise
+
+    return wrapper  # type: ignore[return-value]
