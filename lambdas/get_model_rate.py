@@ -10,12 +10,18 @@ from typing import Any, Dict
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.dynamo_utils import load_artifact_metadata
-from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -113,7 +119,7 @@ def lambda_handler(
     auth: AuthContext,
 ) -> LambdaResponse:
     # ---------------------------------------------------------------------
-    # Extract model id
+    # Step 1 - Extract model id
     # ---------------------------------------------------------------------
     path_params = event.get("pathParameters") or {}
     model_id = path_params.get("id")
@@ -128,7 +134,7 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Load artifact metadata from DynamoDB
+    # Step 2 - Load artifact metadata from DynamoDB
     # ---------------------------------------------------------------------
     artifact = load_artifact_metadata(model_id)
     if artifact is None:
@@ -139,7 +145,7 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Ensure this is a model artifact
+    # Step 3 - Ensure this is a model artifact
     # ---------------------------------------------------------------------
     if artifact.artifact_type != "model":
         return error_response(
@@ -149,7 +155,7 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Format rating response
+    # Step 3 - Format rating response
     # ---------------------------------------------------------------------
     try:
         artifact_dict = artifact.to_dict()

@@ -18,8 +18,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
     Returns a standardized health/liveness response.
     """
+    # ---------------------------------------------------------------------
+    # Step 1 — Get the current datetime
+    # ---------------------------------------------------------------------
     now_utc = datetime.now(timezone.utc).isoformat()
 
+    # ---------------------------------------------------------------------
+    # Step 2 — Construct the response
+    # ---------------------------------------------------------------------
     body = {
         "status": "ok",
         "checked_at": now_utc,

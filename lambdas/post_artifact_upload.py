@@ -17,7 +17,12 @@ from src.logger import logger, with_logging
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.storage.dynamo_utils import save_artifact_metadata
 from src.storage.s3_utils import upload_artifact_to_s3
-from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
 # =============================================================================
@@ -42,6 +47,7 @@ from src.utils.http import LambdaResponse, error_response, json_response, transl
 #   404 - upstream artifact not found
 #   500 - internal errors (handled by @translate_exceptions)
 # =============================================================================
+
 
 @translate_exceptions
 @with_logging

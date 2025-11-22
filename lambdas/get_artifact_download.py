@@ -6,14 +6,19 @@ the stored artifact bundle.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.dynamo_utils import load_artifact_metadata
 from src.storage.s3_utils import generate_s3_download_url
-from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
 # =============================================================================
@@ -34,6 +39,7 @@ from src.utils.http import LambdaResponse, error_response, json_response, transl
 #   500 - catchall (handled by @translate_exceptions)
 # =============================================================================
 
+
 @translate_exceptions
 @with_logging
 @auth_required
@@ -44,7 +50,9 @@ def lambda_handler(
 ) -> LambdaResponse:
     logger.info("[get_artifact] Handling artifact retrieval request")
 
-    # Extract path parameters
+    # ---------------------------------------------------------------------
+    # Step 1 - Extract path parameters
+    # ---------------------------------------------------------------------
     path_params = event.get("pathParameters") or {}
     artifact_type = path_params.get("artifact_type")
     artifact_id = path_params.get("id")
@@ -56,30 +64,33 @@ def lambda_handler(
             error_code="INVALID_REQUEST",
         )
 
-    # Validate artifact_type against enum
-    try:
-        ArtifactType(artifact_type)
-    except ValueError:
+    # ---------------------------------------------------------------------
+    # Step 2 - Validate artifact_type against allowed literals
+    # ---------------------------------------------------------------------
+    if artifact_type not in ("model", "dataset", "code"):
         return error_response(
             400,
             f"Invalid artifact_type '{artifact_type}'",
             error_code="INVALID_ARTIFACT_TYPE",
         )
+    artifact_type = cast(ArtifactType, artifact_type)
 
     logger.debug(
         f"[get_artifact] artifact_type={artifact_type}, artifact_id={artifact_id}"
     )
 
-    # Load metadata from DynamoDB
+    # ---------------------------------------------------------------------
+    # Step 3 - Load metadata from DynamoDB
+    # ---------------------------------------------------------------------
     artifact = load_artifact_metadata(artifact_id)
     if artifact is None:
         return error_response(404, f"Artifact '{artifact_id}' does not exist")
 
     # ---------------------------------------------------------------------
-    # Construct S3 key
+    # Step 4 - Construct S3 key
+    # ---------------------------------------------------------------------
     # Convention: <artifact_type>/<artifact_id>.tar.gz
-    #
-    # You can adjust this if your system uses a different storage layout.
+    # We can adjust this if our system should use a different storage layout.
     # ---------------------------------------------------------------------
     s3_key = f"{artifact_type}/{artifact_id}.tar.gz"
 
@@ -93,7 +104,9 @@ def lambda_handler(
             500, "Failed to generate download URL", error_code="S3_ERROR"
         )
 
-    # Build the returned Artifact object per OpenAPI spec
+    # ---------------------------------------------------------------------
+    # Step 5 - Build the returned Artifact object per OpenAPI spec
+    # ---------------------------------------------------------------------
     response_body = {
         "metadata": {
             "name": artifact.name,
