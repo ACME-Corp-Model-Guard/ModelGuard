@@ -16,7 +16,7 @@ from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
 from src.utils.bootstrap import bootstrap_system
-from src.utils.http import json_response, translate_exceptions
+from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 
 # =============================================================================
@@ -35,7 +35,6 @@ from src.utils.http import json_response, translate_exceptions
 #   500 - catch-all for unexpected errors (handled by @translate_exceptions)
 # =============================================================================
 
-
 @translate_exceptions
 @with_logging
 @auth_required
@@ -43,7 +42,7 @@ def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
-):
+) -> LambdaResponse:
     logger.info("[/reset] Handling DELETE /reset")
 
     # ---------------------------------------------------------------------

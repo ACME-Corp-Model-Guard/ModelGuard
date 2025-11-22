@@ -13,7 +13,7 @@ from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_TABLE
 from src.storage.dynamo_utils import load_artifact_metadata, scan_table
 from src.storage.s3_utils import generate_s3_download_url
-from src.utils.http import error_response, json_response, translate_exceptions
+from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
 
 
 # =============================================================================
@@ -34,7 +34,6 @@ from src.utils.http import error_response, json_response, translate_exceptions
 #   500 - unexpected errors (handled by @translate_exceptions)
 # =============================================================================
 
-
 @translate_exceptions
 @with_logging
 @auth_required
@@ -42,7 +41,7 @@ def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
-):
+) -> LambdaResponse:
     logger.info("[get_artifact_by_name] Handling artifact lookup")
 
     # ------------------------------------------------------------------

@@ -10,13 +10,12 @@ from typing import Any, Dict
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.dynamo_utils import load_artifact_metadata
-from src.utils.http import json_response, error_response, translate_exceptions
+from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
 
 
 # =============================================================================
 # Helpers
 # =============================================================================
-
 
 def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -112,7 +111,7 @@ def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
-):
+) -> LambdaResponse:
     # ---------------------------------------------------------------------
     # Extract model id
     # ---------------------------------------------------------------------
