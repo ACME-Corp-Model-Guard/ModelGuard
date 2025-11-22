@@ -40,6 +40,7 @@ from src.settings import BEDROCK_MODEL_ID, BEDROCK_REGION
 #     data = ask_llm(prompt, return_json=True)
 # ------------------------------------------------------------------------------------
 
+
 def ask_llm(
     prompt: str,
     max_tokens: int = 200,
@@ -108,6 +109,7 @@ def ask_llm(
 #     )
 # ------------------------------------------------------------------------------------
 
+
 def build_llm_prompt(
     instructions: str,
     sections: Optional[Dict[str, str]] = None,
@@ -155,6 +157,7 @@ def build_llm_prompt(
 #     )
 # ------------------------------------------------------------------------------------
 
+
 def build_file_analysis_prompt(
     metric_name: str,
     score_name: str,
@@ -172,10 +175,7 @@ Return ONLY a JSON object of the exact form:
 {{ "{score_name}": <float {score_range}> }}
     """
 
-    sections = {
-        f"FILE: {fname}": content
-        for fname, content in files.items()
-    }
+    sections = {f"FILE: {fname}": content for fname, content in files.items()}
 
     return build_llm_prompt(
         instructions=instructions,

@@ -23,6 +23,7 @@ from src.logger import logger
 # select_relevant_files() below.
 # ------------------------------------------------------------------------------------
 
+
 def extract_files_from_tar(
     tar_path: str,
     max_chars: int = 4000,
@@ -61,6 +62,7 @@ def extract_files_from_tar(
 # Given a dictionary of extracted {path -> contents}, select only the "best"
 # files for analysis based on extension preference and ordering rules.
 # ------------------------------------------------------------------------------------
+
 
 def select_relevant_files(
     all_files: Dict[str, str],
@@ -120,6 +122,7 @@ def select_relevant_files(
 #     files = extract_relevant_files("/tmp/repo.tar.gz", [".py", ".txt"])
 #
 # ------------------------------------------------------------------------------------
+
 
 def extract_relevant_files(
     tar_path: str,

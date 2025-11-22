@@ -35,6 +35,7 @@ _bedrock_runtime: Optional[BedrockRuntimeClient] = None
 # DynamoDB
 # =====================================================================================
 
+
 def get_dynamodb() -> DynamoDBServiceResource:
     """
     Return a cached DynamoDB service resource.
@@ -63,6 +64,7 @@ def get_ddb_table(table_name: str) -> Any:
 # S3
 # =====================================================================================
 
+
 def get_s3() -> S3Client:
     """
     Return a cached S3 client.
@@ -82,6 +84,7 @@ def get_s3() -> S3Client:
 # Cognito
 # =====================================================================================
 
+
 def get_cognito() -> CognitoIdentityProviderClient:
     """
     Return a cached Cognito Identity Provider client.
@@ -100,6 +103,7 @@ def get_cognito() -> CognitoIdentityProviderClient:
 # =====================================================================================
 # Bedrock Runtime
 # =====================================================================================
+
 
 def get_bedrock_runtime(region: Optional[str] = None) -> BedrockRuntimeClient:
     """
