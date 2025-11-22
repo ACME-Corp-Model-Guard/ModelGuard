@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import TYPE_CHECKING, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Union, cast
 
 from src.logger import logger
 from src.metrics.metric import Metric
@@ -102,16 +102,25 @@ class CodeQualityMetric(Metric):
             # ------------------------------------------------------------------
             response = ask_llm(prompt, return_json=True)
 
-            if not response or self.SCORE_FIELD not in response:
+            # Ensure JSON dictionary result
+            if not isinstance(response, dict) or self.SCORE_FIELD not in response:
                 logger.error(
                     f"[code_quality] Invalid/empty response for {model.artifact_id}: {response}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
+            typed_response = cast(Dict[str, Any], response)
+
             # ------------------------------------------------------------------
             # Step 5 — Return score
             # ------------------------------------------------------------------
-            return {self.SCORE_FIELD: float(response[self.SCORE_FIELD])}
+            try:
+                return {self.SCORE_FIELD: float(typed_response[self.SCORE_FIELD])}
+            except (TypeError, ValueError):
+                logger.error(
+                    f"[code_quality] Score field returned in wrong format: {typed_response}"
+                )
+                return {self.SCORE_FIELD: 0.0}
 
         except Exception as e:
             logger.error(
