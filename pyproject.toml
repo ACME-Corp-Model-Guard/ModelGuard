@@ -12,10 +12,6 @@ line_length = 100
 src_paths = ["src", "tests"]
 skip = [".venv", "venv", ".pytest_cache"]
 
-[tool.flake8]
-max-line-length = 100
-exclude = [".git", "__pycache__", "build", "dist", ".venv", "venv", ".pytest_cache"]
-
 [tool.mypy]
 python_version = "3.12"
 disallow_untyped_defs = true
