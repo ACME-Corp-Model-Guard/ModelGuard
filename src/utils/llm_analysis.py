@@ -1,73 +1,90 @@
 """
-AWS Bedrock utilities for LLM analysis.
-Simple functions for any type of analysis using foundation models.
+LLM analysis utilities using AWS Bedrock Runtime.
+
+Provides a simple, unified interface for submitting prompts to a
+foundation model through Amazon Bedrock, returning either raw text or
+JSON-parsed content depending on the caller's needs.
 """
 
+from __future__ import annotations
+
 import json
-import os
-import boto3  # type: ignore[import-untyped]
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
-from typing import Dict, Any, Optional, List, Union
+from typing import Any, Dict, Optional, Union
 
+from botocore.exceptions import ClientError
+from mypy_boto3_bedrock_runtime.client import BedrockRuntimeClient
+
+from src.aws.clients import get_bedrock_runtime
 from src.logger import logger
+from src.settings import BEDROCK_MODEL_ID, BEDROCK_REGION
 
 
-# Module-level client - reused across all function calls
-_bedrock_client = None
-
-
-# Return value should be more specific once we have boto3 stubs setup with MyPy
-def _get_bedrock_client() -> Any:
-    """Get or create singleton Bedrock runtime client."""
-    global _bedrock_client
-    if _bedrock_client is None:
-        region = os.getenv("BEDROCK_REGION", "us-east-2")
-        _bedrock_client = boto3.client("bedrock-runtime", region_name=region)
-    return _bedrock_client
-
+# ====================================================================================
+# High-Level LLM Request
+# ====================================================================================
 
 def ask_llm(
-    prompt: str, max_tokens: int = 200, return_json: bool = False
+    prompt: str,
+    max_tokens: int = 200,
+    return_json: bool = False,
 ) -> Optional[Union[str, Dict[str, Any]]]:
     """
-    Ask the LLM a question and get a response.
+    Submit a prompt to the configured Bedrock foundation model.
 
     Args:
-        prompt: The question or instruction to send to the model
-        max_tokens: Maximum tokens in the response
-        return_json: If True, parse response as JSON
+        prompt:
+            User-supplied text prompt.
+        max_tokens:
+            Maximum tokens allowed in the model response.
+        return_json:
+            If True, attempt to parse the model's output as JSON.
 
     Returns:
-        String response or parsed JSON dict, None if failed
+        - str: raw text returned by the LLM
+        - dict: parsed JSON if return_json=True and valid JSON is produced
+        - None: on failure or malformed model output
     """
-    model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-haiku-4-5-20251001-v1:0")
+
+    model_id = BEDROCK_MODEL_ID
 
     try:
-        client = _get_bedrock_client()
+        client: BedrockRuntimeClient = get_bedrock_runtime(region=BEDROCK_REGION)
+
+        request_body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        }
+
+        logger.debug(f"[llm] Invoking Bedrock model '{model_id}'")
+
         response = client.invoke_model(
             modelId=model_id,
-            body=json.dumps(
-                {
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": max_tokens,
-                    "messages": [{"role": "user", "content": prompt}],
-                }
-            ),
+            body=json.dumps(request_body),
         )
 
-        result = json.loads(response["body"].read().decode("utf-8"))
-        content = result["content"][0]["text"]
+        # Bedrock returns a streaming-like object via response["body"]
+        raw_bytes = response["body"].read()
+        raw_text = raw_bytes.decode("utf-8")  # outer JSON wrapper
+
+        parsed = json.loads(raw_text)
+        content = parsed["content"][0]["text"]
 
         if return_json:
             try:
                 return json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.debug(f"Raw response: {content}")
+            except json.JSONDecodeError:
+                logger.error("[llm] Failed to decode JSON from LLM response")
+                logger.debug(f"[llm] Raw model output for debugging: {content}")
                 return None
 
         return content
 
-    except (ClientError, json.JSONDecodeError, KeyError) as e:
-        logger.error(f"Bedrock request failed: {e}")
+    except (ClientError, KeyError, json.JSONDecodeError) as e:
+        logger.error(f"[llm] Bedrock request failed: {e}", exc_info=True)
         return None
