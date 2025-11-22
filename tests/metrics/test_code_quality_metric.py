@@ -29,6 +29,7 @@ def metric():
 # SUCCESS CASE
 # =====================================================================================
 
+
 def test_code_quality_metric_success(metric, model_artifact):
 
     fake_files = {
@@ -66,6 +67,7 @@ def test_code_quality_metric_success(metric, model_artifact):
 # FAILURE: LLM returns None → expect fallback score 0.0
 # =====================================================================================
 
+
 def test_code_quality_metric_llm_failure(metric, model_artifact):
 
     fake_files = {"main.py": "sample code"}
@@ -90,6 +92,7 @@ def test_code_quality_metric_llm_failure(metric, model_artifact):
 # =====================================================================================
 # FAILURE: LLM returns wrong JSON → expect fallback 0.0
 # =====================================================================================
+
 
 def test_code_quality_metric_bad_llm_json(metric, model_artifact):
 
@@ -116,6 +119,7 @@ def test_code_quality_metric_bad_llm_json(metric, model_artifact):
 # FAILURE: No files extracted → expect fallback 0.0
 # =====================================================================================
 
+
 def test_code_quality_metric_no_files(metric, model_artifact):
 
     with (
@@ -133,6 +137,7 @@ def test_code_quality_metric_no_files(metric, model_artifact):
 # FAILURE: Exception anywhere → expect fallback 0.0
 # =====================================================================================
 
+
 def test_code_quality_metric_exception(metric, model_artifact):
 
     with (
@@ -149,6 +154,7 @@ def test_code_quality_metric_exception(metric, model_artifact):
 # =====================================================================================
 # TEMP FILE CLEANUP (ensures unlink is attempted)
 # =====================================================================================
+
 
 def test_temp_file_cleanup(metric, model_artifact):
 
