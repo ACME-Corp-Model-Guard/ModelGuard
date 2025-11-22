@@ -34,6 +34,7 @@ from src.utils.http import error_response, json_response, translate_exceptions
 #   500 - unexpected errors (handled by @translate_exceptions)
 # =============================================================================
 
+
 @translate_exceptions
 @with_logging
 @auth_required

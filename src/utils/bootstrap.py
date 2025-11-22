@@ -34,7 +34,10 @@ from src.settings import (
 # Helpers
 # =====================================================================================
 
-def _ensure_cognito_group_exists(cognito: CognitoIdentityProviderClient, group_name: str) -> None:
+
+def _ensure_cognito_group_exists(
+    cognito: CognitoIdentityProviderClient, group_name: str
+) -> None:
     """
     Ensure a Cognito group exists. Creates it if missing.
     """
@@ -109,6 +112,7 @@ def _ensure_user_exists(
 # =====================================================================================
 # Public Bootstrap Entry Point
 # =====================================================================================
+
 
 def bootstrap_system() -> None:
     """

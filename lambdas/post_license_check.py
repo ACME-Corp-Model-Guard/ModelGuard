@@ -21,15 +21,15 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from src.logger import logger, with_logging
 from src.auth import AuthContext, auth_required
+from src.logger import logger, with_logging
 from src.storage.dynamo_utils import load_artifact_metadata
 from src.utils.http import (
-    json_response,
+    LambdaResponse,
     error_response,
+    json_response,
     translate_exceptions,
 )
-
 
 # =============================================================================
 # Helper: Fetch GitHub License
@@ -99,7 +99,7 @@ def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
-):
+) -> LambdaResponse:
     logger.info("[license_check] Handling POST /artifact/model/{id}/license-check")
 
     # ---------------------------------------------------------------------
