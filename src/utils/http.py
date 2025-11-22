@@ -6,7 +6,12 @@ Provides consistent JSON responses, error formatting, and CORS headers.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional, TypedDict
+from functools import wraps
+from typing import Any, Callable, Dict, Optional, TypedDict, TypeVar, Union
+
+from src.logger import logger
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 # -----------------------------------------------------------------------------
@@ -37,11 +42,12 @@ DEFAULT_HEADERS: Dict[str, str] = {
 # -----------------------------------------------------------------------------
 def json_response(
     status_code: int,
-    body: Dict[str, Any],
+    body: Union[Dict[str, Any], str, bool],
     headers: Optional[Dict[str, str]] = None,
 ) -> LambdaResponse:
     """
     Build a standardized JSON response object for API Gateway.
+    Body may be a dict (usual case) or a raw JSON string (as required by some spec responses).
     """
     combined_headers = DEFAULT_HEADERS.copy()
     if headers:
@@ -82,3 +88,28 @@ def error_response(
         body=payload,
         headers=headers,
     )
+
+
+# -----------------------------------------------------------------------------
+# Exception → API Gateway Response Translator Decorator
+# -----------------------------------------------------------------------------
+def translate_exceptions(func: F) -> Callable[[Dict[str, Any], Any], LambdaResponse]:
+    """
+    Decorator for Lambda handlers that ensures all uncaught exceptions
+    become standardized JSON error responses.
+    """
+
+    @wraps(func)
+    def wrapper(event: Dict[str, Any], context: Any) -> LambdaResponse:
+        try:
+            return func(event, context)
+
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
+            return error_response(
+                500,
+                f"Internal Server Error: {e}",
+                error_code="INTERNAL_ERROR",
+            )
+
+    return wrapper

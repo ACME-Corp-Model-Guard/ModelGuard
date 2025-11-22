@@ -1,87 +1,53 @@
 """
-Lambda function for GET /artifact/model/{id}/rate endpoint
-Get ratings for model artifacts
+GET /artifact/model/{id}/rate
+Return all model rating metrics and latencies for a model artifact.
 """
 
-import json
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
-from src.artifacts.utils.metadata_storage import load_artifact_from_dynamodb  # type: ignore[import-not-found]
-from src.logger import logger
+from typing import Any, Dict
 
-
-def _create_response(
-    status_code: int, body: Dict[str, Any], headers: Optional[Dict[str, str]] = None
-) -> Dict[str, Any]:
-    """Create a standardized API Gateway response."""
-    default_headers = {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-    }
-    if headers:
-        default_headers.update(headers)
-    return {
-        "statusCode": status_code,
-        "headers": default_headers,
-        "body": json.dumps(body),
-    }
+from src.auth import AuthContext, auth_required
+from src.logger import logger, with_logging
+from src.storage.dynamo_utils import load_artifact_metadata
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
-def _error_response(
-    status_code: int, message: str, error_code: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create an error response."""
-    body = {"error": message}
-    if error_code:
-        body["error_code"] = error_code
-    return _create_response(status_code, body)
-
-
-def _load_artifact_from_dynamodb(artifact_id: str) -> Optional[Dict[str, Any]]:
-    """Load artifact metadata from DynamoDB using metadata_storage.py."""
-    try:
-        artifact = load_artifact_from_dynamodb(artifact_id)
-        if artifact is None:
-            return None
-
-        # Convert artifact to dictionary
-        artifact_dict = artifact.to_dict()
-        return artifact_dict
-    except Exception as e:
-        logger.error(f"Failed to load artifact from DynamoDB: {e}", exc_info=True)
-        return None
+# =============================================================================
+# Helpers
+# =============================================================================
 
 
 def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Format artifact data into the rate response structure.
-
-    Maps scores and scores_latency to the expected API format.
+    Format artifact rating data into the response structure expected by the spec.
+    Includes both metric scores and latency scores when present.
     """
     scores = artifact_dict.get("scores", {})
     scores_latency = artifact_dict.get("scores_latency", {})
-
-    # Extract category from metadata if available
     metadata = artifact_dict.get("metadata", {})
+
     category = (
         metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
     )
 
-    # Build response with all metric scores
     response: Dict[str, Any] = {
         "name": artifact_dict.get("name", "unknown"),
         "category": category,
     }
 
-    # Add NetScore
+    # NetScore (core metric)
     if "NetScore" in scores:
         response["net_score"] = scores["NetScore"]
     if "NetScore" in scores_latency:
         response["net_score_latency"] = scores_latency["NetScore"]
 
-    # Map metric names to API format (camelCase with underscores)
+    # Mapping of TA metrics to API fields
     metric_mapping = {
         "Availability": ("availability", "availability_latency"),
         "RampUp": ("ramp_up_time", "ramp_up_time_latency"),
@@ -95,36 +61,28 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
         "Treescore": ("tree_score", "tree_score_latency"),
     }
 
-    # Add individual metric scores
     for metric_name, (score_key, latency_key) in metric_mapping.items():
         if metric_name in scores:
             response[score_key] = scores[metric_name]
         if metric_name in scores_latency:
             response[latency_key] = scores_latency[metric_name]
 
-    # Handle Size metric (special case - can be a dict)
+    # Size is a special case (may be dict of platform → score)
     if "Size" in scores:
         size_score = scores["Size"]
         if isinstance(size_score, dict):
-            # Map platform names to API format
             size_dict: Dict[str, float] = {}
-            platform_mapping = {
-                "raspberry_pi": "raspberry_pi",
-                "jetson_nano": "jetson_nano",
-                "desktop_pc": "desktop_pc",
-                "aws_server": "aws_server",
-            }
-            for platform, api_name in platform_mapping.items():
+            for platform in ["raspberry_pi", "jetson_nano", "desktop_pc", "aws_server"]:
                 if platform in size_score:
-                    size_dict[api_name] = size_score[platform]
-            response["size_score"] = size_dict if size_dict else size_score
+                    size_dict[platform] = size_score[platform]
+            response["size_score"] = size_dict or size_score
         else:
             response["size_score"] = size_score
 
     if "Size" in scores_latency:
         response["size_score_latency"] = scores_latency["Size"]
 
-    # Handle dataset_and_code_score (if available)
+    # Dataset & Code combined metric
     if "DatasetAndCode" in scores:
         response["dataset_and_code_score"] = scores["DatasetAndCode"]
     if "DatasetAndCode" in scores_latency:
@@ -133,42 +91,82 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     return response
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    Lambda handler for GET /artifact/model/{id}/rate.
+# =============================================================================
+# Lambda Handler: GET /artifact/model/{id}/rate
+# =============================================================================
+#
+# Responsibilities:
+#   1. Authenticate caller
+#   2. Validate model id
+#   3. Load model artifact metadata
+#   4. Convert rating information to API format
+#   5. Return complete metric score response
+#
+# Errors:
+#   400 - missing or invalid id, or wrong artifact type
+#   403 - auth (handled by @auth_required)
+#   404 - artifact not found
+#   500 - unexpected errors (handled by @translate_exceptions)
+# =============================================================================
 
-    Returns model rating with all metric scores and latencies.
-    """
+
+@translate_exceptions
+@with_logging
+@auth_required
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+    auth: AuthContext,
+) -> LambdaResponse:
+    # ---------------------------------------------------------------------
+    # Step 1 - Extract model id
+    # ---------------------------------------------------------------------
     path_params = event.get("pathParameters") or {}
-    model_id = path_params.get("id", "")
+    model_id = path_params.get("id")
 
-    logger.info(f"Processing GET /artifact/model/{model_id}/rate")
+    logger.info(f"[get_model_rate] Handling GET /artifact/model/{model_id}/rate")
 
     if not model_id:
-        logger.warning("Model ID is missing")
-        return _error_response(400, "Model ID is required", "MISSING_ID")
-
-    # Load artifact from DynamoDB
-    artifact_dict = _load_artifact_from_dynamodb(model_id)
-    if artifact_dict is None:
-        logger.warning(f"Model not found: {model_id}")
-        return _error_response(404, f"Model not found: {model_id}", "MODEL_NOT_FOUND")
-
-    # Verify it's a model artifact
-    artifact_type = artifact_dict.get("artifact_type", "")
-    if artifact_type != "model":
-        logger.warning(f"Artifact {model_id} is not a model (type: {artifact_type})")
-        return _error_response(
-            400, f"Artifact {model_id} is not a model", "INVALID_ARTIFACT_TYPE"
+        return error_response(
+            400,
+            "Model ID is required",
+            error_code="MISSING_ID",
         )
 
-    # Format and return rate response
+    # ---------------------------------------------------------------------
+    # Step 2 - Load artifact metadata from DynamoDB
+    # ---------------------------------------------------------------------
+    artifact = load_artifact_metadata(model_id)
+    if artifact is None:
+        return error_response(
+            404,
+            f"Model not found: {model_id}",
+            error_code="MODEL_NOT_FOUND",
+        )
+
+    # ---------------------------------------------------------------------
+    # Step 3 - Ensure this is a model artifact
+    # ---------------------------------------------------------------------
+    if artifact.artifact_type != "model":
+        return error_response(
+            400,
+            f"Artifact {model_id} is not a model",
+            error_code="INVALID_ARTIFACT_TYPE",
+        )
+
+    # ---------------------------------------------------------------------
+    # Step 3 - Format rating response
+    # ---------------------------------------------------------------------
     try:
+        artifact_dict = artifact.to_dict()
         rate_data = _format_rate_response(artifact_dict)
-        logger.info(f"Successfully retrieved rate for model: {model_id}")
-        return _create_response(200, rate_data)
     except Exception as e:
-        logger.error(f"Failed to format rate response: {e}", exc_info=True)
-        return _error_response(
-            500, f"Failed to format rate data: {str(e)}", "INTERNAL_ERROR"
+        logger.error(f"[get_model_rate] Failed to format rate data: {e}", exc_info=True)
+        return error_response(
+            500,
+            f"Failed to format rate data: {str(e)}",
+            error_code="INTERNAL_ERROR",
         )
+
+    logger.info(f"[get_model_rate] Successfully retrieved rating for model {model_id}")
+    return json_response(200, rate_data)
