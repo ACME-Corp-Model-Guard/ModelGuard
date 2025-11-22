@@ -8,16 +8,16 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
-from src.artifacts.types import ArtifactType
 from src.artifacts.base_artifact import BaseArtifact
+from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.s3_utils import upload_artifact_to_s3
-from src.storage.dynamo_utils import save_artifact_metadata
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.utils.http import json_response, error_response, translate_exceptions
+from src.storage.dynamo_utils import save_artifact_metadata
+from src.storage.s3_utils import upload_artifact_to_s3
+from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
 
 
 # =============================================================================
@@ -43,7 +43,6 @@ from src.utils.http import json_response, error_response, translate_exceptions
 #   500 - internal errors (handled by @translate_exceptions)
 # =============================================================================
 
-
 @translate_exceptions
 @with_logging
 @auth_required
@@ -51,7 +50,7 @@ def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
-):
+) -> LambdaResponse:
     logger.info("[post_artifact] Handling POST /artifact request")
 
     # ---------------------------------------------------------------------
@@ -67,14 +66,13 @@ def lambda_handler(
             error_code="INVALID_ARTIFACT_TYPE",
         )
 
-    try:
-        artifact_type = ArtifactType(artifact_type_raw)
-    except ValueError:
+    if artifact_type_raw not in ("model", "dataset", "code"):
         return error_response(
             400,
             f"Invalid artifact_type '{artifact_type_raw}'",
             error_code="INVALID_ARTIFACT_TYPE",
         )
+    artifact_type = cast(ArtifactType, artifact_type_raw)
 
     logger.info(f"[post_artifact] artifact_type={artifact_type}")
 
