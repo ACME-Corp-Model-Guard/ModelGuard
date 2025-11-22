@@ -6,16 +6,9 @@ Reset the system to default state:
 - Reinitialize required bootstrap state (default admin user, etc.)
 """
 
-import json
-import os
-from typing import Any, Dict, Optional, TypedDict
+from __future__ import annotations
 
-try:
-    import boto3  # type: ignore[import-untyped]
-    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
-except ImportError:
-    boto3 = None  # type: ignore[assignment]
-    ClientError = Exception  # type: ignore[assignment, misc]
+from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
