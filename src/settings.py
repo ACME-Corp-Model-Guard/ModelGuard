@@ -9,11 +9,11 @@ import os
 
 
 # -----------------------------------------------------------------------------
-# Helper: Fetch required environment variables
+# Helper: Fetch Required Environment Variables
 # -----------------------------------------------------------------------------
 def _require_env(name: str) -> str:
     """
-    Fetch an environment variable or raise a descriptive error.
+    Fetch a REQUIRED environment variable or raise a descriptive error.
     """
     value = os.environ.get(name)
     if value is None:
@@ -37,15 +37,25 @@ ARTIFACTS_BUCKET: str = _require_env("ARTIFACTS_BUCKET")
 USER_POOL_ID: str = _require_env("USER_POOL_ID")
 USER_POOL_CLIENT_ID: str = _require_env("USER_POOL_CLIENT_ID")
 
-# Logging configuration (optional)
+# Logging Configuration (Optional)
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 
-# Anthropic/BEDROCK settings (if needed globally)
-BEDROCK_MODEL_ID: str = os.environ.get("BEDROCK_MODEL_ID", "")
-BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
 
 # -----------------------------------------------------------------------------
-# Default admin user settings for /reset
+# Bedrock Settings
+# -----------------------------------------------------------------------------
+# BEDROCK_MODEL_ID is optional but we provide a safe default to avoid breakage.
+BEDROCK_MODEL_ID: str = os.environ.get(
+    "BEDROCK_MODEL_ID",
+    "anthropic.claude-haiku-4-5-20251001-v1:0",
+)
+
+# BEDROCK_REGION defaults to AWS_REGION if not explicitly defined.
+BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
+
+
+# -----------------------------------------------------------------------------
+# Default Admin User Settings for /reset Endpoint
 # -----------------------------------------------------------------------------
 DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
 DEFAULT_ADMIN_PASSWORD: str = (
