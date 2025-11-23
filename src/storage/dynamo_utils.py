@@ -40,6 +40,17 @@ def scan_table(table_name: str) -> List[Dict[str, Any]]:
 
     return results
 
+# This is likely innefficient
+def search_table_by_field(table_name: str, field_name: str, field_value: Any) -> List[Dict[str, Any]]:
+    rows = scan_table(table_name=table_name)
+    match: Optional[Dict[str, Any]] = None
+
+    for row in rows:
+        if row.get(field_name) == field_value:
+            match = row
+            break
+
+    return match
 
 def batch_delete(
     table_name: str,

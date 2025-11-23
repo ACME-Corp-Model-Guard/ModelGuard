@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_TABLE
-from src.storage.dynamo_utils import load_artifact_metadata, scan_table
+from src.storage.dynamo_utils import load_artifact_metadata, search_table_by_field
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -68,13 +68,7 @@ def lambda_handler(
     # ------------------------------------------------------------------
     # Step 2 - Scan DynamoDB for an item with this name
     # ------------------------------------------------------------------
-    rows = scan_table(ARTIFACTS_TABLE)
-    match: Optional[Dict[str, Any]] = None
-
-    for row in rows:
-        if row.get("name") == name:
-            match = row
-            break
+    match = search_table_by_field(ARTIFACTS_TABLE, "name", name)
 
     if not match:
         return error_response(

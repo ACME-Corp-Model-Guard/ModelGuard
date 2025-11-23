@@ -131,32 +131,9 @@ def lambda_handler(
 
     logger.info(f"[post_artifact] Created artifact: id={artifact.artifact_id}")
 
-    # ---------------------------------------------------------------------
-    # Step 4 — Download upstream content → upload packaged artifact to S3
-    # ---------------------------------------------------------------------
-    try:
-        upload_artifact_to_s3(
-            artifact_id=artifact.artifact_id,
-            artifact_type=artifact_type,
-            s3_key=artifact.s3_key,
-            source_url=url,
-        )
-    except FileDownloadError:
-        return error_response(
-            404,
-            "Upstream artifact not found or download failed",
-            error_code="SOURCE_NOT_FOUND",
-        )
-    except Exception as e:
-        logger.error(f"[post_artifact] S3 upload failed: {e}", exc_info=True)
-        return error_response(
-            500,
-            "Failed to upload artifact to S3",
-            error_code="S3_UPLOAD_ERROR",
-        )
 
     # ---------------------------------------------------------------------
-    # Step 5 — Save metadata to DynamoDB
+    # Step 4 — Save metadata to DynamoDB
     # ---------------------------------------------------------------------
     try:
         save_artifact_metadata(artifact)
@@ -169,7 +146,7 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Step 6 — Build ArtifactResponse
+    # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
     response_body = {
         "metadata": {

@@ -164,7 +164,7 @@ def build_file_analysis_prompt(
     files: Dict[str, str],
     score_range: str = "[0.0, 1.0]",
 ) -> str:
-    """Construct a structured prompt for LLM-based multi-file analysis."""
+    """Construct a structured prompt for scoring files."""
 
     instructions = f"""
 You are an expert evaluator for the metric: "{metric_name}".
@@ -181,3 +181,48 @@ Return ONLY a JSON object of the exact form:
         instructions=instructions,
         sections=sections,
     )
+
+
+# ====================================================================================
+# EXTRACT FIELDS FROM FILES PROMPT BUILDER
+# ====================================================================================
+# Build a prompt that defines what field to extract from a set of files
+#
+# This helper:
+#   1. Defines extraction instructions
+#   2. Enforces strict JSON output (e.g., {"FIELD": "VALUE"})
+#   3. Adds each provided file as a separate prompt section
+#
+# Usage:
+#     prompt = build_extract_fields_from_files_prompt(
+#         fields=["field1", "field2"],
+#         files={"main.py": "...", "README.md": "..."},
+#     )
+# ------------------------------------------------------------------------------------
+
+
+def build_extract_fields_from_files_prompt(
+    fields: List[str],
+    files: Dict[str, str],
+) -> str:
+    """Construct a structured prompt for extracting fields from files."""
+
+    # Convert list to json, with value = None
+    fields_json = {}
+    for item in fields:
+        fields_json[item] = None
+
+    instructions = f"""
+Examine the provided repository files and fill in the value for the following fields: {json.dumps(fields_json)}.
+
+Return ONLY a JSON object of the exact form:
+{{ "FIELD": "VALUE" }}
+    """
+
+    sections = {f"FILE: {fname}": content for fname, content in files.items()}
+
+    return build_llm_prompt(
+        instructions=instructions,
+        sections=sections,
+    )
+

@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from src.logger import logger
 from src.storage.downloaders.dispatchers import fetch_artifact_metadata
 from src.artifacts.types import ArtifactType
+from src.storage.s3_utils import upload_artifact_to_s3
 
 
 class BaseArtifact(ABC):
@@ -56,6 +57,24 @@ class BaseArtifact(ABC):
         self.source_url = source_url
         self.s3_key = s3_key or f"{artifact_type}s/{self.artifact_id}"
         self.metadata = metadata or {}
+
+        # If created a new s3_key, upload artifact to S3
+        try:
+            if not s3_key:
+                upload_artifact_to_s3(self.artifact_id, self.artifact_type, self.s3_key, self.source_url)
+        except FileDownloadError:
+            return error_response(
+                404,
+                "Upstream artifact not found or download failed",
+                error_code="SOURCE_NOT_FOUND",
+            )
+        except Exception as e:
+            logger.error(f"[post_artifact] S3 upload failed: {e}", exc_info=True)
+            return error_response(
+                500,
+                "Failed to upload artifact to S3",
+                error_code="S3_UPLOAD_ERROR",
+            )
 
         logger.debug(
             f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}"

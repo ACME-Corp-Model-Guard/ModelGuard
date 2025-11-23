@@ -3,6 +3,8 @@ Code artifact class.
 """
 
 from typing import Dict, Any, Optional
+from src.storage.dynamo_utils import search_table_by_name
+from src.settings import ARTIFACTS_TABLE
 
 from .base_artifact import BaseArtifact
 
@@ -41,6 +43,7 @@ class CodeArtifact(BaseArtifact):
             s3_key=s3_key,
             metadata=metadata,
         )
+
 
     def to_dict(self) -> Dict[str, Any]:
         """

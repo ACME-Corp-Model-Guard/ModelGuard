@@ -11,6 +11,9 @@ from typing import Any, Dict, Optional, Union
 from src import metrics as _metrics
 from src.logger import logger
 from src.metrics.net_score import calculate_net_score
+from src.utils.llm_analysis import build_extract_fields_from_files_prompt, ask_llm
+from src.storage.s3_utils import download_artifact_from_s3
+from src.storage.file_extraction import extract_relevant_files
 
 from .base_artifact import BaseArtifact
 
@@ -51,8 +54,10 @@ class ModelArtifact(BaseArtifact):
         metadata: Optional[Dict[str, Any]] = None,
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
-        dataset_artifact_id: Optional[str] = None,
+        code_name: str = None,
         code_artifact_id: Optional[str] = None,
+        dataset_name: str = None,
+        dataset_artifact_id: Optional[str] = None,
         parent_model_key: Optional[str] = None,
         auto_score: bool = True,
     ):
@@ -69,8 +74,10 @@ class ModelArtifact(BaseArtifact):
             metadata: Optional dict for additional model-specific data
             scores: Optional pre-computed scores dict
             scores_latency: Optional pre-computed latencies dict
-            dataset_artifact_id: Optional link to dataset artifact (for lineage)
-            code_artifact_id: Optional link to code artifact (for lineage)
+            code_name: Optional name of associated code artifact
+            code_artifact_id: Optional link to code artifact
+            dataset_name: Optional name of associated dataset artifact
+            dataset_artifact_id: Optional link to dataset artifact
             parent_model_key: Optional link to parent model (for lineage)
             auto_score: Whether to automatically compute scores on creation (default: True)
         """
@@ -90,9 +97,12 @@ class ModelArtifact(BaseArtifact):
         self.scores = scores or {}
         self.scores_latency = scores_latency or {}
 
-        # Connection fields for lineage (stored but not used in MVP)
-        self.dataset_artifact_id = dataset_artifact_id
-        self.code_artifact_id = code_artifact_id
+        # Connect to dataset and code artifacts
+        self._find_code_and_dataset_artifact_names()
+        code_artifact_id = search_table_by_field(ARTIFACTS_TABLE, "name", code_name).get("artifact_id")
+        dataset_artifact_id = search_table_by_field(ARTIFACTS_TABLE, "name", dataset_name).get("artifact_id")
+
+        # Lineage
         self.parent_model_key = parent_model_key
 
         # Automatically compute scores on creation unless explicitly disabled
@@ -101,6 +111,35 @@ class ModelArtifact(BaseArtifact):
             self._compute_scores()
         else:
             logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
+
+    def _find_code_and_dataset_artifact_names(self) -> None:
+        download_artifact_from_s3(
+            artifact_id=self.artifact_id,
+            s3_key=self.s3_key,
+            local_path="/tmp/model_artifact_files",
+        )
+
+        files = extract_relevant_files(
+            tar_path="/tmp/model_artifact_files",
+            include_ext={".md", ".txt"},
+            max_files=1,
+            prioritize_readme=True,
+        )
+
+        prompt = build_extract_fields_from_files_prompt(
+            fields=["code_name", "dataset_name"],
+            files=files,
+        )
+        
+        response = ask_llm(prompt, return_json=True)
+
+        code_name = response.get("code_name", "unknown")
+        dataset_name = response.get("dataset_name", "unknown")
+
+        logger.info(
+            f"Extracted code_name='{code_name}', dataset_name='{dataset_name}' "
+            f"for model artifact: {self.artifact_id}"
+        )
 
     def _compute_scores(self) -> None:
         """
