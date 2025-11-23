@@ -56,6 +56,8 @@ Resources:
       Tags:
         - Key: Project
           Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
 
   TokensTable:
     Type: AWS::DynamoDB::Table
@@ -71,10 +73,30 @@ Resources:
       Tags:
         - Key: Project
           Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
 
   ###########################################################
   # S3 Artifact Storage
   ###########################################################
+  ArtifactsLogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'modelguard-artifacts-logs'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 7
+            Prefix: "access-logs/"
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -84,6 +106,15 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ArtifactsLogBucket
+        LogFilePrefix: "access-logs/"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 #(free)
+      VersioningConfiguration:
+        Status: Suspended
       Tags:
         - Key: Project
           Value: ModelGuard

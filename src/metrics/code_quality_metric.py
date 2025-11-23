@@ -4,14 +4,17 @@ import os
 import tempfile
 from typing import TYPE_CHECKING, Any, Dict, Union, cast
 
+from src.artifacts.code_artifact import CodeArtifact
 from src.logger import logger
 from src.metrics.metric import Metric
 from src.storage.file_extraction import extract_relevant_files
+from src.storage.dynamo_utils import load_artifact_metadata
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.llm_analysis import ask_llm, build_file_analysis_prompt
 
 if TYPE_CHECKING:
-    from src.artifacts import ModelArtifact
+    from src.artifacts.base_artifact import BaseArtifact
+    from src.artifacts.model_artifact import ModelArtifact
 
 
 class CodeQualityMetric(Metric):
@@ -57,17 +60,35 @@ class CodeQualityMetric(Metric):
         """
 
         # ------------------------------------------------------------------
+        # Step 0 — Get the code artifact, if it exists
+        # ------------------------------------------------------------------
+        if not model.code_artifact_id:
+            logger.warning(
+                f"[code_quality] No code artifact_id for artifact {model.artifact_id}"
+            )
+            return {self.SCORE_FIELD: 0.0}
+
+        code_artifact: BaseArtifact | None = load_artifact_metadata(
+            model.code_artifact_id
+        )
+        if not isinstance(code_artifact, CodeArtifact):
+            logger.warning(
+                f"[code_quality] Invalid or missing code artifact for {model.artifact_id}"
+            )
+            return {self.SCORE_FIELD: 0.0}
+
+        # ------------------------------------------------------------------
         # Step 1 — Download tarball from S3
         # ------------------------------------------------------------------
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         try:
             logger.debug(
-                f"[code_quality] Downloading artifact {model.artifact_id} from S3"
+                f"[code_quality] Downloading artifact {code_artifact.artifact_id} from S3"
             )
             download_artifact_from_s3(
-                artifact_id=model.artifact_id,
-                s3_key=model.s3_key,
+                artifact_id=code_artifact.artifact_id,
+                s3_key=code_artifact.s3_key,
                 local_path=tmp_tar,
             )
 
@@ -84,7 +105,7 @@ class CodeQualityMetric(Metric):
 
             if not files:
                 logger.warning(
-                    f"[code_quality] No relevant files extracted for {model.artifact_id}"
+                    f"[code_quality] No relevant files extracted for {code_artifact.artifact_id}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
@@ -105,7 +126,7 @@ class CodeQualityMetric(Metric):
             # Ensure JSON dictionary result
             if not isinstance(response, dict) or self.SCORE_FIELD not in response:
                 logger.error(
-                    f"[code_quality] Invalid/empty response for {model.artifact_id}: {response}"
+                    f"[code_quality] Invalid/empty response for {code_artifact.artifact_id}: {response}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
@@ -124,7 +145,7 @@ class CodeQualityMetric(Metric):
 
         except Exception as e:
             logger.error(
-                f"[code_quality] Evaluation failed for {model.artifact_id}: {e}",
+                f"[code_quality] Evaluation failed for {code_artifact.artifact_id}: {e}",
                 exc_info=True,
             )
             return {self.SCORE_FIELD: 0.0}
