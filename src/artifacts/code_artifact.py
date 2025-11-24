@@ -3,18 +3,22 @@ Code artifact class.
 """
 
 from typing import Dict, Any, Optional
-from src.storage.dynamo_utils import search_table_by_name, save_artifact_metadata, load_artifact_metadata
+from src.storage.dynamo_utils import (
+    save_artifact_metadata,
+    load_all_artifacts_by_field,
+)
 from src.settings import ARTIFACTS_TABLE
+from typing import List
 
 from .base_artifact import BaseArtifact
+from .model_artifact import ModelArtifact
 
 
 class CodeArtifact(BaseArtifact):
     """
-    Code artifact with minimal fields.
+    Code artifact.
 
     Inherits all base functionality from BaseArtifact.
-    Future enhancements may add code-specific fields (e.g., language, framework, etc.).
     """
 
     def __init__(
@@ -45,15 +49,17 @@ class CodeArtifact(BaseArtifact):
         )
 
         # Check if this code is connected to any models
-        model_dicts: List[Dict[str, Any]] = search_table_by_field(
-            table_name=ARTIFACTS_TABLE,
+        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_field(
             field_name="code_name",
             field_value=self.name,
+            artifact_type="model",
         )
 
         # Update linked model artifacts to reference this code artifact
-        for model_dict in model_dicts:
-            model_artifact: ModelArtifact = load_artifact_metadata(model_dict.get("artifact_id"))
+        for model_artifact in model_artifacts:
+            if not isinstance(model_artifact, ModelArtifact):
+                continue
+            model_artifact: ModelArtifact = model_artifact
             model_artifact.code_artifact_id = self.artifact_id
             save_artifact_metadata(model_artifact)
 

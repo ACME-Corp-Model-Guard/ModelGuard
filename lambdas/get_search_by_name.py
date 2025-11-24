@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_TABLE
-from src.storage.dynamo_utils import load_artifact_metadata, search_table_by_field
+from src.storage.dynamo_utils import load_artifact_metadata, load_all_artifacts_by_field
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -66,33 +66,22 @@ def lambda_handler(
     logger.debug(f"[get_artifact_by_name] Searching for artifact with name={name}")
 
     # ------------------------------------------------------------------
-    # Step 2 - Scan DynamoDB for an item with this name (just use first match)
+    # Step 2 - Scan DynamoDB for an item with this name, and get the first matching artifact
     # ------------------------------------------------------------------
-    matches = search_table_by_field(ARTIFACTS_TABLE, "name", name)
+    artifacts = load_all_artifacts_by_field(ARTIFACTS_TABLE, "name", name)
 
-    if not matches:
+    if not artifacts:
         return error_response(
             404,
             f"Artifact with name '{name}' does not exist",
             error_code="NOT_FOUND",
         )
 
-    artifact_id = matches[0]["artifact_id"]
-    logger.info(f"[get_artifact_by_name] Found artifact_id={artifact_id}")
+    artifact = artifacts[0]
+    logger.info(f"[get_artifact_by_name] Found artifact_id={artifact.artifact_id}")
 
     # ------------------------------------------------------------------
-    # Step 3 - Load the artifact
-    # ------------------------------------------------------------------
-    artifact = load_artifact_metadata(artifact_id)
-    if artifact is None:
-        return error_response(
-            404,
-            f"Artifact '{name}' exists but metadata is corrupted/missing",
-            error_code="NOT_FOUND",
-        )
-
-    # ------------------------------------------------------------------
-    # Step 4 - Construct S3 key and presigned download URL
+    # Step 3 - Construct S3 key and presigned download URL
     # ------------------------------------------------------------------
     s3_key = artifact.s3_key
 
@@ -106,7 +95,7 @@ def lambda_handler(
         return error_response(500, "Failed to generate download URL", "S3_ERROR")
 
     # ------------------------------------------------------------------
-    # Step 5 - Build response
+    # Step 4 - Build response
     # ------------------------------------------------------------------
     response_body = {
         "metadata": {

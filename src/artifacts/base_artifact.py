@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from src.logger import logger
-from src.storage.downloaders.dispatchers import fetch_artifact_metadata
+from src.storage.downloaders.dispatchers import fetch_artifact_metadata, FileDownloadError
+from src.utils.http import error_response
 from src.artifacts.types import ArtifactType
 from src.storage.s3_utils import upload_artifact_to_s3
 
@@ -68,18 +69,9 @@ class BaseArtifact(ABC):
                     source_url=self.source_url,
                 )
         except FileDownloadError:
-            return error_response(
-                404,
-                "Upstream artifact not found or download failed",
-                error_code="SOURCE_NOT_FOUND",
-            )
+            logger.error(f"S3 upload failed for {self.source_url}", exc_info=True)
         except Exception as e:
-            logger.error(f"[post_artifact] S3 upload failed: {e}", exc_info=True)
-            return error_response(
-                500,
-                "Failed to upload artifact to S3",
-                error_code="S3_UPLOAD_ERROR",
-            )
+            logger.error(f"Unexpected error during S3 upload for {self.source_url}: {e}", exc_info=True)
 
         logger.debug(
             f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}"

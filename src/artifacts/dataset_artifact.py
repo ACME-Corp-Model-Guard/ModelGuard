@@ -2,17 +2,21 @@
 Dataset artifact class.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from src.storage.dynamo_utils import (
+    save_artifact_metadata,
+    load_all_artifacts_by_field,
+)
 
 from .base_artifact import BaseArtifact
+from .model_artifact import ModelArtifact
 
 
 class DatasetArtifact(BaseArtifact):
     """
-    Dataset artifact with minimal fields.
+    Dataset artifact.
 
     Inherits all base functionality from BaseArtifact.
-    Future enhancements may add dataset-specific fields (e.g., schema, row_count, etc.).
     """
 
     def __init__(
@@ -43,15 +47,17 @@ class DatasetArtifact(BaseArtifact):
         )
 
         # Check if this dataset is connected to any models
-        model_dicts: List[Dict[str, Any]] = search_table_by_field(
-            table_name=ARTIFACTS_TABLE,
+        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_field(
             field_name="dataset_name",
             field_value=self.name,
+            artifact_type="model",
         )
 
         # Update linked model artifacts to reference this dataset artifact
-        for model_dict in model_dicts:
-            model_artifact: ModelArtifact = load_artifact_metadata(model_dict.get("artifact_id"))
+        for model_artifact in model_artifacts:
+            if not isinstance(model_artifact, ModelArtifact):
+                continue
+            model_artifact: ModelArtifact = model_artifact
             model_artifact.dataset_artifact_id = self.artifact_id
             save_artifact_metadata(model_artifact)
 

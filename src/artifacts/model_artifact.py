@@ -14,10 +14,21 @@ from src.metrics.net_score import calculate_net_score
 from src.utils.llm_analysis import build_extract_fields_from_files_prompt, ask_llm
 from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
-from src.storage.dynamo_utils import scan_table, search_table_by_field, load_artifact_metadata, save_artifact_metadata
+from src.storage.dynamo_utils import (
+    scan_table,
+    search_table_by_field,
+    load_artifact_metadata,
+    save_artifact_metadata,
+    load_all_artifacts,
+    load_all_artifacts_by_field,
+)
 from src.settings import ARTIFACTS_TABLE
+from typing import List
 
+from .types import ArtifactType
 from .base_artifact import BaseArtifact
+from .code_artifact import CodeArtifact
+from .dataset_artifact import DatasetArtifact
 
 # Static list of all metrics to run on model artifacts
 METRICS: list[_metrics.Metric] = [
@@ -42,7 +53,7 @@ class ModelArtifact(BaseArtifact):
     Extends BaseArtifact with:
     - Model-specific fields (size, license)
     - Scoring system (scores, scores_latency)
-    - Connection fields for lineage (dataset_artifact_id, code_artifact_id, parent_model_key)
+    - Connection fields for lineage (dataset_artifact_id, code_artifact_id, parent_model_id)
     """
 
     def __init__(
@@ -62,7 +73,7 @@ class ModelArtifact(BaseArtifact):
         dataset_artifact_id: Optional[str] = None,
         parent_model_name: Optional[str] = None,
         parent_model_source: Optional[str] = None,
-        parent_model_key: Optional[str] = None,
+        parent_model_id: Optional[str] = None,
         auto_score: bool = True,
     ):
         """
@@ -84,7 +95,8 @@ class ModelArtifact(BaseArtifact):
             dataset_artifact_id: Optional link to dataset artifact
             parent_model_name: Optional name of parent model artifact (for lineage)
             parent_model_source: Optional filename where parent model was discovered
-            parent_model_key: Optional link to parent model (for lineage)
+            parent_model_relationship: Optional relationship type to parent model
+            parent_model_id: Optional link to parent model (for lineage)
             auto_score: Whether to automatically compute scores on creation (default: True)
         """
         super().__init__(
@@ -104,35 +116,55 @@ class ModelArtifact(BaseArtifact):
         self.scores_latency = scores_latency or {}
 
         # Get list of all artifacts
-        artifacts: List[Dict[str, Any]] = scan_table(ARTIFACTS_TABLE)
+        artifacts: List[BaseArtifact] = load_all_artifacts()
 
-        # Connect to dataset, code, parent model artifacts
-        self._find_code_and_dataset_artifact_names()
+        # Connect to dataset, code, parent model artifacts (currently just use first matching result)
+        self._find_connected_artifact_names()
         if code_name and not code_artifact_id:
-            code_artifact_id = search_table_by_field(
-                table_name=ARTIFACTS_TABLE, field_name="name", field_value=code_name, table_dict=artifacts
-            ).get("artifact_id")
+            code_artifact: BaseArtifact = load_all_artifacts_by_field(
+                field_name="name",
+                field_value=code_name,
+                artifact_type="code",
+                artifact_list=artifacts,
+            )[0]
+            if code_artifact and isinstance(code_artifact, CodeArtifact):
+                code_artifact_id = code_artifact.artifact_id
+
         if dataset_name and not dataset_artifact_id:
-            dataset_artifact_id = search_table_by_field(
-                table_name=ARTIFACTS_TABLE, field_name="name", field_value=dataset_name, table_dict=artifacts
-            ).get("artifact_id")
-        if parent_model_name and not parent_model_key:
-            parent_model_key = search_table_by_field(
-                table_name=ARTIFACTS_TABLE, field_name="name", field_value=parent_model_name, table_dict=artifacts,
-            ).get("artifact_id")
+            dataset_artifact = load_all_artifacts_by_field(
+                field_name="name",
+                field_value=dataset_name,
+                artifact_type="dataset",
+                artifact_list=artifacts,
+            )[0]
+            if dataset_artifact and isinstance(dataset_artifact, DatasetArtifact):
+                dataset_artifact_id = dataset_artifact.artifact_id
+
+        if parent_model_name and not parent_model_id:
+            parent_model_artifact = load_all_artifacts_by_field(
+                field_name="name",
+                field_value=parent_model_name,
+                artifact_type="model",
+                artifact_list=artifacts,
+            )[0]
+            if parent_model_artifact and isinstance(parent_model_artifact, ModelArtifact):
+                parent_model_id = parent_model_artifact.artifact_id
 
         # Check if this model is the parent model of other models
-        model_dicts: List[Dict[str, Any]] = search_table_by_field(
-            table_name=ARTIFACTS_TABLE,
+        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_field(
             field_name="parent_model_name",
             field_value=self.name,
-            table_dict=artifacts,
+            artifact_type="model",
+            artifact_list=artifacts,
         )
 
         # Update child model artifact to link to this parent model
-        for model_dict in model_dicts:
-            child_model_artifact: ModelArtifact = load_artifact_metadata(model_dict.get("artifact_id"))
-            child_model_artifact.parent_model_key = self.artifact_id
+        for model_artifact in model_artifacts:
+            child_model_artifact: BaseArtifact | None = load_artifact_metadata(model_artifact.artifact_id)
+            if not isinstance(child_model_artifact, ModelArtifact):
+                continue
+            child_model_artifact.parent_model_id = self.artifact_id
+            child_model_artifact._compute_scores() # recompute scores (only affects treescore/net score)
             save_artifact_metadata(child_model_artifact)
 
         # Automatically compute scores on creation unless explicitly disabled
@@ -143,6 +175,10 @@ class ModelArtifact(BaseArtifact):
             logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
 
     def _find_connected_artifact_names(self) -> None:
+        """
+        Use LLM to extract connected artifact names from model files.
+        Populates code_name, dataset_name, parent_model_name, parent_model_source, parent_model_relationship fields.
+        """
         try:
             download_artifact_from_s3(
                 artifact_id=self.artifact_id,
@@ -158,7 +194,13 @@ class ModelArtifact(BaseArtifact):
             )
 
             prompt = build_extract_fields_from_files_prompt(
-                fields=["code_name", "dataset_name", "parent_model_name"],
+                fields=[
+                    "code_name",
+                    "dataset_name",
+                    "parent_model_name",
+                    "parent_model_source",
+                    "parent_model_relationship"
+                ],
                 files=files,
             )
 
@@ -167,6 +209,8 @@ class ModelArtifact(BaseArtifact):
             code_name = response.get("code_name")
             dataset_name = response.get("dataset_name")
             parent_model_name = response.get("parent_model_name")
+            parent_model_source = response.get("parent_model_source")
+            parent_model_relationship = response.get("parent_model_relationship")
 
             logger.info(
                 f"Extracted code_name='{code_name}', dataset_name='{dataset_name}', parent_model_name='{parent_model_name}' "
@@ -245,7 +289,7 @@ class ModelArtifact(BaseArtifact):
                 "scores_latency": self.scores_latency,
                 "dataset_artifact_id": self.dataset_artifact_id,
                 "code_artifact_id": self.code_artifact_id,
-                "parent_model_key": self.parent_model_key,
+                "parent_model_id": self.parent_model_id,
             }
         )
         return data
