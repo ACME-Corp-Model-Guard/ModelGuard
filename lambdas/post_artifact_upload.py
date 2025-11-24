@@ -131,7 +131,6 @@ def lambda_handler(
 
     logger.info(f"[post_artifact] Created artifact: id={artifact.artifact_id}")
 
-
     # ---------------------------------------------------------------------
     # Step 4 — Save metadata to DynamoDB
     # ---------------------------------------------------------------------

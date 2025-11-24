@@ -3,7 +3,7 @@ Code artifact class.
 """
 
 from typing import Dict, Any, Optional
-from src.storage.dynamo_utils import search_table_by_name
+from src.storage.dynamo_utils import search_table_by_name, save_artifact_metadata, load_artifact_metadata
 from src.settings import ARTIFACTS_TABLE
 
 from .base_artifact import BaseArtifact
@@ -44,6 +44,18 @@ class CodeArtifact(BaseArtifact):
             metadata=metadata,
         )
 
+        # Check if this code is connected to any models
+        model_dicts: List[Dict[str, Any]] = search_table_by_field(
+            table_name=ARTIFACTS_TABLE,
+            field_name="code_name",
+            field_value=self.name,
+        )
+
+        # Update linked model artifacts to reference this code artifact
+        for model_dict in model_dicts:
+            model_artifact: ModelArtifact = load_artifact_metadata(model_dict.get("artifact_id"))
+            model_artifact.code_artifact_id = self.artifact_id
+            save_artifact_metadata(model_artifact)
 
     def to_dict(self) -> Dict[str, Any]:
         """

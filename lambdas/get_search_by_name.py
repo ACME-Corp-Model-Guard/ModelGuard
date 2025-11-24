@@ -66,18 +66,18 @@ def lambda_handler(
     logger.debug(f"[get_artifact_by_name] Searching for artifact with name={name}")
 
     # ------------------------------------------------------------------
-    # Step 2 - Scan DynamoDB for an item with this name
+    # Step 2 - Scan DynamoDB for an item with this name (just use first match)
     # ------------------------------------------------------------------
-    match = search_table_by_field(ARTIFACTS_TABLE, "name", name)
+    matches = search_table_by_field(ARTIFACTS_TABLE, "name", name)
 
-    if not match:
+    if not matches:
         return error_response(
             404,
             f"Artifact with name '{name}' does not exist",
             error_code="NOT_FOUND",
         )
 
-    artifact_id = match["artifact_id"]
+    artifact_id = matches[0]["artifact_id"]
     logger.info(f"[get_artifact_by_name] Found artifact_id={artifact_id}")
 
     # ------------------------------------------------------------------

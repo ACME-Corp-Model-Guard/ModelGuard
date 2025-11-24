@@ -40,17 +40,24 @@ def scan_table(table_name: str) -> List[Dict[str, Any]]:
 
     return results
 
-# This is likely innefficient
-def search_table_by_field(table_name: str, field_name: str, field_value: Any) -> List[Dict[str, Any]]:
-    rows = scan_table(table_name=table_name)
-    match: Optional[Dict[str, Any]] = None
+
+# This is likely innefficient - are we taking full advantage of indexes?
+# table_dict can be used to avoid a full table scan
+def search_table_by_field(
+    table_name: str, field_name: str, field_value: Any, table_dict: Optional[List[Dict[str, Any]]] = None
+) -> List[Dict[str, Any]]:
+    if not table_dict:
+        rows = scan_table(table_name=table_name)
+    else:
+        rows = table_dict
+    matches: List[Dict[str, Any]] = []
 
     for row in rows:
-        if row.get(field_name) == field_value:
-            match = row
-            break
+        if row.get(field_name.lower()) == field_value.lower():
+            matches.append(row)
 
-    return match
+    return matches
+
 
 def batch_delete(
     table_name: str,

@@ -42,6 +42,19 @@ class DatasetArtifact(BaseArtifact):
             metadata=metadata,
         )
 
+        # Check if this dataset is connected to any models
+        model_dicts: List[Dict[str, Any]] = search_table_by_field(
+            table_name=ARTIFACTS_TABLE,
+            field_name="dataset_name",
+            field_value=self.name,
+        )
+
+        # Update linked model artifacts to reference this dataset artifact
+        for model_dict in model_dicts:
+            model_artifact: ModelArtifact = load_artifact_metadata(model_dict.get("artifact_id"))
+            model_artifact.dataset_artifact_id = self.artifact_id
+            save_artifact_metadata(model_artifact)
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Serialize DatasetArtifact to dictionary for DynamoDB storage.

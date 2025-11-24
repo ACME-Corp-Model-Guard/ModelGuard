@@ -61,7 +61,12 @@ class BaseArtifact(ABC):
         # If created a new s3_key, upload artifact to S3
         try:
             if not s3_key:
-                upload_artifact_to_s3(self.artifact_id, self.artifact_type, self.s3_key, self.source_url)
+                upload_artifact_to_s3(
+                    artifact_id=self.artifact_id,
+                    artifact_type=self.artifact_type,
+                    s3_key=self.s3_key,
+                    source_url=self.source_url,
+                )
         except FileDownloadError:
             return error_response(
                 404,
