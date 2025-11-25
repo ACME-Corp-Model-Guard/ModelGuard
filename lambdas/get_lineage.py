@@ -6,7 +6,7 @@ Return the lineage graph for a model artifact.
 from typing import Any, Dict
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata, load_all_artifacts, load_all_artifacts_by_fields
+from src.artifacts.artifactory import load_artifact_metadata, load_all_artifacts, load_all_artifacts_by_fields
 from src.utils.http import (
     LambdaResponse,
     error_response,

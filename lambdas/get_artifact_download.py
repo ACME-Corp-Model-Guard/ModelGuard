@@ -11,7 +11,7 @@ from typing import Any, Dict, cast
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,

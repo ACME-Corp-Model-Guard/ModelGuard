@@ -12,10 +12,11 @@ from typing import Any, Dict, cast
 
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
+from src.artifacts.artifactory import create_artifact
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.storage.dynamo_utils import save_artifact_metadata
+from src.artifacts.artifactory import save_artifact_metadata
 from src.storage.s3_utils import upload_artifact_to_s3
 from src.utils.http import (
     LambdaResponse,
@@ -108,7 +109,7 @@ def lambda_handler(
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = BaseArtifact.from_url(url, artifact_type)
+        artifact = create_artifact(artifact_type, source_url=url)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         logger.error(

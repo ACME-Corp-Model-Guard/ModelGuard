@@ -23,7 +23,7 @@ import requests
 
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
     error_response,

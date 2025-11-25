@@ -3,11 +3,6 @@ Code artifact class.
 """
 
 from typing import Dict, Any, Optional
-from src.storage.dynamo_utils import (
-    save_artifact_metadata,
-    load_all_artifacts_by_fields,
-)
-from src.settings import ARTIFACTS_TABLE
 from typing import List
 
 from .base_artifact import BaseArtifact

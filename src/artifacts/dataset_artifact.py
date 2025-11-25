@@ -3,11 +3,6 @@ Dataset artifact class.
 """
 
 from typing import Dict, Any, Optional, List
-from src.storage.dynamo_utils import (
-    save_artifact_metadata,
-    load_all_artifacts_by_fields,
-)
-
 from .base_artifact import BaseArtifact
 
 
