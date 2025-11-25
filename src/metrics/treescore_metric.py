@@ -26,15 +26,16 @@ class TreescoreMetric(Metric):
 
         score : float = 0.0
         parent_count : int = 0
-        if model.parent_id is None:
+        temp_model = model
+        if temp_model.parent_model_id is None:
             return {"treescore": 0.5} # No parent, neutral score
         else:
-            while model.parent_id is not None:
-                parent = self.load_artifact_metadata(model.parent_id)
+            while temp_model.parent_model_id is not None:
+                parent = self.load_artifact_metadata(temp_model.parent_model_id)
                 if parent and isinstance(parent, ModelArtifact):
                     score += parent.scores.get("net_score", 0.5)
                     parent_count += 1
-                    model = parent
+                    temp_model = parent
                 else:
                     break
         score = score / parent_count if parent_count > 0 else 0.5
