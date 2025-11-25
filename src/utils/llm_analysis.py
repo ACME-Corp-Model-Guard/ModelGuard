@@ -5,6 +5,7 @@ Provides:
 - ask_llm(): unified function for Bedrock inference
 - build_llm_prompt(): generic structured prompt builder
 - build_file_analysis_prompt(): helper for metrics analyzing code/dataset files
+- extract_llm_score_field(): safely extract a numeric score field from LLM JSON output
 """
 
 from __future__ import annotations
@@ -94,32 +95,34 @@ def ask_llm(
 #
 # This helper:
 #   1. Inserts a main instruction block
-#   2. Appends one or more titled sections
-#   3. Produces a consistent multi-block prompt format
+#   2. Optionally inserts a "Metric Description" block
+#   3. Appends one or more titled sections
+#   4. Produces a consistent multi-block prompt format
 #
 # Useful for:
 #   - Code-quality analysis
 #   - Dataset-quality analysis
 #   - Any metric using LLM-based static review
-#
-# Usage:
-#     prompt = build_llm_prompt(
-#         instructions="Explain the following code:",
-#         sections={"example.py": "def foo(): pass"},
-#     )
 # ------------------------------------------------------------------------------------
 
 
 def build_llm_prompt(
     instructions: str,
     sections: Optional[Dict[str, str]] = None,
+    metric_description: Optional[str] = None,
 ) -> str:
-    """Construct a structured prompt with instructions and sectioned content."""
+    """Construct a structured prompt with instructions, optional metric description,
+    and sectioned content blocks."""
 
     parts: List[str] = []
 
     # Instructions
     parts.append(instructions.strip() + "\n\n")
+
+    # Optional metric description
+    if metric_description:
+        parts.append("=== Metric Description ===\n")
+        parts.append(metric_description.strip() + "\n\n")
 
     # Section blocks
     if sections:
@@ -132,7 +135,7 @@ def build_llm_prompt(
 
     logger.debug(
         f"[llm_prompt_builder] Built prompt with "
-        f"{1 + (len(sections) if sections else 0)} block(s)"
+        f"{1 + (len(sections) if sections else 0) + (1 if metric_description else 0)} block(s)"
     )
 
     return prompt
@@ -148,13 +151,7 @@ def build_llm_prompt(
 #   1. Defines metric-specific evaluation instructions
 #   2. Enforces strict JSON output (e.g., {"code_quality": 0.73})
 #   3. Adds each provided file as a separate prompt section
-#
-# Usage:
-#     prompt = build_file_analysis_prompt(
-#         metric_name="Code Quality",
-#         score_name="code_quality",
-#         files={"main.py": "...", "README.md": "..."},
-#     )
+#   4. Optionally inserts a metric description block
 # ------------------------------------------------------------------------------------
 
 
@@ -163,8 +160,10 @@ def build_file_analysis_prompt(
     score_name: str,
     files: Dict[str, str],
     score_range: str = "[0.0, 1.0]",
+    metric_description: Optional[str] = None,
 ) -> str:
-    """Construct a structured prompt for LLM-based multi-file analysis."""
+    """Construct a structured prompt for LLM-based multi-file analysis with an
+    optional detailed metric description."""
 
     instructions = f"""
 You are an expert evaluator for the metric: "{metric_name}".
@@ -173,11 +172,63 @@ Examine the provided repository files and produce a single score in the range {s
 
 Return ONLY a JSON object of the exact form:
 {{ "{score_name}": <float {score_range}> }}
-    """
+    """.strip()
 
     sections = {f"FILE: {fname}": content for fname, content in files.items()}
 
     return build_llm_prompt(
         instructions=instructions,
         sections=sections,
+        metric_description=metric_description,
     )
+
+
+# ====================================================================================
+# JSON SCORE FIELD EXTRACTION
+# ====================================================================================
+# Safely extract a numeric score from an LLM JSON response.
+#
+# This helper:
+#   1. Validates response is a dict
+#   2. Ensures the score field exists
+#   3. Ensures the value is numeric or convertible to float
+#   4. Returns the float on success or None on failure
+#
+# Used by all LLM-based metrics (e.g., code quality, dataset quality).
+# ------------------------------------------------------------------------------------
+
+
+def extract_llm_score_field(
+    response: Any,
+    field: str,
+) -> Optional[float]:
+    """
+    Safely extract a numeric score field from an LLM JSON response.
+
+    Args:
+        response: Result from ask_llm(..., return_json=True)
+        field: Name of the score field expected inside the JSON object
+
+    Returns:
+        float score if valid, otherwise None
+    """
+
+    # Must be dictionary-shaped
+    if not isinstance(response, dict):
+        return None
+
+    # Must contain the field
+    if field not in response:
+        return None
+
+    value = response[field]
+
+    # Already numeric
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    # Attempt to parse numeric strings
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
