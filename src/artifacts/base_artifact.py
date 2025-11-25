@@ -10,7 +10,7 @@ from src.logger import logger
 from src.storage.downloaders.dispatchers import fetch_artifact_metadata, FileDownloadError
 from src.utils.http import error_response
 from src.artifacts.types import ArtifactType
-from src.storage.s3_utils import upload_artifact_to_s3
+from .artifact_manager import upload_artifact_to_s3, artifact_connector
 
 
 class BaseArtifact(ABC):
@@ -59,19 +59,10 @@ class BaseArtifact(ABC):
         self.s3_key = s3_key or f"{artifact_type}s/{self.artifact_id}"
         self.metadata = metadata or {}
 
-        # If created a new s3_key, upload artifact to S3
-        try:
-            if not s3_key:
-                upload_artifact_to_s3(
-                    artifact_id=self.artifact_id,
-                    artifact_type=self.artifact_type,
-                    s3_key=self.s3_key,
-                    source_url=self.source_url,
-                )
-        except FileDownloadError:
-            logger.error(f"S3 upload failed for {self.source_url}", exc_info=True)
-        except Exception as e:
-            logger.error(f"Unexpected error during S3 upload for {self.source_url}: {e}", exc_info=True)
+        # If created a new s3_key (which means new artifact), upload artifact to S3 and connect artifacts
+        if not s3_key:
+            artifact_uploader(self)
+            artifact_connector(self)
 
         logger.debug(
             f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}"

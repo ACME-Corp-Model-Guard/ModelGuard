@@ -9,26 +9,11 @@ from typing import Any, Dict, Optional, Union
 
 # Import metrics module to access METRICS list
 from src import metrics as _metrics
-from src.logger import logger
 from src.metrics.net_score import calculate_net_score
-from src.utils.llm_analysis import build_extract_fields_from_files_prompt, ask_llm
-from src.storage.s3_utils import download_artifact_from_s3
-from src.storage.file_extraction import extract_relevant_files
-from src.storage.dynamo_utils import (
-    scan_table,
-    search_table_by_fields,
-    load_artifact_metadata,
-    save_artifact_metadata,
-    load_all_artifacts,
-    load_all_artifacts_by_fields,
-)
-from src.settings import ARTIFACTS_TABLE
+from src.logger import logger
 from typing import List
-
 from .types import ArtifactType
 from .base_artifact import BaseArtifact
-from .code_artifact import CodeArtifact
-from .dataset_artifact import DatasetArtifact
 
 # Static list of all metrics to run on model artifacts
 METRICS: list[_metrics.Metric] = [
@@ -121,6 +106,7 @@ class ModelArtifact(BaseArtifact):
             metadata=metadata,
         )
 
+        # Model-specific fields
         self.size = size
         self.license = license
 
@@ -128,113 +114,12 @@ class ModelArtifact(BaseArtifact):
         self.scores = scores or {}
         self.scores_latency = scores_latency or {}
 
-        # Get list of all artifacts
-        artifacts: List[BaseArtifact] = load_all_artifacts()
-
-        # Connect to dataset, code, parent model artifacts (currently just use first matching result)
-        self._find_connected_artifact_names()
-
-        if code_name and not code_artifact_id:
-            code_artifact: BaseArtifact = load_all_artifacts_by_fields(
-                fields={"name": code_name},
-                artifact_type="code",
-                artifact_list=artifacts,
-            )[0]
-            if code_artifact and isinstance(code_artifact, CodeArtifact):
-                code_artifact_id = code_artifact.artifact_id
-
-        if dataset_name and not dataset_artifact_id:
-            dataset_artifact = load_all_artifacts_by_fields(
-                fields={"name": dataset_name},
-                artifact_type="dataset",
-                artifact_list=artifacts,
-            )[0]
-            if dataset_artifact and isinstance(dataset_artifact, DatasetArtifact):
-                dataset_artifact_id = dataset_artifact.artifact_id
-
-        if parent_model_name and not parent_model_id:
-            parent_model_artifact = load_all_artifacts_by_fields(
-                fields={"name": parent_model_name},
-                artifact_type="model",
-                artifact_list=artifacts,
-            )[0]
-            if parent_model_artifact and isinstance(parent_model_artifact, ModelArtifact):
-                parent_model_id = parent_model_artifact.artifact_id
-
-        # Check if this model is the parent model of other existing models
-        if child_model_ids is None:
-            child_model_ids = []
-
-            model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
-                fields={"parent_model_name": self.name},
-                artifact_type="model",
-                artifact_list=artifacts,
-            )
-
-            # Update child model artifact to link to this parent model
-            for model_artifact in model_artifacts:
-                child_model_artifact: BaseArtifact | None = load_artifact_metadata(model_artifact.artifact_id)
-                if not isinstance(child_model_artifact, ModelArtifact):
-                    continue
-                child_model_artifact.parent_model_id = self.artifact_id
-                child_model_artifact._compute_scores() # recompute scores (only affects treescore/net score)
-                save_artifact_metadata(child_model_artifact)
-                child_model_ids.append(child_model_artifact.artifact_id) # update this model for lineage
-
         # Automatically compute scores on creation unless explicitly disabled
         if auto_score and not scores:
             logger.info(f"Auto-scoring model artifact: {self.artifact_id}")
             self._compute_scores()
         else:
             logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
-
-    def _find_connected_artifact_names(self) -> None:
-        """
-        Use LLM to extract connected artifact names from model files.
-        Populates code_name, dataset_name, parent_model_name, parent_model_source, parent_model_relationship fields.
-        """
-        try:
-            download_artifact_from_s3(
-                artifact_id=self.artifact_id,
-                s3_key=self.s3_key,
-                local_path="/tmp/model_artifact_files",
-            )
-
-            files = extract_relevant_files(
-                tar_path="/tmp/model_artifact_files",
-                include_ext={".json", ".md", ".txt"},
-                max_files=10,
-                prioritize_readme=True,
-            )
-
-            prompt = build_extract_fields_from_files_prompt(
-                fields=[
-                    "code_name",
-                    "dataset_name",
-                    "parent_model_name",
-                    "parent_model_source",
-                    "parent_model_relationship"
-                ],
-                files=files,
-            )
-
-            response = ask_llm(prompt, return_json=True)
-
-            code_name = response.get("code_name")
-            dataset_name = response.get("dataset_name")
-            parent_model_name = response.get("parent_model_name")
-            parent_model_source = response.get("parent_model_source")
-            parent_model_relationship = response.get("parent_model_relationship")
-
-            logger.info(
-                f"Extracted code_name='{code_name}', dataset_name='{dataset_name}', parent_model_name='{parent_model_name}' "
-                f"for model artifact: {self.artifact_id}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Failed to extract connected artifact names for {self.artifact_id}: {e}",
-                exc_info=True,
-            )
 
     def _compute_scores(self) -> None:
         """

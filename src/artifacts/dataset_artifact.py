@@ -9,7 +9,6 @@ from src.storage.dynamo_utils import (
 )
 
 from .base_artifact import BaseArtifact
-from .model_artifact import ModelArtifact
 
 
 class DatasetArtifact(BaseArtifact):
@@ -45,21 +44,6 @@ class DatasetArtifact(BaseArtifact):
             s3_key=s3_key,
             metadata=metadata,
         )
-
-        # Check if this dataset is connected to any models
-        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
-            fields={"dataset_name": self.name},
-            artifact_type="model",
-        )
-
-        # Update linked model artifacts to reference this dataset artifact
-        for model_artifact in model_artifacts:
-            if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
-                continue
-            model_artifact: ModelArtifact = model_artifact
-            model_artifact.dataset_artifact_id = self.artifact_id
-            model_artifact._compute_scores() # Recompute scores
-            save_artifact_metadata(model_artifact)
 
     def to_dict(self) -> Dict[str, Any]:
         """
