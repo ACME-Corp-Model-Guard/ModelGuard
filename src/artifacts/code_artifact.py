@@ -5,7 +5,7 @@ Code artifact class.
 from typing import Dict, Any, Optional
 from src.storage.dynamo_utils import (
     save_artifact_metadata,
-    load_all_artifacts_by_field,
+    load_all_artifacts_by_fields,
 )
 from src.settings import ARTIFACTS_TABLE
 from typing import List
@@ -49,18 +49,18 @@ class CodeArtifact(BaseArtifact):
         )
 
         # Check if this code is connected to any models
-        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_field(
-            field_name="code_name",
-            field_value=self.name,
+        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+            fields={"code_name": self.name},
             artifact_type="model",
         )
 
         # Update linked model artifacts to reference this code artifact
         for model_artifact in model_artifacts:
-            if not isinstance(model_artifact, ModelArtifact):
+            if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
                 continue
             model_artifact: ModelArtifact = model_artifact
             model_artifact.code_artifact_id = self.artifact_id
+            model_artifact._compute_scores() # Recompute scores
             save_artifact_metadata(model_artifact)
 
     def to_dict(self) -> Dict[str, Any]:

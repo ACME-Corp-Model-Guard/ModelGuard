@@ -42,12 +42,19 @@ def scan_table(table_name: str) -> List[Dict[str, Any]]:
     return results
 
 
-def search_table_by_field(
+def search_table_by_fields(
     table_name: str,
-    field_name: str,
-    field_value: Any,
+    fields: Dict[str, Any], # multiple fields to match
     item_list: Optional[List[Dict[str, Any]]] = None, # item_list can be used to avoid a full table scan
 ) -> List[Dict[str, Any]]:
+    """
+    Search a DynamoDB table for items matching specific field values.
+
+    Args:
+        table_name: Name of the DynamoDB table to search.
+        fields: Dictionary of field names and their expected values.
+        item_list: Optional list of items to search within (avoids full table scan).
+    """
     if not item_list:
         rows = scan_table(table_name=table_name)
     else:
@@ -55,7 +62,16 @@ def search_table_by_field(
     matches: List[Dict[str, Any]] = []
 
     for row in rows:
-        if row.get(field_name.lower()) == field_value.lower():
+        for field_name, field_value in fields.items():
+            # Convert strings to lowercase for case-insensitive comparison
+            if isinstance(field_value, str):
+                field_value = field_value.lower()
+                row_value = row.get(field_name).lower() 
+            else:
+                row_value = row.get(field_name)
+            if row_value != field_value:
+                break
+        else:
             matches.append(row)
 
     return matches
@@ -188,9 +204,8 @@ def load_all_artifacts() -> List[BaseArtifact]:
         logger.error(f"[DDB] Failed to load all artifacts: {e}", exc_info=True)
         raise
 
-def load_all_artifacts_by_field(
-    field_name: str,
-    field_value: Any,
+def load_all_artifacts_by_fields(
+    fields: Dict[str, Any],
     artifact_type: Optional[ArtifactType] = None, # Optional filter by artifact type
     artifact_list: Optional[List[BaseArtifact]] = None, # artifact_list can be used to avoid a full table scan
 ) -> List[BaseArtifact]:
@@ -198,8 +213,7 @@ def load_all_artifacts_by_field(
     Load all artifacts from the DynamoDB table matching a specific field value.
 
     Args:
-        field_name: The name of the field to filter by.
-        field_value: The value of the field to match.
+        fields: Dictionary of field names and their expected values.
         artifact_type: Optional filter by artifact type.
         artifact_list: Optional list of artifacts to search within (avoids full table scan).
     """
@@ -214,14 +228,17 @@ def load_all_artifacts_by_field(
         if artifact_type and row.artifact_type != artifact_type:
             continue
 
-        attribute: Any = getattr(row, field_name, None)
-        # Convert strings to lowercase for case-insensitive comparison
-        if isinstance(attribute, str):
-            attribute = attribute.lower()
-        if isinstance(field_value, str):
-            field_value = field_value.lower()
-        if attribute == field_value:
+        for field_name, field_value in fields.items():
+            attribute: Any = getattr(row, field_name, None)
+            # Convert strings to lowercase for case-insensitive comparison
+            if isinstance(attribute, str):
+                attribute = attribute.lower()
+            if isinstance(field_value, str):
+                field_value = field_value.lower()
+            if attribute != field_value:
+                break
+        else:
             artifacts.append(row)
-    
+
     return artifacts
 

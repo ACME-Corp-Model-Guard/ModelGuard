@@ -6,7 +6,7 @@ Return the lineage graph for a model artifact.
 from typing import Any, Dict
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata, load_all_artifacts
+from src.storage.dynamo_utils import load_artifact_metadata, load_all_artifacts, load_all_artifacts_by_fields
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -19,14 +19,14 @@ from src.artifacts.model_artifact import ModelArtifact
 # Helpers
 #============================================================================
 
-def add_ancestors(root: ModelArtifact, all_artifacts: [ModelArtifact], nodes: list, edges: list):
+def add_ancestors(root: ModelArtifact, nodes: list, edges: list) -> None:
     """
     Recursively add ancestor nodes and edges to the lineage graph.
     """
-    parent_id = getattr(root, "parent_model_id", None)
-    if parent_id and parent_id in all_artifacts:
-        parent = all_artifacts.get(parent_id)
-        if parent:
+    parent_id: str | None = getattr(root, "parent_model_id", None)
+    if parent_id:
+        parent: BaseArtifact | None = load_artifact_metadata(parent_id)
+        if parent and isinstance(parent, ModelArtifact):
             nodes.append({
                 "artifact_id": parent.artifact_id,
                 "name": parent.name,
@@ -37,25 +37,26 @@ def add_ancestors(root: ModelArtifact, all_artifacts: [ModelArtifact], nodes: li
                 "to": root.artifact_id,
                 "relationship": root.parent_model_relationship,
             })
-            add_ancestors(parent, all_artifacts, nodes, edges)
+            add_ancestors(parent, nodes, edges)
 
-def add_descendants(root: ModelArtifact, all_artifacts: [ModelArtifact], nodes: list, edges: list):
-    """
-    Recursively add ancestor nodes and edges to the lineage graph.
-    """
-    for model in all_artifacts.values():
-        if model.parent_id == root.artifact_id:
-            nodes.append({
-                "artifact_id": model.artifact_id,
-                "name": model.name,
-                "source": model.parent_model_source,
-            })
-            edges.append({
-                "from": root.artifact_id,
-                "to": model.artifact_id,
-                "relationship": model.parent_model_relationship,
-            })
-            add_descendants(model, all_artifacts, nodes, edges)
+def add_descendants(root: ModelArtifact, nodes: list, edges: list) -> None:
+	"""
+	Recursively add descendant nodes and edges to the lineage graph.
+	"""
+	for child_model_id in getattr(root, "child_model_ids", []):
+		child: BaseArtifact | None = load_artifact_metadata(child_model_id)
+		if child and isinstance(child, ModelArtifact):
+			nodes.append({
+				"artifact_id": child.artifact_id,
+				"name": child.name,
+				"source": child.parent_model_source,
+			})
+			edges.append({
+				"from": root.artifact_id,
+				"to": child.artifact_id,
+				"relationship": child.parent_model_relationship,
+			})
+			add_descendants(child, nodes, edges)
 
 
 # =============================================================================
@@ -128,7 +129,7 @@ def lambda_handler(
 	})
 
 	# Recursively add ancestors (parents, grandparents, etc.)
-	add_ancestors(root, all_artifacts, nodes, edges)
+	add_ancestors(root, nodes, edges)
 
 	# Recursively add descendants (children, grandchildren, etc.)
 	add_descendants(root.artifact_id, all_artifacts, nodes, edges)

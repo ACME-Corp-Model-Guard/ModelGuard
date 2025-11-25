@@ -16,11 +16,11 @@ from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.dynamo_utils import (
     scan_table,
-    search_table_by_field,
+    search_table_by_fields,
     load_artifact_metadata,
     save_artifact_metadata,
     load_all_artifacts,
-    load_all_artifacts_by_field,
+    load_all_artifacts_by_fields,
 )
 from src.settings import ARTIFACTS_TABLE
 from typing import List
@@ -57,24 +57,36 @@ class ModelArtifact(BaseArtifact):
     """
 
     def __init__(
+        # Basic info
         self,
         name: str,
         source_url: str,
         artifact_id: Optional[str] = None,
-        size: float = 0.0,
-        license: str = "unknown",
         s3_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        
+        # Model-specific fields
+        size: float = 0.0,
+        license: str = "unknown",
+
+        # Scoring fields
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
+        auto_score: bool = True,
+
+        # Connection fields
         code_name: Optional[str] = None,
         code_artifact_id: Optional[str] = None,
+
         dataset_name: Optional[str] = None,
         dataset_artifact_id: Optional[str] = None,
+
         parent_model_name: Optional[str] = None,
         parent_model_source: Optional[str] = None,
+        parent_model_relationship: Optional[str] = None,
         parent_model_id: Optional[str] = None,
-        auto_score: bool = True,
+
+        child_model_ids: Optional[List[str]] = None,
     ):
         """
         Initialize ModelArtifact.
@@ -83,12 +95,13 @@ class ModelArtifact(BaseArtifact):
             artifact_id: Optional UUID (generated if not provided)
             name: Model name
             source_url: URL where model was sourced from
-            size: Model size in bytes (default: 0.0)
-            license: Model license (default: "unknown")
             s3_key: Optional S3 storage key
             metadata: Optional dict for additional model-specific data
+            size: Model size in bytes (default: 0.0)
+            license: Model license (default: "unknown")
             scores: Optional pre-computed scores dict
             scores_latency: Optional pre-computed latencies dict
+            auto_score: Whether to automatically compute scores on creation (default: True)
             code_name: Optional name of associated code artifact
             code_artifact_id: Optional link to code artifact
             dataset_name: Optional name of associated dataset artifact
@@ -97,7 +110,7 @@ class ModelArtifact(BaseArtifact):
             parent_model_source: Optional filename where parent model was discovered
             parent_model_relationship: Optional relationship type to parent model
             parent_model_id: Optional link to parent model (for lineage)
-            auto_score: Whether to automatically compute scores on creation (default: True)
+            child_model_ids: Optional list of child model IDs (for lineage)
         """
         super().__init__(
             artifact_id=artifact_id,
@@ -120,10 +133,10 @@ class ModelArtifact(BaseArtifact):
 
         # Connect to dataset, code, parent model artifacts (currently just use first matching result)
         self._find_connected_artifact_names()
+
         if code_name and not code_artifact_id:
-            code_artifact: BaseArtifact = load_all_artifacts_by_field(
-                field_name="name",
-                field_value=code_name,
+            code_artifact: BaseArtifact = load_all_artifacts_by_fields(
+                fields={"name": code_name},
                 artifact_type="code",
                 artifact_list=artifacts,
             )[0]
@@ -131,9 +144,8 @@ class ModelArtifact(BaseArtifact):
                 code_artifact_id = code_artifact.artifact_id
 
         if dataset_name and not dataset_artifact_id:
-            dataset_artifact = load_all_artifacts_by_field(
-                field_name="name",
-                field_value=dataset_name,
+            dataset_artifact = load_all_artifacts_by_fields(
+                fields={"name": dataset_name},
                 artifact_type="dataset",
                 artifact_list=artifacts,
             )[0]
@@ -141,31 +153,33 @@ class ModelArtifact(BaseArtifact):
                 dataset_artifact_id = dataset_artifact.artifact_id
 
         if parent_model_name and not parent_model_id:
-            parent_model_artifact = load_all_artifacts_by_field(
-                field_name="name",
-                field_value=parent_model_name,
+            parent_model_artifact = load_all_artifacts_by_fields(
+                fields={"name": parent_model_name},
                 artifact_type="model",
                 artifact_list=artifacts,
             )[0]
             if parent_model_artifact and isinstance(parent_model_artifact, ModelArtifact):
                 parent_model_id = parent_model_artifact.artifact_id
 
-        # Check if this model is the parent model of other models
-        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_field(
-            field_name="parent_model_name",
-            field_value=self.name,
-            artifact_type="model",
-            artifact_list=artifacts,
-        )
+        # Check if this model is the parent model of other existing models
+        if child_model_ids is None:
+            child_model_ids = []
 
-        # Update child model artifact to link to this parent model
-        for model_artifact in model_artifacts:
-            child_model_artifact: BaseArtifact | None = load_artifact_metadata(model_artifact.artifact_id)
-            if not isinstance(child_model_artifact, ModelArtifact):
-                continue
-            child_model_artifact.parent_model_id = self.artifact_id
-            child_model_artifact._compute_scores() # recompute scores (only affects treescore/net score)
-            save_artifact_metadata(child_model_artifact)
+            model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+                fields={"parent_model_name": self.name},
+                artifact_type="model",
+                artifact_list=artifacts,
+            )
+
+            # Update child model artifact to link to this parent model
+            for model_artifact in model_artifacts:
+                child_model_artifact: BaseArtifact | None = load_artifact_metadata(model_artifact.artifact_id)
+                if not isinstance(child_model_artifact, ModelArtifact):
+                    continue
+                child_model_artifact.parent_model_id = self.artifact_id
+                child_model_artifact._compute_scores() # recompute scores (only affects treescore/net score)
+                save_artifact_metadata(child_model_artifact)
+                child_model_ids.append(child_model_artifact.artifact_id) # update this model for lineage
 
         # Automatically compute scores on creation unless explicitly disabled
         if auto_score and not scores:
@@ -287,9 +301,15 @@ class ModelArtifact(BaseArtifact):
                 "license": self.license,
                 "scores": self.scores,
                 "scores_latency": self.scores_latency,
-                "dataset_artifact_id": self.dataset_artifact_id,
+                "code_name": self.code_name,
                 "code_artifact_id": self.code_artifact_id,
+                "dataset_name": self.dataset_name,
+                "dataset_artifact_id": self.dataset_artifact_id,
+                "parent_model_name": self.parent_model_name,
+                "parent_model_source": self.parent_model_source,
+                "parent_model_relationship": self.parent_model_relationship,
                 "parent_model_id": self.parent_model_id,
+                "child_model_ids": self.child_model_ids,
             }
         )
         return data
