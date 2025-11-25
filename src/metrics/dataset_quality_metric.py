@@ -4,8 +4,10 @@ import os
 import tempfile
 from typing import TYPE_CHECKING, Dict
 
+from src.artifacts.dataset_artifact import DatasetArtifact
 from src.logger import logger
 from src.metrics.metric import Metric
+from src.storage.dynamo_utils import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.llm_analysis import (
@@ -15,58 +17,68 @@ from src.utils.llm_analysis import (
 )
 
 if TYPE_CHECKING:
-    from src.artifacts.dataset_artifact import DatasetArtifact
+    from src.artifacts.model_artifact import ModelArtifact
 
 
 class DatasetQualityMetric(Metric):
     """
     Dataset Quality Metric
 
-    Evaluates the clarity, structure, documentation, and general
-    usefulness of a dataset artifact by:
+    Evaluates the clarity, structure, documentation, and general utility of
+    a model's associated dataset artifact by:
 
-      1. Fetching its dataset bundle (.tar.gz) from S3
-      2. Extracting representative dataset + documentation files
-      3. Submitting those files to a Bedrock LLM for evaluation
-      4. Returning the LLM-generated numeric score
+      1. Looking up the dataset artifact from DynamoDB
+      2. Fetching its dataset bundle (.tar.gz) from S3
+      3. Extracting representative dataset/documentation files
+      4. Submitting them to a Bedrock LLM for evaluation
+      5. Returning the LLM-generated numeric score
 
     Output Format:
         { "dataset_quality": <float in [0.0, 1.0]> }
     """
 
     SCORE_FIELD = "dataset_quality"
-
-    # Include dataset-relevant formats + documentation
     INCLUDE_EXT = [".csv", ".tsv", ".json", ".jsonl", ".md", ".txt"]
-
     MAX_FILES = 6
     MAX_CHARS_PER_FILE = 4000
 
     METRIC_DESCRIPTION = """
 This metric evaluates the overall quality of a dataset, including:
-- Clarity and completeness of dataset documentation
-- Readability and consistency of dataset samples
-- Presence of meaningful README or dataset card files
-- Quality and structure of CSV/TSV/JSON/JSONL samples
-- Evidence of clear labeling and metadata
-- General suitability of the dataset for ML training
+- Documentation clarity (README, dataset card, metadata files)
+- Structure and consistency of dataset samples
+- Proper formatting of CSV/TSV/JSON/JSONL files
+- Evidence of coherent labeling or metadata
+- Data suitability for machine learning applications
 
-A score of 1.0 means excellent dataset clarity and structure.
-A score of 0.0 means poorly documented, inconsistent, or unusable data.
+A score of 1.0 indicates excellent dataset documentation and sample quality.
+A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
 """
 
     # ====================================================================================
-    # SCORE METHOD
+    # SCORE METHOD (mirror pattern of CodeQualityMetric)
     # ====================================================================================
 
-    def score(self, model: DatasetArtifact) -> Dict[str, float]:
-        """
-        Execute the complete dataset-quality evaluation pipeline.
+    def score(self, model: ModelArtifact) -> Dict[str, float]:
+        """Compute dataset_quality score for the provided ModelArtifact."""
 
-        Returns:
-            {"dataset_quality": float} on success
-            {"dataset_quality": 0.0} on any failure
-        """
+        # ------------------------------------------------------------------
+        # Step 0 — Identify dataset artifact
+        # ------------------------------------------------------------------
+        dataset_id = model.dataset_artifact_id
+        if dataset_id is None:
+            logger.warning(
+                f"[dataset_quality] No dataset artifact_id for model {model.artifact_id}"
+            )
+            return {self.SCORE_FIELD: 0.0}
+
+        dataset_artifact = load_artifact_metadata(dataset_id)
+
+        if not isinstance(dataset_artifact, DatasetArtifact):
+            logger.warning(
+                f"[dataset_quality] Missing or invalid dataset artifact for model "
+                f"{model.artifact_id}"
+            )
+            return {self.SCORE_FIELD: 0.0}
 
         # ------------------------------------------------------------------
         # Step 1 — Download dataset tarball from S3
@@ -75,12 +87,12 @@ A score of 0.0 means poorly documented, inconsistent, or unusable data.
 
         try:
             logger.debug(
-                f"[dataset_quality] Downloading dataset bundle for {model.artifact_id}"
+                f"[dataset_quality] Downloading dataset bundle for {dataset_artifact.artifact_id}"
             )
 
             download_artifact_from_s3(
-                artifact_id=model.artifact_id,
-                s3_key=model.s3_key,
+                artifact_id=dataset_artifact.artifact_id,
+                s3_key=dataset_artifact.s3_key,
                 local_path=tmp_tar,
             )
 
@@ -97,7 +109,8 @@ A score of 0.0 means poorly documented, inconsistent, or unusable data.
 
             if not files:
                 logger.warning(
-                    f"[dataset_quality] No relevant dataset files extracted for {model.artifact_id}"
+                    f"[dataset_quality] No relevant dataset files extracted for "
+                    f"{dataset_artifact.artifact_id}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
@@ -117,24 +130,24 @@ A score of 0.0 means poorly documented, inconsistent, or unusable data.
             response = ask_llm(prompt, return_json=True)
 
             # ------------------------------------------------------------------
-            # Step 5 — Extract score from LLM JSON
+            # Step 5 — Extract score
             # ------------------------------------------------------------------
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
                 logger.error(
-                    f"[dataset_quality] Invalid score returned for {model.artifact_id}: {response}"
+                    f"[dataset_quality] Invalid score returned for {dataset_artifact.artifact_id}: "
+                    f"{response}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
-            # Ensure score in [0, 1]
+            # Clamp to [0.0, 1.0]
             score = max(0.0, min(float(score), 1.0))
-
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
             logger.error(
-                f"[dataset_quality] Evaluation failed for {model.artifact_id}: {e}",
+                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}: {e}",
                 exc_info=True,
             )
             return {self.SCORE_FIELD: 0.0}
