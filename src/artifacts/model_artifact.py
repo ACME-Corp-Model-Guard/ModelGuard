@@ -5,28 +5,13 @@ Model artifact class with scoring functionality.
 import concurrent.futures
 import time
 import traceback
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-# Import metrics module to access METRICS list
-from src import metrics as _metrics
-from src.metrics.net_score import calculate_net_score
+from src.artifacts.base_artifact import BaseArtifact
 from src.logger import logger
-from typing import List
-from .types import ArtifactType
-from .base_artifact import BaseArtifact
-
-# Static list of all metrics to run on model artifacts
-METRICS: list[_metrics.Metric] = [
-    _metrics.AvailabilityMetric(),
-    _metrics.BusFactorMetric(),
-    _metrics.CodeQualityMetric(),
-    _metrics.DatasetQualityMetric(),
-    _metrics.LicenseMetric(),
-    _metrics.PerformanceClaimsMetric(),
-    _metrics.RampUpMetric(),
-    _metrics.SizeMetric(),
-    _metrics.TreescoreMetric(),
-]
+from src.metrics import Metric
+from src.metrics.net_score import calculate_net_score
+from src.metrics.registry import METRICS
 
 
 class ModelArtifact(BaseArtifact):
@@ -47,28 +32,22 @@ class ModelArtifact(BaseArtifact):
         artifact_id: Optional[str] = None,
         s3_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        
         # Model-specific fields
         size: float = 0.0,
         license: str = "unknown",
-
         # Scoring fields
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
         auto_score: bool = True,
-
         # Connection fields
         code_name: Optional[str] = None,
         code_artifact_id: Optional[str] = None,
-
         dataset_name: Optional[str] = None,
         dataset_artifact_id: Optional[str] = None,
-
         parent_model_name: Optional[str] = None,
         parent_model_source: Optional[str] = None,
         parent_model_relationship: Optional[str] = None,
         parent_model_id: Optional[str] = None,
-
         child_model_ids: Optional[List[str]] = None,
     ):
         """
@@ -133,7 +112,7 @@ class ModelArtifact(BaseArtifact):
         latencies: Dict[str, float] = {}
 
         def run_metric(
-            metric: _metrics.Metric,
+            metric: Metric,
         ) -> tuple[str, float | dict[str, float], float]:
             metric_name = metric.__class__.__name__.replace("Metric", "")
             t0 = time.perf_counter()
