@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Union, Dict
 
-from src.logger import logger
-from src.metrics.metric import Metric
-from src.storage.dynamo_utils import load_artifact_metadata
+from .metric import Metric
+from artifacts.artifactory import load_artifact_metadata
+from utils.logger import logger
 
 if TYPE_CHECKING:
-    from src.artifacts.model_artifact import ModelArtifact
+    from src.artifacts import ModelArtifact
 
 
 class TreescoreMetric(Metric):
@@ -15,48 +15,35 @@ class TreescoreMetric(Metric):
     Treescore metric: average NetScore of all ancestor models in the lineage.
     """
 
-    SCORE_FIELD = "tree_score"
-
-    def score(self, model: "ModelArtifact") -> Dict[str, float]:
+    def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Compute the treescore as the average NetScore of all ancestors.
 
         Args:
-            model: The ModelArtifact being scored.
+            model: The ModelArtifact object to score
 
         Returns:
             {"tree_score": <float>}
         """
-
-        parent_id = model.parent_model_id
-        if parent_id is None:
-            return {self.SCORE_FIELD: 0.5}
-
-        total = 0.0
-        count = 0
-        current_id = parent_id
-
-        # Walk the lineage chain
-        while current_id:
-            parent = load_artifact_metadata(current_id)
-
-            # Must be ModelArtifact; ignore other artifact types
-            if not parent or not hasattr(parent, "scores"):
-                break
-
-            parent_net = parent.scores.get("NetScore", 0.5)
-            try:
-                parent_net = float(parent_net)
-            except Exception:
-                parent_net = 0.5
-
-            total += parent_net
-            count += 1
-
-            current_id = parent.parent_model_id
-
-        score = total / count if count > 0 else 0.5
-        score = max(0.0, min(1.0, score))
-
-        logger.info(f"[treescore] Computed {score:.3f} for model {model.artifact_id}")
-        return {self.SCORE_FIELD: score}
+        
+        score : float = 0.0
+        parent_count : int = 0
+        temp_model = model
+        if temp_model.parent_model_id is None:
+            return {"treescore": 0.5} # No parent, neutral score
+        else:
+            while temp_model.parent_model_id is not None:
+                parent = self.load_artifact_metadata(temp_model.parent_model_id)
+                if parent and isinstance(parent, ModelArtifact):
+                    score += parent.scores.get("net_score", 0.5)
+                    parent_count += 1
+                    temp_model = parent
+                else:
+                    break
+        score = score / parent_count if parent_count > 0 else 0.5
+        if score < 0.0 or score > 1.0:
+            logger.warning(f"Computed treescore {score} out of bounds for model {model.artifact_id}")
+            score = 0.5  # Clamp to neutral if out of bounds
+        logger.info(f"Computed treescore {score} for model {model.artifact_id}")
+        return {"treescore": score}
+            
