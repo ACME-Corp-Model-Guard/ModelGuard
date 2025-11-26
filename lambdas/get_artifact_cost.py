@@ -13,7 +13,12 @@ from src.aws.clients import get_s3
 from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_BUCKET
 from src.storage.dynamo_utils import load_artifact_metadata
-from src.utils.http import LambdaResponse, error_response, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 VALID_TYPES = {"model", "dataset", "code"}
 
@@ -40,7 +45,9 @@ VALID_TYPES = {"model", "dataset", "code"}
 @with_logging
 @translate_exceptions
 @auth_required
-def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> LambdaResponse:
+def lambda_handler(
+    event: Dict[str, Any], context: Any, auth: AuthContext
+) -> LambdaResponse:
     logger.info("[artifact_cost] Handling artifact cost request")
 
     # ----------------------------------------------------------------------
@@ -92,9 +99,7 @@ def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> La
     s3 = get_s3()
 
     try:
-        logger.debug(
-            f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{artifact.s3_key}"
-        )
+        logger.debug(f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{artifact.s3_key}")
         head = s3.head_object(Bucket=ARTIFACTS_BUCKET, Key=artifact.s3_key)
     except Exception as e:
         logger.error(
