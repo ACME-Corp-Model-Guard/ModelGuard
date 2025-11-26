@@ -32,14 +32,13 @@ def mock_settings(monkeypatch):
 # ask_llm() — success cases
 # =====================================================================
 
+
 def test_ask_llm_returns_string(mock_bedrock):
     """
     ask_llm should extract the model text content and return it.
     """
     # Fake Bedrock response structure
-    response_json = {
-        "content": [{"text": "Hello world"}]
-    }
+    response_json = {"content": [{"text": "Hello world"}]}
 
     mock_bedrock.invoke_model.return_value = {
         "body": MagicMock(read=lambda: json.dumps(response_json).encode("utf-8"))
@@ -55,9 +54,7 @@ def test_ask_llm_returns_json_parsed(mock_bedrock):
     """
     ask_llm(return_json=True) should JSON-decode the model output.
     """
-    response_json = {
-        "content": [{"text": '{"score": 0.95}'}]
-    }
+    response_json = {"content": [{"text": '{"score": 0.95}'}]}
 
     mock_bedrock.invoke_model.return_value = {
         "body": MagicMock(read=lambda: json.dumps(response_json).encode("utf-8"))
@@ -70,6 +67,7 @@ def test_ask_llm_returns_json_parsed(mock_bedrock):
 # =====================================================================
 # ask_llm() — error & malformed cases
 # =====================================================================
+
 
 def test_ask_llm_malformed_body(mock_bedrock):
     """
@@ -113,6 +111,7 @@ def test_ask_llm_client_error(mock_bedrock):
 # build_llm_prompt()
 # =====================================================================
 
+
 def test_build_llm_prompt_with_sections():
     prompt = llm.build_llm_prompt(
         instructions="Analyze:",
@@ -137,11 +136,9 @@ def test_build_llm_prompt_without_sections():
 # build_file_analysis_prompt()
 # =====================================================================
 
+
 def test_build_file_analysis_prompt_basic():
-    files = {
-        "a.py": "print('a')",
-        "README.md": "docs"
-    }
+    files = {"a.py": "print('a')", "README.md": "docs"}
 
     prompt = llm.build_file_analysis_prompt(
         metric_name="Code Quality",

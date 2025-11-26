@@ -37,6 +37,7 @@ def mock_cognito(monkeypatch):
 # _ensure_cognito_group_exists()
 # ================================================================
 
+
 def test_ensure_group_exists_already_present(mock_cognito):
     mock_cognito.get_group.return_value = {"Group": {"GroupName": "Admin"}}
 
@@ -65,6 +66,7 @@ def test_ensure_group_exists_creates_when_missing(mock_cognito):
 # ================================================================
 # _ensure_user_exists()
 # ================================================================
+
 
 def test_ensure_user_exists_already_present(mock_cognito):
     """
@@ -140,6 +142,7 @@ def test_ensure_user_exists_group_already_added(mock_cognito):
 # ================================================================
 # bootstrap_system()
 # ================================================================
+
 
 def test_bootstrap_system_calls_both_steps(mock_cognito, monkeypatch):
     """

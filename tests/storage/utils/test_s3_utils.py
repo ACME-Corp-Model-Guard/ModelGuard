@@ -139,8 +139,7 @@ def test_upload_artifact_to_s3_download_error(monkeypatch):
     monkeypatch.setattr(
         s3_utils,
         "download_artifact",
-        lambda *args,
-        **kwargs: (_ for _ in ()).throw(FileDownloadError("boom"))
+        lambda *args, **kwargs: (_ for _ in ()).throw(FileDownloadError("boom")),
     )
 
     with pytest.raises(FileDownloadError):

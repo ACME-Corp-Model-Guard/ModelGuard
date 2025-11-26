@@ -25,9 +25,12 @@ def reset_before_each_test(monkeypatch):
 # get_dynamodb()
 # ===============================================================
 
+
 def test_get_dynamodb_initializes_once(monkeypatch):
     mock_resource = MagicMock()
-    monkeypatch.setattr(clients.boto3, "resource", lambda svc, region_name=None: mock_resource)
+    monkeypatch.setattr(
+        clients.boto3, "resource", lambda svc, region_name=None: mock_resource
+    )
 
     r1 = clients.get_dynamodb()
     r2 = clients.get_dynamodb()
@@ -61,10 +64,10 @@ def test_get_ddb_table_returns_table(monkeypatch):
 # get_s3()
 # ===============================================================
 
+
 def test_get_s3_initializes_once(monkeypatch):
     mock_s3 = MagicMock()
-    monkeypatch.setattr(clients.boto3, "client",
-                        lambda svc, region_name=None: mock_s3)
+    monkeypatch.setattr(clients.boto3, "client", lambda svc, region_name=None: mock_s3)
 
     s1 = clients.get_s3()
     s2 = clients.get_s3()
@@ -84,6 +87,7 @@ def test_get_s3_runtime_error(monkeypatch):
 # ===============================================================
 # get_cognito()
 # ===============================================================
+
 
 def test_get_cognito_initializes_once(monkeypatch):
     mock_cognito = MagicMock()
@@ -111,6 +115,7 @@ def test_get_cognito_runtime_error(monkeypatch):
 # ===============================================================
 # get_bedrock_runtime()
 # ===============================================================
+
 
 def test_get_bedrock_runtime_initializes_once(monkeypatch):
     mock_bedrock = MagicMock()

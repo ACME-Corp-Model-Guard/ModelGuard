@@ -83,6 +83,7 @@ def test_translate_exceptions_success(monkeypatch):
     """
     If handler returns normally, wrapper should pass its response through unchanged.
     """
+
     @http.translate_exceptions
     def handler(event, context):
         return http.json_response(200, {"ok": True})
@@ -98,6 +99,7 @@ def test_translate_exceptions_turns_exception_into_500(monkeypatch):
     If handler raises, translate_exceptions should catch it and return
     a standardized 500 error response.
     """
+
     @http.translate_exceptions
     def handler(event, context):
         raise RuntimeError("boom")

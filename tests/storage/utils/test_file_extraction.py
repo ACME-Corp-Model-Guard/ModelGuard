@@ -24,11 +24,15 @@ def create_tar(tmp_path: Path, files: dict[str, str]) -> str:
 # extract_files_from_tar()
 # ============================================================
 
+
 def test_extract_files_from_tar_basic(tmp_path):
-    tar_path = create_tar(tmp_path, {
-        "a.py": "print('hello')",
-        "b.txt": "some text",
-    })
+    tar_path = create_tar(
+        tmp_path,
+        {
+            "a.py": "print('hello')",
+            "b.txt": "some text",
+        },
+    )
 
     result = fx.extract_files_from_tar(tar_path)
 
@@ -69,9 +73,9 @@ def test_extract_files_from_tar_handles_bad_file(tmp_path, monkeypatch):
 
 def test_extract_files_from_tar_invalid_tar(monkeypatch):
     monkeypatch.setattr(
-        tarfile, "open",
-        lambda *args,
-        **kwargs: (_ for _ in ()).throw(Exception("boom"))
+        tarfile,
+        "open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(Exception("boom")),
     )
 
     result = fx.extract_files_from_tar("not_a_tar.gz")
@@ -81,6 +85,7 @@ def test_extract_files_from_tar_invalid_tar(monkeypatch):
 # ============================================================
 # select_relevant_files()
 # ============================================================
+
 
 def test_select_relevant_files_regular_extensions():
     files = {
@@ -136,9 +141,7 @@ def test_select_relevant_files_no_readme_priority():
 
 
 def test_select_relevant_files_max_files_limit():
-    files = {
-        f"file{i}.py": "x" for i in range(10)
-    }
+    files = {f"file{i}.py": "x" for i in range(10)}
 
     selected = fx.select_relevant_files(
         files,
@@ -170,16 +173,20 @@ def test_select_relevant_files_ext_case_insensitive():
 # extract_relevant_files() high-level
 # ============================================================
 
+
 def test_extract_relevant_files_integration(tmp_path):
     """
     Creates a real tar.gz, extracts it, then filters.
     """
-    tar_path = create_tar(tmp_path, {
-        "a.py": "print('a')",
-        "b.txt": "hello",
-        "README.md": "readme content",
-        "image.png": "binary-ish",
-    })
+    tar_path = create_tar(
+        tmp_path,
+        {
+            "a.py": "print('a')",
+            "b.txt": "hello",
+            "README.md": "readme content",
+            "image.png": "binary-ish",
+        },
+    )
 
     result = fx.extract_relevant_files(
         tar_path,
