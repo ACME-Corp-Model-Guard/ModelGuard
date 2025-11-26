@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict
 
-from artifacts.artifactory import load_artifact_metadata
 from src.logger import logger
 from src.metrics.metric import Metric
+from src.storage.dynamo_utils import load_artifact_metadata
 
 if TYPE_CHECKING:
     from src.artifacts.model_artifact import ModelArtifact
@@ -12,20 +12,20 @@ if TYPE_CHECKING:
 
 class TreescoreMetric(Metric):
     """
-    Treescore metric for evaluating code structure.
+    Treescore metric: average NetScore of all ancestor models in the lineage.
     """
 
     SCORE_FIELD = "tree_score"
 
     def score(self, model: "ModelArtifact") -> Dict[str, float]:
         """
-        Score model treescore as the average net_score of its ancestors.
+        Compute the treescore as the average NetScore of all ancestors.
 
         Args:
             model: The ModelArtifact being scored.
 
         Returns:
-            Treescore score as a dictionary
+            {"tree_score": <float>}
         """
 
         parent_id = model.parent_model_id
