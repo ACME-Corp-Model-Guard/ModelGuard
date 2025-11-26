@@ -3,18 +3,6 @@ from unittest.mock import patch, MagicMock
 
 import src.storage.dynamo_utils as dynamo_utils
 
-class DummyArtifact:
-	def __init__(self, artifact_id, artifact_type, name):
-		self.artifact_id = artifact_id
-		self.artifact_type = artifact_type
-		self.name = name
-	def to_dict(self):
-		return {
-			"artifact_id": self.artifact_id,
-			"artifact_type": self.artifact_type,
-			"name": self.name,
-		}
-
 def test_scan_table_returns_items():
 	mock_table = MagicMock()
 	mock_table.scan.side_effect = [
@@ -47,11 +35,3 @@ def test_clear_table_calls_batch_delete():
 		count = dynamo_utils.clear_table("table", "artifact_id")
 	assert count == 1
 	mock_delete.assert_called_once()
-
-def test_save_artifact_metadata_puts_item():
-	dummy = DummyArtifact("id1", "model", "foo")
-	mock_table = MagicMock()
-	with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table), \
-		 patch("src.storage.dynamo_utils.ARTIFACTS_TABLE", "table"):
-		dynamo_utils.save_artifact_metadata(dummy)
-	mock_table.put_item.assert_called_once_with(Item=dummy.to_dict())

@@ -24,8 +24,6 @@ METRICS: list[_metrics.Metric] = [
     _metrics.LicenseMetric(),
     _metrics.PerformanceClaimsMetric(),
     _metrics.RampUpMetric(),
-    _metrics.ReproducibilityMetric(),
-    _metrics.ReviewednessMetric(),
     _metrics.SizeMetric(),
     _metrics.TreescoreMetric(),
 ]

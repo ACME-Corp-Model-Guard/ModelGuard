@@ -12,11 +12,10 @@ from typing import Any, Dict, cast
 
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
-from src.artifacts.artifactory import create_artifact
+from src.artifacts.artifactory import create_artifact, save_artifact_metadata
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.artifacts.artifactory import save_artifact_metadata
 from src.storage.s3_utils import upload_artifact_to_s3
 from src.utils.http import (
     LambdaResponse,

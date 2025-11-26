@@ -26,6 +26,8 @@ class DatasetQualityMetric(Metric):
         Returns:
             Dataset quality score as a dictionary
         """
+        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
+        
         # TODO: Implement actual dataset quality scoring when S3 integration is ready
         # For now, return a placeholder score
         return {"dataset_quality": 0.5}

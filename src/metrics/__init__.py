@@ -9,8 +9,6 @@ from .license_metric import LicenseMetric
 from .performance_claims_metric import PerformanceClaimsMetric
 from .ramp_up_metric import RampUpMetric
 from .size_metric import SizeMetric
-from .reproducibility_metric import ReproducibilityMetric
-from .reviewedness_metric import ReviewednessMetric
 from .treescore_metric import TreescoreMetric
 
 __all__ = [
@@ -23,7 +21,5 @@ __all__ = [
     "PerformanceClaimsMetric",
     "RampUpMetric",
     "SizeMetric",
-    "ReproducibilityMetric",
-    "ReviewednessMetric",
     "TreescoreMetric",
 ]

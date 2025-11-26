@@ -55,6 +55,7 @@ class CodeQualityMetric(Metric):
             {"code_quality": float} on success
             {"code_quality": 0.0} on failure
         """
+        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
 
         # ------------------------------------------------------------------
         # Step 1 — Download tarball from S3

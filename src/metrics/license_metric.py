@@ -26,6 +26,8 @@ class LicenseMetric(Metric):
         Returns:
             License score as a dictionary
         """
+        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
+        
         # TODO: Implement actual license scoring when S3 integration is ready
         # For now, return a placeholder score
         return {"license": 0.5}

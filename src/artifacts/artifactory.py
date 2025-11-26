@@ -29,6 +29,10 @@ from src.utils.llm_analysis import (
 )
 from functools import singledispatch
 
+# =============================================================================
+# Artifact Creation
+# =============================================================================
+
 def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
     """
     Create the appropriate artifact subclass and handle metadata fetching, artifact connection, and S3 upload for newly created artifacts.

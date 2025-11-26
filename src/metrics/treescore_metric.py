@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union, Dict
 
 from .metric import Metric
+from artifacts.artifactory import load_artifact_metadata
+from utils.logger import logger
 
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
@@ -23,7 +25,8 @@ class TreescoreMetric(Metric):
         Returns:
             Treescore score as a dictionary
         """
-
+        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
+        
         score : float = 0.0
         parent_count : int = 0
         temp_model = model

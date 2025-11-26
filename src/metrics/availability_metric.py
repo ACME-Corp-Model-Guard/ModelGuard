@@ -26,6 +26,8 @@ class AvailabilityMetric(Metric):
         Returns:
             Availability score as a dictionary
         """
+        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
+
         # TODO: Implement actual availability scoring when S3 integration is ready
         # For now, return a placeholder score
         return {"availability": 0.5}
