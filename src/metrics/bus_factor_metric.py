@@ -48,8 +48,7 @@ class BusFactorMetric(Metric):
                 return {"bus_factor": bus_factor}
             except Exception as e:
                 logger.error(
-                    f"Failed to calculate bus factor for GitHub repo {source_url}: {e}",
-                    exc_info=True,
+                    f"Failed to calculate bus factor for GitHub repo {source_url}: {e}"
                 )
                 return {"bus_factor": 0.0}
 
@@ -70,8 +69,7 @@ class BusFactorMetric(Metric):
                     return {"bus_factor": 0.5}
             except Exception as e:
                 logger.error(
-                    f"Failed to get GitHub URL for HuggingFace model {source_url}: {e}",
-                    exc_info=True,
+                    f"Failed to get GitHub URL for HuggingFace model {source_url}: {e}"
                 )
                 return {"bus_factor": 0.5}
 
@@ -239,12 +237,11 @@ class BusFactorMetric(Metric):
 
         except requests.RequestException as e:
             logger.error(
-                f"Failed to fetch contributors from GitHub API for {owner}/{repo}: {e}",
-                exc_info=True,
+                f"Failed to fetch contributors from GitHub API for {owner}/{repo}: {e}"
             )
             return []
         except Exception as e:
             logger.error(
-                f"Unexpected error fetching GitHub contributors: {e}", exc_info=True
+                f"Unexpected error fetching GitHub contributors: {e}"
             )
             return []

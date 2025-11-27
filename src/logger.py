@@ -97,8 +97,7 @@ def with_logging(func: F) -> F:
 
         except Exception as e:
             logger.error(
-                f"Unhandled exception in {func.__name__}: {e}",
-                exc_info=True,
+                f"Unhandled exception in {func.__name__}: {e}"
             )
             raise
 

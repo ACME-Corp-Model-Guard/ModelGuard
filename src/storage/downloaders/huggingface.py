@@ -120,7 +120,7 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
 
     except Exception as e:
-        logger.error(f"[HF] Download failed: {e}", exc_info=True)
+        logger.error(f"[HF] Download failed: {e}")
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
@@ -171,7 +171,7 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch model metadata: {e}", exc_info=True)
+        logger.error(f"[HF] Failed to fetch model metadata: {e}")
         raise
 
 
@@ -208,5 +208,5 @@ def fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch dataset metadata: {e}", exc_info=True)
+        logger.error(f"[HF] Failed to fetch dataset metadata: {e}")
         raise

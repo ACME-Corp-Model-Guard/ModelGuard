@@ -40,18 +40,17 @@ def mock_metrics(mock_metric_class):
 
 @pytest.fixture
 def model_artifact():
-    """Return a baseline ModelArtifact instance (auto_score disabled)."""
+    """Return a baseline ModelArtifact instance (no metrics provided)."""
     return ModelArtifact(
         name="demo-model",
         source_url="https://example.com/model",
         size=12345,
         license="MIT",
-        auto_score=False,
     )
 
 
-def test_init_without_autoscore(model_artifact):
-    """Ensure scores are not computed automatically when auto_score=False."""
+def test_init_without_metrics(model_artifact):
+    """Ensure scores are not computed automatically when no metrics are provided."""
     assert model_artifact.scores == {}
     assert model_artifact.scores_latency == {}
 
@@ -60,9 +59,8 @@ def test_compute_scores_parallel(model_artifact, mock_metrics):
     """Verify that _compute_scores runs all metrics in parallel and populates scores."""
     from src.artifacts import model_artifact as ma_module
 
-    # Patch METRICS with a non-empty list of mock metrics
-    with patch.object(ma_module, "METRICS", mock_metrics):
-        model_artifact._compute_scores()
+    # Compute scores with a set of mock metrics
+    model_artifact._compute_scores(mock_metrics)
 
     # Assert all metrics are present in scores
     for m in mock_metrics:
@@ -77,8 +75,7 @@ def test_compute_scores_parallel(model_artifact, mock_metrics):
     assert "NetScore" in model_artifact.scores_latency
 
 
-@patch("src.artifacts.model_artifact.METRICS", new_callable=list)
-def test_compute_scores_handles_exceptions(mock_metrics, model_artifact):
+def test_compute_scores_handles_exceptions(model_artifact):
     """Verify that metric failures are handled gracefully."""
     good_metric = MagicMock()
     good_metric.__class__.__name__ = "GoodMetric"
@@ -88,8 +85,7 @@ def test_compute_scores_handles_exceptions(mock_metrics, model_artifact):
     bad_metric.__class__.__name__ = "BadMetric"
     bad_metric.score.side_effect = RuntimeError("Boom!")
 
-    with patch("src.artifacts.model_artifact.METRICS", [good_metric, bad_metric]):
-        model_artifact._compute_scores()
+    model_artifact._compute_scores([good_metric, bad_metric])
 
     # Good metric should have a numeric score
     assert "Good" in model_artifact.scores
@@ -98,6 +94,7 @@ def test_compute_scores_handles_exceptions(mock_metrics, model_artifact):
     # Bad metric should have defaulted to 0.0
     assert model_artifact.scores["Bad"] == 0.0
     assert model_artifact.scores_latency["Bad"] == 0.0
+    print("Handled exception in BadMetric as expected.")
 
 
 def test_to_dict_contains_expected_fields(model_artifact):
@@ -128,9 +125,7 @@ def test_net_score_called_once(mock_calc, model_artifact):
     fake_metric = MagicMock()
     fake_metric.__class__.__name__ = "FakeMetric"
     fake_metric.score.return_value = 0.5
-
-    with patch("src.artifacts.model_artifact.METRICS", [fake_metric]):
-        model_artifact._compute_scores()
+    model_artifact._compute_scores([fake_metric])
 
     mock_calc.assert_called_once()
     assert model_artifact.scores["NetScore"] == 0.99

@@ -23,6 +23,7 @@ from src.utils.http import (
     json_response,
     translate_exceptions,
 )
+from src.metrics.registry import METRICS
 
 
 # =============================================================================
@@ -108,11 +109,11 @@ def lambda_handler(
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = create_artifact(artifact_type, source_url=url)
+        artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         logger.error(
-            f"[post_artifact] Upstream metadata fetch failed: {e}", exc_info=True
+            f"[post_artifact] Upstream metadata fetch failed: {e}",
         )
         return error_response(
             404,
@@ -121,7 +122,7 @@ def lambda_handler(
         )
     except Exception as e:
         logger.error(
-            f"[post_artifact] Unexpected metadata ingestion failure: {e}", exc_info=True
+            f"[post_artifact] Unexpected metadata ingestion failure: {e}",
         )
         return error_response(
             500,
@@ -137,7 +138,7 @@ def lambda_handler(
     try:
         save_artifact_metadata(artifact)
     except Exception as e:
-        logger.error(f"[post_artifact] Failed to save metadata: {e}", exc_info=True)
+        logger.error(f"[post_artifact] Failed to save metadata: {e}")
         return error_response(
             500,
             "Failed to save artifact metadata",

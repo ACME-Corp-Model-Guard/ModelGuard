@@ -69,7 +69,7 @@ def fetch_github_license(github_url: str) -> Optional[str]:
         return license_info.get("spdx_id")
 
     except Exception as e:
-        logger.error(f"[license_check] GitHub license fetch error: {e}", exc_info=True)
+        logger.error(f"[license_check] GitHub license fetch error: {e}")
         raise
 
 

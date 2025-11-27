@@ -11,7 +11,6 @@ from src.artifacts.base_artifact import BaseArtifact
 from src.logger import logger
 from src.metrics import Metric
 from src.metrics.net_score import calculate_net_score
-from src.metrics.registry import METRICS
 
 
 class ModelArtifact(BaseArtifact):
@@ -36,9 +35,9 @@ class ModelArtifact(BaseArtifact):
         size: float = 0.0,
         license: str = "unknown",
         # Scoring fields
+        metrics: Optional[List[Metric]] = None, # Do not serialize and store
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
-        auto_score: bool = True,
         # Connection fields
         code_name: Optional[str] = None,
         code_artifact_id: Optional[str] = None,
@@ -61,9 +60,9 @@ class ModelArtifact(BaseArtifact):
             metadata: Optional dict for additional model-specific data
             size: Model size in bytes (default: 0.0)
             license: Model license (default: "unknown")
+            metrics: Optional list of Metric instances to use for scoring
             scores: Optional pre-computed scores dict
             scores_latency: Optional pre-computed latencies dict
-            auto_score: Whether to automatically compute scores on creation (default: True)
             code_name: Optional name of associated code artifact
             code_artifact_id: Optional link to code artifact
             dataset_name: Optional name of associated dataset artifact
@@ -91,14 +90,25 @@ class ModelArtifact(BaseArtifact):
         self.scores = scores or {}
         self.scores_latency = scores_latency or {}
 
-        # Automatically compute scores on creation unless explicitly disabled
-        if auto_score and not scores:
+        # Connection fields
+        self.code_name = code_name
+        self.code_artifact_id = code_artifact_id
+        self.dataset_name = dataset_name
+        self.dataset_artifact_id = dataset_artifact_id
+        self.parent_model_name = parent_model_name
+        self.parent_model_source = parent_model_source
+        self.parent_model_relationship = parent_model_relationship
+        self.parent_model_id = parent_model_id
+        self.child_model_ids = child_model_ids
+
+        # Automatically compute scores on creation if metrics provided
+        if metrics:
             logger.info(f"Auto-scoring model artifact: {self.artifact_id}")
-            self._compute_scores()
+            self._compute_scores(metrics)
         else:
             logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
 
-    def _compute_scores(self) -> None:
+    def _compute_scores(self, metrics: List[Metric]) -> None:
         """
         Populate scores and scores_latency by running each metric in parallel.
 
@@ -108,8 +118,6 @@ class ModelArtifact(BaseArtifact):
         logger.info(
             f"Computing scores (parallel) for model artifact: {self.artifact_id}"
         )
-        scores: Dict[str, Union[float, Dict[str, float]]] = {}
-        latencies: Dict[str, float] = {}
 
         def run_metric(
             metric: Metric,
@@ -130,31 +138,29 @@ class ModelArtifact(BaseArtifact):
 
         # Run all metrics concurrently
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(8, len(METRICS))
+            max_workers=min(8, len(metrics))
         ) as executor:
-            futures = {executor.submit(run_metric, m): m for m in METRICS}
+            futures = {executor.submit(run_metric, m): m for m in metrics}
             for future in concurrent.futures.as_completed(futures):
                 metric_name, value, elapsed_ms = future.result()
-                scores[metric_name] = value
-                latencies[metric_name] = elapsed_ms
+                self.scores[metric_name] = value
+                self.scores_latency[metric_name] = elapsed_ms
 
         # Compute NetScore (sequential, depends on other scores)
         t0 = time.perf_counter()
-        scores["NetScore"] = calculate_net_score(scores)
+        self.scores["NetScore"] = calculate_net_score(self.scores)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-        latencies["NetScore"] = elapsed_ms
-
-        self.scores = scores
-        self.scores_latency = latencies
+        self.scores_latency["NetScore"] = elapsed_ms
 
         logger.info(
             f"Computed NetScore {self.scores['NetScore']:.3f} for artifact {self.artifact_id} "
-            f"({len(METRICS)} metrics in parallel)"
+            f"({len(metrics)} metrics in parallel)"
         )
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Serialize ModelArtifact to dictionary for DynamoDB storage.
+        Does not store Metric instances, only computed scores.
         """
         data = self._base_to_dict()
         data.update(

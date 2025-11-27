@@ -90,7 +90,6 @@ def lambda_handler(
     except Exception as e:
         logger.error(
             f"[get_artifact_by_name] Failed to generate presigned URL: {e}",
-            exc_info=True,
         )
         return error_response(500, "Failed to generate download URL", "S3_ERROR")
 

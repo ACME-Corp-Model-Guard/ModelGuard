@@ -83,7 +83,7 @@ def ask_llm(
         return content
 
     except (ClientError, KeyError, json.JSONDecodeError) as e:
-        logger.error(f"[llm] Bedrock request failed: {e}", exc_info=True)
+        logger.error(f"[llm] Bedrock request failed: {e}")
         return None
 
 

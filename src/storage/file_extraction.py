@@ -51,7 +51,7 @@ def extract_files_from_tar(
                     logger.warning(f"[file_extraction] Failed to extract {m.name}: {e}")
 
     except Exception as e:
-        logger.error(f"[file_extraction] Failed to open tar: {e}", exc_info=True)
+        logger.error(f"[file_extraction] Failed to open tar: {e}")
 
     return files
 

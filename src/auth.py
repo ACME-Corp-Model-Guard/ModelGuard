@@ -98,7 +98,7 @@ def authenticate_user(username: str, password: str) -> dict:
         }
 
     except ClientError as e:
-        logger.error(f"[auth] Cognito authentication failed: {e}", exc_info=True)
+        logger.error(f"[auth] Cognito authentication failed: {e}")
         raise
 
 
@@ -253,7 +253,7 @@ def auth_required(
             auth: AuthContext = authorize(event)
             return func(event, context, auth=auth)
         except Exception as e:
-            logger.error(f"[auth_required] Unauthorized: {e}", exc_info=True)
+            logger.error(f"[auth_required] Unauthorized: {e}")
             return error_response(
                 401,
                 f"Unauthorized: {e}",
@@ -298,7 +298,7 @@ def roles_required(
                 auth: AuthContext = authorize(event, allowed_roles=allowed_roles)
                 return func(event, context, auth=auth)
             except Exception as e:
-                logger.error(f"[roles_required] Forbidden: {e}", exc_info=True)
+                logger.error(f"[roles_required] Forbidden: {e}")
                 return error_response(
                     403,
                     f"Forbidden: {e}",

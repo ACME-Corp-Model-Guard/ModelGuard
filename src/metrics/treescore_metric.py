@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union, Dict
 
 from .metric import Metric
-from artifacts.artifactory import load_artifact_metadata
-from utils.logger import logger
-
-if TYPE_CHECKING:
-    from src.artifacts import ModelArtifact
+from src.artifacts.artifactory import load_artifact_metadata
+from src.artifacts.model_artifact import ModelArtifact
+from src.logger import logger
 
 
 class TreescoreMetric(Metric):
@@ -33,7 +31,7 @@ class TreescoreMetric(Metric):
             return {"treescore": 0.5} # No parent, neutral score
         else:
             while temp_model.parent_model_id is not None:
-                parent = self.load_artifact_metadata(temp_model.parent_model_id)
+                parent = load_artifact_metadata(temp_model.parent_model_id)
                 if parent and isinstance(parent, ModelArtifact):
                     score += parent.scores.get("net_score", 0.5)
                     parent_count += 1

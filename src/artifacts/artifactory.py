@@ -28,6 +28,7 @@ from src.utils.llm_analysis import (
     ask_llm,
 )
 from functools import singledispatch
+from typing import Any, Dict, List, Optional, Union, overload
 
 # =============================================================================
 # Artifact Creation
@@ -57,6 +58,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
             f"Invalid artifact_type: {artifact_type}. Must be one of {list(artifact_map.keys())}"
         )
     artifact_class = artifact_map[artifact_type]
+    kwargs.pop("artifact_type", None) # Remove if accidentally passed
 
     # if not name, then this model has no metadata yet; fetch it
     if not kwargs.get("name") and kwargs.get("source_url"):
@@ -64,7 +66,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
             metadata = fetch_artifact_metadata(kwargs["source_url"], artifact_type)
             kwargs.update(metadata)
         except FileDownloadError as e:
-            logger.error(f"Failed to fetch metadata for artifact creation: {e}", exc_info=True)
+            logger.error(f"Failed to fetch metadata for artifact creation: {e}")
             raise
 
     # Create artifact instance
@@ -148,7 +150,7 @@ def load_all_artifacts() -> List[BaseArtifact]:
         return artifacts
 
     except ClientError as e:
-        logger.error(f"Failed to load all artifacts: {e}", exc_info=True)
+        logger.error(f"Failed to load all artifacts: {e}")
         raise
 
 def load_all_artifacts_by_fields(
@@ -240,8 +242,7 @@ def _find_connected_artifact_names(artifact: BaseArtifact) -> None:
         )
     except Exception as e:
         logger.error(
-            f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}",
-            exc_info=True,
+            f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}"
         )
 
 # ============================================================================
@@ -328,7 +329,10 @@ def _(artifact: ModelArtifact) -> None:
             if not isinstance(child_model_artifact, ModelArtifact):
                 continue
             child_model_artifact.parent_model_id = artifact.artifact_id # link to this parent model
-            child_model_artifact._compute_scores() # recompute scores (only affects treescore/net score)
+
+            from src.metrics.treescore_metric import TreeScoreMetric # Lazy import to avoid circular dependency
+            child_model_artifact._compute_scores([TreeScoreMetric()]) # recompute relevant scores
+
             save_artifact_metadata(child_model_artifact) # save updated child model
             artifact.child_model_ids.append(child_model_artifact.artifact_id) # update this model for lineage
     logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
@@ -350,7 +354,7 @@ def _(artifact: CodeArtifact) -> None:
         if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
             continue
         model_artifact.code_artifact_id = artifact.artifact_id
-        model_artifact._compute_scores() # Recompute scores
+        model_artifact._compute_scores() # Recompute scores TODO: Pass proper metrics
         save_artifact_metadata(model_artifact)
     logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
 
@@ -371,6 +375,6 @@ def _(artifact: DatasetArtifact) -> None:
         if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
             continue
         model_artifact.dataset_artifact_id = artifact.artifact_id
-        model_artifact._compute_scores() # Recompute scores
+        model_artifact._compute_scores() # Recompute scores TODO: Pass proper metrics
         save_artifact_metadata(model_artifact)
     logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")

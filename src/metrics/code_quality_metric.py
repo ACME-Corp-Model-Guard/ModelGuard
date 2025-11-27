@@ -125,8 +125,7 @@ class CodeQualityMetric(Metric):
 
         except Exception as e:
             logger.error(
-                f"[code_quality] Evaluation failed for {model.artifact_id}: {e}",
-                exc_info=True,
+                f"[code_quality] Evaluation failed for {model.artifact_id}: {e}"
             )
             return {self.SCORE_FIELD: 0.0}
 
