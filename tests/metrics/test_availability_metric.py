@@ -17,7 +17,6 @@ def model_artifact():
         source_url="https://example.com/model",
         size=123,
         license="MIT",
-        auto_score=False,
         artifact_id="m-12345",
         dataset_artifact_id="ds-111",
         code_artifact_id="cd-222",
@@ -95,7 +94,6 @@ def test_availability_metric_missing_fields(metric):
         source_url="https://example.com/model",
         size=10,
         license="Unknown",
-        auto_score=False,
     )
 
     result = metric.score(model)

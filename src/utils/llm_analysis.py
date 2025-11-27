@@ -84,7 +84,7 @@ def ask_llm(
         return content
 
     except (ClientError, KeyError, json.JSONDecodeError) as e:
-        logger.error(f"[llm] Bedrock request failed: {e}", exc_info=True)
+        logger.error(f"[llm] Bedrock request failed: {e}")
         return None
 
 
@@ -180,6 +180,51 @@ Return ONLY a JSON object of the exact form:
         instructions=instructions,
         sections=sections,
         metric_description=metric_description,
+    )
+
+
+# ====================================================================================
+# EXTRACT FIELDS FROM FILES PROMPT BUILDER
+# ====================================================================================
+# Build a prompt that defines what field to extract from a set of files
+#
+# This helper:
+#   1. Defines extraction instructions
+#   2. Enforces strict JSON output (e.g., {"FIELD": "VALUE"})
+#   3. Adds each provided file as a separate prompt section
+#
+# Usage:
+#     prompt = build_extract_fields_from_files_prompt(
+#         fields=["field1", "field2"],
+#         files={"main.py": "...", "README.md": "..."},
+#     )
+# ------------------------------------------------------------------------------------
+
+
+def build_extract_fields_from_files_prompt(
+    fields: List[str],
+    files: Dict[str, str],
+) -> str:
+    """Construct a structured prompt for extracting fields from files."""
+
+    # Convert list to json, with value = PUT VALUE HERE
+    fields_json: Dict[str, str | None] = {}
+    for item in fields:
+        fields_json[item] = "PUT VALUE HERE"
+
+    instructions = f"""
+Examine the provided repository files and fill in the value for the following fields: {json.dumps(fields_json)}.
+Include only one value per field, even if it appears in multiple files.
+
+Return ONLY a JSON object of the exact form:
+{{ "FIELD": "VALUE" }}
+    """
+
+    sections = {f"FILE: {fname}": content for fname, content in files.items()}
+
+    return build_llm_prompt(
+        instructions=instructions,
+        sections=sections,
     )
 
 

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from src.logger import logger
-from src.storage.downloaders.dispatchers import fetch_artifact_metadata
+from src.utils.http import error_response
 from src.artifacts.types import ArtifactType
 
 
@@ -60,84 +60,6 @@ class BaseArtifact(ABC):
         logger.debug(
             f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}"
         )
-
-    @staticmethod
-    def create(artifact_type: ArtifactType, **kwargs: Any) -> "BaseArtifact":
-        """
-        Factory method to create the appropriate artifact subclass.
-
-        Args:
-            artifact_type: One of 'model', 'dataset', 'code'
-            **kwargs: Arguments passed to the subclass constructor
-
-        Returns:
-            Instance of ModelArtifact, DatasetArtifact, or CodeArtifact
-
-        Raises:
-            ValueError: If artifact_type is invalid
-        """
-        logger.debug(f"Creating artifact of type: {artifact_type}")
-
-        # Import here to avoid circular imports
-        from .code_artifact import CodeArtifact
-        from .dataset_artifact import DatasetArtifact
-        from .model_artifact import ModelArtifact
-
-        artifact_map = {
-            "model": ModelArtifact,
-            "dataset": DatasetArtifact,
-            "code": CodeArtifact,
-        }
-
-        if artifact_type not in artifact_map:
-            logger.error(f"Invalid artifact_type in factory: {artifact_type}")
-            raise ValueError(
-                f"Invalid artifact_type: {artifact_type}. Must be one of {BaseArtifact.VALID_TYPES}"
-            )
-
-        # Create and return the appropriate artifact instance
-        artifact_class = artifact_map[artifact_type]
-        artifact = artifact_class(**kwargs)
-        logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
-        return artifact
-
-    @classmethod
-    def from_url(cls, url: str, artifact_type: ArtifactType) -> "BaseArtifact":
-        """
-        Create an artifact by fetching metadata from external source (HuggingFace or GitHub).
-
-        Args:
-            url: URL to artifact (HuggingFace model/dataset or GitHub repo)
-            artifact_type: One of 'model', 'dataset', 'code'
-
-        Returns:
-            Instance of appropriate artifact subclass with fetched metadata
-
-        Raises:
-            IngestionError: If fetching or parsing fails
-            ValueError: If artifact_type is invalid
-
-        Example:
-            >>> model = BaseArtifact.from_url(
-            ...     "https://huggingface.co/bert-base-uncased",
-            ...     artifact_type="model"
-            ... )
-        """
-        logger.info(f"Creating {artifact_type} artifact from URL: {url}")
-
-        # Fetch metadata from external source
-        metadata = fetch_artifact_metadata(url, artifact_type)
-
-        # Ensure source_url is set
-        metadata["source_url"] = url
-
-        # Create artifact using factory method
-        artifact = cls.create(artifact_type, **metadata)
-        logger.info(
-            f"Successfully created {artifact_type} artifact from URL: {artifact.artifact_id}"
-        )
-
-        return artifact
 
     @abstractmethod
     def to_dict(self) -> Dict[str, Any]:

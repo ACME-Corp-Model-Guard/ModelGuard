@@ -20,7 +20,6 @@ def model_artifact():
         source_url="https://example.com/model",
         size=123,
         license="MIT",
-        auto_score=False,
         artifact_id="model-12345",
         dataset_artifact_id="ds-abcde",
         s3_key="models/test.tar.gz",

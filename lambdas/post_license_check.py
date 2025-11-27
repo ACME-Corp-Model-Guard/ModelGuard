@@ -23,7 +23,7 @@ import requests
 
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -69,7 +69,7 @@ def fetch_github_license(github_url: str) -> Optional[str]:
         return license_info.get("spdx_id")
 
     except Exception as e:
-        logger.error(f"[license_check] GitHub license fetch error: {e}", exc_info=True)
+        logger.error(f"[license_check] GitHub license fetch error: {e}")
         raise
 
 

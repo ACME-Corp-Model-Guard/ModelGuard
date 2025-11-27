@@ -2,17 +2,15 @@
 Dataset artifact class.
 """
 
-from typing import Dict, Any, Optional
-
+from typing import Dict, Any, Optional, List
 from .base_artifact import BaseArtifact
 
 
 class DatasetArtifact(BaseArtifact):
     """
-    Dataset artifact with minimal fields.
+    Dataset artifact.
 
     Inherits all base functionality from BaseArtifact.
-    Future enhancements may add dataset-specific fields (e.g., schema, row_count, etc.).
     """
 
     def __init__(

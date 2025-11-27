@@ -11,7 +11,7 @@ from typing import Any, Dict, cast
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -97,9 +97,7 @@ def lambda_handler(
     try:
         download_url = generate_s3_download_url(artifact_id, s3_key=s3_key)
     except Exception as e:
-        logger.error(
-            f"[get_artifact] Failed to generate presigned URL: {e}", exc_info=True
-        )
+        logger.error(f"[get_artifact] Failed to generate presigned URL: {e}")
         return error_response(
             500, "Failed to generate download URL", error_code="S3_ERROR"
         )

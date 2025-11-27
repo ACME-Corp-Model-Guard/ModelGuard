@@ -41,18 +41,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: artifact_id
           AttributeType: S
-        - AttributeName: name
-          AttributeType: S
       KeySchema:
         - AttributeName: artifact_id
           KeyType: HASH  # Primary key
-      GlobalSecondaryIndexes:
-        - IndexName: NameIndex
-          KeySchema:
-            - AttributeName: name
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: ModelGuard
@@ -94,7 +85,7 @@ Resources:
       LifecycleConfiguration:
         Rules:
           - Status: Enabled
-            ExpirationInDays: 7
+            ExpirationInDays: 1
             Prefix: "access-logs/"
 
   ArtifactsBucket:

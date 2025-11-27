@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -161,7 +161,7 @@ def lambda_handler(
         artifact_dict = artifact.to_dict()
         rate_data = _format_rate_response(artifact_dict)
     except Exception as e:
-        logger.error(f"[get_model_rate] Failed to format rate data: {e}", exc_info=True)
+        logger.error(f"[get_model_rate] Failed to format rate data: {e}")
         return error_response(
             500,
             f"Failed to format rate data: {str(e)}",

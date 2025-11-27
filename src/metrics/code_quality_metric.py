@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict
 from src.artifacts.code_artifact import CodeArtifact
 from src.logger import logger
 from src.metrics.metric import Metric
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.llm_analysis import (

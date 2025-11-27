@@ -3,16 +3,16 @@ Code artifact class.
 """
 
 from typing import Dict, Any, Optional
+from typing import List
 
 from .base_artifact import BaseArtifact
 
 
 class CodeArtifact(BaseArtifact):
     """
-    Code artifact with minimal fields.
+    Code artifact.
 
     Inherits all base functionality from BaseArtifact.
-    Future enhancements may add code-specific fields (e.g., language, framework, etc.).
     """
 
     def __init__(

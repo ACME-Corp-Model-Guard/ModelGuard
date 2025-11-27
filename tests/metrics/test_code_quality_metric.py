@@ -15,7 +15,6 @@ def model_artifact():
         source_url="https://example.com/model",
         size=123,
         license="MIT",
-        auto_score=False,
         artifact_id="12345",
         code_artifact_id="code-abcde",
         s3_key="models/test.tar.gz",
