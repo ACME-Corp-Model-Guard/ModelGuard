@@ -21,7 +21,7 @@ class TreescoreMetric(Metric):
             model: The ModelArtifact object to score
 
         Returns:
-            {"tree_score": <float>}
+            {"treescore": <float>}
         """
         
         score : float = 0.0
