@@ -12,7 +12,7 @@ from src.auth import AuthContext, auth_required
 from src.aws.clients import get_s3
 from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_BUCKET
-from src.storage.dynamo_utils import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
     error_response,
