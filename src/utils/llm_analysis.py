@@ -208,7 +208,7 @@ def build_extract_fields_from_files_prompt(
     """Construct a structured prompt for extracting fields from files."""
 
     # Convert list to json, with value = PUT VALUE HERE
-    fields_json : Dict[str, str | None] = {}
+    fields_json: Dict[str, str | None] = {}
     for item in fields:
         fields_json[item] = "PUT VALUE HERE"
 

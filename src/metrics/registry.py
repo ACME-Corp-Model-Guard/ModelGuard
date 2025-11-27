@@ -7,8 +7,9 @@ from src.metrics.performance_claims_metric import PerformanceClaimsMetric
 from src.metrics.ramp_up_metric import RampUpMetric
 from src.metrics.size_metric import SizeMetric
 from src.metrics.treescore_metric import TreescoreMetric
+from src.metrics.metric import Metric
 
-METRICS = [
+METRICS: list[Metric] = [
     AvailabilityMetric(),
     BusFactorMetric(),
     CodeQualityMetric(),
@@ -21,16 +22,16 @@ METRICS = [
 ]
 
 # Categorized metric lists for targeted reevaluations on new connections
-LINEAGE_METRICS = [
+LINEAGE_METRICS: list[Metric] = [
     TreescoreMetric(),
 ]
 
-CODE_METRICS = [
+CODE_METRICS: list[Metric] = [
     CodeQualityMetric(),
     AvailabilityMetric(),
 ]
 
-DATASET_METRICS = [
+DATASET_METRICS: list[Metric] = [
     DatasetQualityMetric(),
     AvailabilityMetric(),
 ]

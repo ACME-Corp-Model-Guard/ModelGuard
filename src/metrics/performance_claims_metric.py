@@ -26,7 +26,7 @@ class PerformanceClaimsMetric(Metric):
         Returns:
             Performance claims score as a dictionary
         """
-        
+
         # TODO: Implement actual performance claims scoring when S3 integration is ready
         # For now, return a placeholder score
         return {"performance_claims": 0.5}

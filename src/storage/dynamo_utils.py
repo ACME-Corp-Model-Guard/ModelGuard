@@ -18,6 +18,7 @@ from botocore.exceptions import ClientError
 from src.aws.clients import get_ddb_table
 from src.logger import logger
 
+
 # =============================================================================
 # Generic DynamoDB Table Utilities
 # =============================================================================
@@ -41,8 +42,10 @@ def scan_table(table_name: str) -> List[Dict[str, Any]]:
 
 def search_table_by_fields(
     table_name: str,
-    fields: Dict[str, Any], # multiple fields to match
-    item_list: Optional[List[Dict[str, Any]]] = None, # item_list can be used to avoid a full table scan
+    fields: Dict[str, Any],  # multiple fields to match
+    item_list: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # item_list can be used to avoid a full table scan
 ) -> List[Dict[str, Any]]:
     """
     Search a DynamoDB table for items matching specific field values.
@@ -67,6 +70,7 @@ def search_table_by_fields(
 
     return matches
 
+
 def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
     """
     Save a generic item to a DynamoDB table.
@@ -79,7 +83,10 @@ def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
         logger.error(f"[DDB] Failed to save item to {table_name}: {e}")
         raise
 
-def load_item_from_key(table_name: str, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
+def load_item_from_key(
+    table_name: str, key: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """
     Load a generic item from a DynamoDB table by its key.
     """
@@ -95,6 +102,7 @@ def load_item_from_key(table_name: str, key: Dict[str, Any]) -> Optional[Dict[st
     except ClientError as e:
         logger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
         raise
+
 
 def batch_delete(
     table_name: str,

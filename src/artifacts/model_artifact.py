@@ -99,7 +99,6 @@ class ModelArtifact(BaseArtifact):
         self.parent_model_id = parent_model_id
         self.child_model_ids = child_model_ids
 
-
     def compute_scores(self, metrics: List[Metric]) -> None:
         """
         Populate scores and scores_latency by running each metric in parallel.

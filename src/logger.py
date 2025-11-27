@@ -96,9 +96,7 @@ def with_logging(func: F) -> F:
             return result
 
         except Exception as e:
-            logger.error(
-                f"Unhandled exception in {func.__name__}: {e}"
-            )
+            logger.error(f"Unhandled exception in {func.__name__}: {e}")
             raise
 
     return wrapper  # type: ignore[return-value]

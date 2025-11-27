@@ -11,7 +11,10 @@ from typing import Any, Dict, Optional
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.settings import ARTIFACTS_TABLE
-from src.artifacts.artifactory import load_artifact_metadata, load_all_artifacts_by_field
+from src.artifacts.artifactory import (
+    load_artifact_metadata,
+    load_all_artifacts_by_fields,
+)
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -68,7 +71,7 @@ def lambda_handler(
     # ------------------------------------------------------------------
     # Step 2 - Scan DynamoDB for an item with this name, and get the first matching artifact
     # ------------------------------------------------------------------
-    artifacts = load_all_artifacts_by_field(ARTIFACTS_TABLE, "name", name)
+    artifacts = load_all_artifacts_by_fields(fields={"name": name})
 
     if not artifacts:
         return error_response(

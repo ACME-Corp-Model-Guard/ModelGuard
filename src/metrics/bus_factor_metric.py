@@ -34,7 +34,7 @@ class BusFactorMetric(Metric):
             Bus factor score as a dictionary with value between 0.0 and 1.0
             (higher is better - more distributed contributions)
         """
-        
+
         source_url = model.source_url
         if not source_url:
             logger.warning(f"No source_url for model {model.artifact_id}")
@@ -240,7 +240,5 @@ class BusFactorMetric(Metric):
             )
             return []
         except Exception as e:
-            logger.error(
-                f"Unexpected error fetching GitHub contributors: {e}"
-            )
+            logger.error(f"Unexpected error fetching GitHub contributors: {e}")
             return []
