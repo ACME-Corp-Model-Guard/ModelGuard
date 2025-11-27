@@ -34,7 +34,6 @@ class BusFactorMetric(Metric):
             Bus factor score as a dictionary with value between 0.0 and 1.0
             (higher is better - more distributed contributions)
         """
-        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
         
         source_url = model.source_url
         if not source_url:

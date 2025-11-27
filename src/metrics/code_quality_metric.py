@@ -62,7 +62,6 @@ This metric evaluates the overall quality of a code repository, including:
             {"code_quality": float} on success
             {"code_quality": 0.0} on any failure
         """
-        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
 
         # ------------------------------------------------------------------
         # Step 0 — Identify code artifact

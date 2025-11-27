@@ -26,7 +26,6 @@ class SizeMetric(Metric):
         Returns:
             Size score as a dictionary
         """
-        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
         
         # TODO: Implement actual size scoring when S3 integration is ready
         # For now, return a placeholder score
