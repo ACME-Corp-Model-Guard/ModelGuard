@@ -112,8 +112,7 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
     if not item:
         logger.warning(f"Artifact {artifact_id} not found")
         return None
-    # At this point, item is a dict[str, Any]
-    item = item  # type: ignore[assignment]
+
     artifact_type = item.get("artifact_type")
     if not artifact_type:
         raise ValueError(f"Artifact {artifact_id} missing artifact_type field")
