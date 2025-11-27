@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Union, overload
 # Artifact Creation
 # =============================================================================
 
-def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
+def create_artifact(artifact_type: ArtifactType, **kwargs: dict[str, Any]) -> BaseArtifact:
     """
     Create the appropriate artifact subclass and handle metadata fetching, artifact connection, and S3 upload for newly created artifacts.
 
@@ -63,7 +63,8 @@ def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
     # if not name, then this model has no metadata yet; fetch it
     if not kwargs.get("name") and kwargs.get("source_url"):
         try:
-            metadata = fetch_artifact_metadata(kwargs["source_url"], artifact_type)
+            url: str = kwargs.get("source_url")
+            metadata = fetch_artifact_metadata(url=url, artifact_type=artifact_type)
             kwargs.update(metadata)
         except FileDownloadError as e:
             logger.error(f"Failed to fetch metadata for artifact creation: {e}")
@@ -108,11 +109,11 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
         BaseArtifact instance or None if not found.
     """
     item = load_item_from_key(ARTIFACTS_TABLE, {"artifact_id": artifact_id})
-
     if not item:
         logger.warning(f"Artifact {artifact_id} not found")
         return None
-
+    # At this point, item is a dict[str, Any]
+    item = item  # type: ignore[assignment]
     artifact_type = item.get("artifact_type")
     if not artifact_type:
         raise ValueError(f"Artifact {artifact_id} missing artifact_type field")
@@ -154,7 +155,7 @@ def load_all_artifacts() -> List[BaseArtifact]:
         logger.info(f"Loaded {len(artifacts)} artifacts from {ARTIFACTS_TABLE}")
         return artifacts
 
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"Failed to load all artifacts: {e}")
         raise
 

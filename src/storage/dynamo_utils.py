@@ -60,13 +60,7 @@ def search_table_by_fields(
 
     for row in rows:
         for field_name, field_value in fields.items():
-            # Convert strings to lowercase for case-insensitive comparison
-            if isinstance(field_value, str) and isinstance(row.get(field_name), str):
-                field_value = field_value.lower()
-                row_value = row.get(field_name).lower() 
-            else:
-                row_value = row.get(field_name)
-            if row_value != field_value:
+            if row.get(field_name) != field_value:
                 break
         else:
             matches.append(row)
