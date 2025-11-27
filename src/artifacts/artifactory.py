@@ -82,6 +82,11 @@ def create_artifact(artifact_type: ArtifactType, **kwargs) -> BaseArtifact:
         )
         connect_artifact(artifact)
 
+    # If it's a model artifact, compute scores if metrics provided
+    if isinstance(artifact, ModelArtifact):
+        from src.metrics.registry import METRICS # Lazy import to avoid circular dependency
+        artifact.compute_scores(METRICS)  # Compute scores with provided metrics
+
     logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
     return artifact
 
@@ -330,8 +335,8 @@ def _(artifact: ModelArtifact) -> None:
                 continue
             child_model_artifact.parent_model_id = artifact.artifact_id # link to this parent model
 
-            from src.metrics.treescore_metric import TreeScoreMetric # Lazy import to avoid circular dependency
-            child_model_artifact._compute_scores([TreeScoreMetric()]) # recompute relevant scores
+            from src.metrics.registry import LINEAGE_METRICS # Lazy import to avoid circular dependency
+            child_model_artifact.compute_scores(LINEAGE_METRICS) # recompute relevant scores
 
             save_artifact_metadata(child_model_artifact) # save updated child model
             artifact.child_model_ids.append(child_model_artifact.artifact_id) # update this model for lineage
@@ -354,7 +359,10 @@ def _(artifact: CodeArtifact) -> None:
         if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
             continue
         model_artifact.code_artifact_id = artifact.artifact_id
-        model_artifact._compute_scores() # Recompute scores TODO: Pass proper metrics
+
+        from src.metrics.registry import CODE_METRICS # Lazy import to avoid circular dependency
+        model_artifact.compute_scores(CODE_METRICS) # Recompute scores
+
         save_artifact_metadata(model_artifact)
     logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
 
@@ -375,6 +383,9 @@ def _(artifact: DatasetArtifact) -> None:
         if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
             continue
         model_artifact.dataset_artifact_id = artifact.artifact_id
-        model_artifact._compute_scores() # Recompute scores TODO: Pass proper metrics
+
+        from src.metrics.registry import DATASET_METRICS # Lazy import to avoid circular dependency
+        model_artifact.compute_scores(DATASET_METRICS) # Recompute scores
+
         save_artifact_metadata(model_artifact)
     logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")

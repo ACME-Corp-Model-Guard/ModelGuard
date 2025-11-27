@@ -56,11 +56,11 @@ def test_init_without_metrics(model_artifact):
 
 
 def test_compute_scores_parallel(model_artifact, mock_metrics):
-    """Verify that _compute_scores runs all metrics in parallel and populates scores."""
+    """Verify that compute_scores runs all metrics in parallel and populates scores."""
     from src.artifacts import model_artifact as ma_module
 
     # Compute scores with a set of mock metrics
-    model_artifact._compute_scores(mock_metrics)
+    model_artifact.compute_scores(mock_metrics)
 
     # Assert all metrics are present in scores
     for m in mock_metrics:
@@ -85,7 +85,7 @@ def test_compute_scores_handles_exceptions(model_artifact):
     bad_metric.__class__.__name__ = "BadMetric"
     bad_metric.score.side_effect = RuntimeError("Boom!")
 
-    model_artifact._compute_scores([good_metric, bad_metric])
+    model_artifact.compute_scores([good_metric, bad_metric])
 
     # Good metric should have a numeric score
     assert "Good" in model_artifact.scores
@@ -125,7 +125,7 @@ def test_net_score_called_once(mock_calc, model_artifact):
     fake_metric = MagicMock()
     fake_metric.__class__.__name__ = "FakeMetric"
     fake_metric.score.return_value = 0.5
-    model_artifact._compute_scores([fake_metric])
+    model_artifact.compute_scores([fake_metric])
 
     mock_calc.assert_called_once()
     assert model_artifact.scores["NetScore"] == 0.99

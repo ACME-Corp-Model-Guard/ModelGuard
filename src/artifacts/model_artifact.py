@@ -35,7 +35,6 @@ class ModelArtifact(BaseArtifact):
         size: float = 0.0,
         license: str = "unknown",
         # Scoring fields
-        metrics: Optional[List[Metric]] = None, # Do not serialize and store
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
         # Connection fields
@@ -60,7 +59,6 @@ class ModelArtifact(BaseArtifact):
             metadata: Optional dict for additional model-specific data
             size: Model size in bytes (default: 0.0)
             license: Model license (default: "unknown")
-            metrics: Optional list of Metric instances to use for scoring
             scores: Optional pre-computed scores dict
             scores_latency: Optional pre-computed latencies dict
             code_name: Optional name of associated code artifact
@@ -101,14 +99,8 @@ class ModelArtifact(BaseArtifact):
         self.parent_model_id = parent_model_id
         self.child_model_ids = child_model_ids
 
-        # Automatically compute scores on creation if metrics provided
-        if metrics:
-            logger.info(f"Auto-scoring model artifact: {self.artifact_id}")
-            self._compute_scores(metrics)
-        else:
-            logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
 
-    def _compute_scores(self, metrics: List[Metric]) -> None:
+    def compute_scores(self, metrics: List[Metric]) -> None:
         """
         Populate scores and scores_latency by running each metric in parallel.
 

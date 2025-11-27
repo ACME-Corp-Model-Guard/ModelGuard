@@ -19,3 +19,18 @@ METRICS = [
     SizeMetric(),
     TreescoreMetric(),
 ]
+
+# Categorized metric lists for targeted reevaluations on new connections
+LINEAGE_METRICS = [
+    TreescoreMetric(),
+]
+
+CODE_METRICS = [
+    CodeQualityMetric(),
+    AvailabilityMetric(),
+]
+
+DATASET_METRICS = [
+    DatasetQualityMetric(),
+    AvailabilityMetric(),
+]
