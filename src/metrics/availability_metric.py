@@ -1,33 +1,89 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union, Dict
+from typing import TYPE_CHECKING, Dict, Union
 
+from src.logger import logger
 from .metric import Metric
 
 if TYPE_CHECKING:
-    from src.artifacts import ModelArtifact
+    from src.artifacts.model_artifact import ModelArtifact
 
 
 class AvailabilityMetric(Metric):
     """
-    Availability metric for evaluating model availability.
+    Availability Metric
 
-    This is a stub implementation that will be filled out when
-    S3 and SageMaker/Bedrock integration is available.
+    Measures whether a model has both:
+      1. An available dataset (dataset_artifact_id not None)
+      2. An available code artifact (code_artifact_id not None)
+
+    Scoring:
+        +0.5 if dataset is available
+        +0.5 if code is available
+
+    Output Format:
+        { "availability": <float in {0.0, 0.5, 1.0}> }
     """
+
+    SCORE_FIELD = "availability"
+
+    # ====================================================================================
+    # SCORE METHOD
+    # ====================================================================================
+    # Computes a simple availability score based on linked artifact presence.
+    # ====================================================================================
 
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
-        Score model availability.
+        Evaluate availability for a ModelArtifact.
 
-        Args:
-            model: The ModelArtifact object to score
+        Steps:
+            1. Check whether dataset_artifact_id is present
+            2. Check whether code_artifact_id is present
+            3. Compute score:
+                - 0.0 : neither available
+                - 0.5 : exactly one available
+                - 1.0 : both available
 
         Returns:
-            Availability score as a dictionary
+            {"availability": float} on success
         """
-        from src.artifacts import ModelArtifact # Lazy import to avoid circular dependency
 
-        # TODO: Implement actual availability scoring when S3 integration is ready
-        # For now, return a placeholder score
-        return {"availability": 0.5}
+        logger.debug(
+            f"[availability] Scoring model {model.artifact_id} "
+            f"(dataset_id={model.dataset_artifact_id}, code_id={model.code_artifact_id})"
+        )
+
+        try:
+            # ------------------------------------------------------------------
+            # Step 1 — Check dataset availability
+            # ------------------------------------------------------------------
+            dataset_available = model.dataset_artifact_id is not None
+
+            # ------------------------------------------------------------------
+            # Step 2 — Check code availability
+            # ------------------------------------------------------------------
+            code_available = model.code_artifact_id is not None
+
+            # ------------------------------------------------------------------
+            # Step 3 — Compute score
+            # ------------------------------------------------------------------
+            score = 0.0
+            if dataset_available:
+                score += 0.5
+            if code_available:
+                score += 0.5
+
+            logger.debug(
+                f"[availability] Model {model.artifact_id} → availability={score}"
+            )
+
+            return {self.SCORE_FIELD: score}
+
+        except Exception as e:
+            logger.error(
+                f"[availability] Unexpected error scoring availability for "
+                f"model {model.artifact_id}: {e}",
+                exc_info=True,
+            )
+            return {self.SCORE_FIELD: 0.0}

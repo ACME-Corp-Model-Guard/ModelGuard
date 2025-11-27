@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from src.artifacts.model_artifact import ModelArtifact
+from src.artifacts.code_artifact import CodeArtifact
 from src.metrics.code_quality_metric import CodeQualityMetric
 
 
@@ -15,7 +16,18 @@ def model_artifact():
         size=123,
         license="MIT",
         artifact_id="12345",
+        code_artifact_id="code-abcde",
         s3_key="models/test.tar.gz",
+    )
+
+
+@pytest.fixture
+def code_artifact():
+    return CodeArtifact(
+        name="test-code",
+        source_url="https://example.com/code",
+        artifact_id="code-abcde",
+        s3_key="code/test.tar.gz",
     )
 
 
@@ -29,7 +41,7 @@ def metric():
 # =====================================================================================
 
 
-def test_code_quality_metric_success(metric, model_artifact):
+def test_code_quality_metric_success(metric, model_artifact, code_artifact):
 
     fake_files = {
         "main.py": "print('hello')",
@@ -38,6 +50,10 @@ def test_code_quality_metric_success(metric, model_artifact):
 
     # Mock all external dependencies
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3") as mock_dl,
         patch(
             "src.metrics.code_quality_metric.extract_relevant_files",
@@ -63,15 +79,56 @@ def test_code_quality_metric_success(metric, model_artifact):
 
 
 # =====================================================================================
+# FAILURE: ModelArtifact does not have code_artifact_id → expect fallback score 0.0
+# =====================================================================================
+def test_code_quality_metric_no_code_artifact(metric, model_artifact, code_artifact):
+
+    model_artifact.code_artifact_id = None  # Remove code artifact reference
+
+    with patch(
+        "src.metrics.code_quality_metric.load_artifact_metadata",
+        wraps="src.metrics.code_quality_metric.load_artifact_metadata",
+    ) as mock_load:
+        result = metric.score(model_artifact)
+
+    assert result["code_quality"] == 0.0
+    assert not mock_load.called  # load_artifact_metadata should not be called
+
+
+# =====================================================================================
+# FAILURE: invalid CodeArtifact → expect fallback score 0.0
+# =====================================================================================
+def test_code_quality_metric_invalid_code_artifact(
+    metric, model_artifact, code_artifact
+):
+
+    with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=None,
+        ),
+        patch("src.metrics.code_quality_metric.download_artifact_from_s3") as mock_dl,
+    ):
+        result = metric.score(model_artifact)
+
+    assert result["code_quality"] == 0.0
+    assert not mock_dl.called  # download_artifact_from_s3 should not be called
+
+
+# =====================================================================================
 # FAILURE: LLM returns None → expect fallback score 0.0
 # =====================================================================================
 
 
-def test_code_quality_metric_llm_failure(metric, model_artifact):
+def test_code_quality_metric_llm_failure(metric, model_artifact, code_artifact):
 
     fake_files = {"main.py": "sample code"}
 
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3"),
         patch(
             "src.metrics.code_quality_metric.extract_relevant_files",
@@ -93,11 +150,15 @@ def test_code_quality_metric_llm_failure(metric, model_artifact):
 # =====================================================================================
 
 
-def test_code_quality_metric_bad_llm_json(metric, model_artifact):
+def test_code_quality_metric_bad_llm_json(metric, model_artifact, code_artifact):
 
     fake_files = {"main.py": "print('x')"}
 
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3"),
         patch(
             "src.metrics.code_quality_metric.extract_relevant_files",
@@ -119,9 +180,13 @@ def test_code_quality_metric_bad_llm_json(metric, model_artifact):
 # =====================================================================================
 
 
-def test_code_quality_metric_no_files(metric, model_artifact):
+def test_code_quality_metric_no_files(metric, model_artifact, code_artifact):
 
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3"),
         patch(
             "src.metrics.code_quality_metric.extract_relevant_files", return_value={}
@@ -137,9 +202,13 @@ def test_code_quality_metric_no_files(metric, model_artifact):
 # =====================================================================================
 
 
-def test_code_quality_metric_exception(metric, model_artifact):
+def test_code_quality_metric_exception(metric, model_artifact, code_artifact):
 
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch(
             "src.metrics.code_quality_metric.download_artifact_from_s3",
             side_effect=RuntimeError("boom"),
@@ -155,9 +224,13 @@ def test_code_quality_metric_exception(metric, model_artifact):
 # =====================================================================================
 
 
-def test_temp_file_cleanup(metric, model_artifact):
+def test_temp_file_cleanup(metric, model_artifact, code_artifact):
 
     with (
+        patch(
+            "src.metrics.code_quality_metric.load_artifact_metadata",
+            return_value=code_artifact,
+        ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3"),
         patch(
             "src.metrics.code_quality_metric.extract_relevant_files",
