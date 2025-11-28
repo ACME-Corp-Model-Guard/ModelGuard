@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union, Dict
 
+from src.logger import logger
+
 from .metric import Metric
 
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
-
 
 class LicenseMetric(Metric):
     """
@@ -59,12 +60,86 @@ class LicenseMetric(Metric):
         """
         Score model license.
 
-        Args:
-            model: The ModelArtifact object to score
+        Compute a license compatibilty score for a ModelArtifact
+
+        Resolution order for the license identifier:
+        1. model.license (top-level field populated during ingestion, 
+        ex: from HuggingFace model card "license")
+        2. model.metadata["license"]
+        3. model.metadata["metadata"]["license"] --> Fallback for nested shapes
+
+        The resolved license string (SPDX-style where possible) is normalized to 
+        lowercase and mapped using LICENSE_COMPATIBILITY. Any unkonw or unmapped license falls back 
+        to the value 0.5 as an "unambiguous license"
 
         Returns:
-            License score as a dictionary
+            dict: {"license": <float score> }
+            
         """
+
+        logger.debug(
+            "[license] Scoring model %s (license=%r, metadata=%r)",
+            getattr(model, "artifact_id", None),
+            getattr(model, "license", None),
+            getattr(model, "metadata", None)
+        )
+
+        try:
+            """
+            Step 1 - Start with the dedicated model.license field
+            """
+            license_id = (getattr(model, "license", "") or "").strip() or "unknown"
+
+            # Treat common "unknown-ish" values as unknown
+            if license_id.lower() in ("", "unknown", "none", "no-license", "nolicense"):
+                license_id = "unknown"
+
+            """
+            Step 2 - Fallback to metadata if needed
+            """
+            if license_id == "unknown":
+                meta = getattr(model, "metadata", {}) or {}
+
+                # Some ingestion paths may stash license alongside other metadata
+                meta_license = (
+                    meta.get("license")
+                    or meta.get("metadata", {}).get("license")
+                )
+
+                if isinstance(meta_license, str) and meta_license.strip():
+                    license_id = meta_license.strip()
+
+            """
+            Step 3 - Normalize and map to a score
+            """
+            license_key = (license_id or "unknown").lower()
+            license_score = self.LICENSE_COMPATIBILITY.get(license_key, 0.5)
+
+            logger.debug(
+                "[License] Model %s -> license_id=%r -> score=%.3f",
+                getattr(model, "artifact_id", None),
+                license_key,
+                license_score
+            )
+
+            return {self.SCORE_FIELD: float(license_score)}
+        
+        except Exception as exc:
+            """ 
+            Edge case/Error handling: if anything goes wrong, treat 
+            the license as ambiguous/unknown
+            """
+            logger.error(
+                "[license] Failed to score license for model %s: %s",
+                getattr(model, "artifact_id", None),
+                exc,
+                exc_info=True
+            )
+            return {self.SCORE_FIELD: 0.5}
+
+
+
+
         # TODO: Implement actual license scoring when S3 integration is ready
         # For now, return a placeholder score
         return {"license": 0.5}
