@@ -85,26 +85,6 @@ class LicenseMetric(Metric):
             """
             license_id = (getattr(model, "license", "") or "").strip()
 
-            # if missing or obviously unknown/unrecognized., try to fall back to metadata.
-            if not license_id or license_id.lower() in (
-                "unknown",
-                "none",
-                "no-license",
-                "nolicense",
-            ):
-                metadata = getattr(model, "metadata", {}) or {}
-
-                # Direct top-level metadata field
-                meta_license = metadata.get("license")
-
-                # # Nested under "metadata" key (ex: GitHub metadata structure)
-                # if not meta_license and isinstance(metadata.get("metadata"), dict):
-                #     meta_license = metadata["metadata"].get("license")
-
-                # if isinstance(meta_license, str) and meta_license.strip():
-                #     license_id = meta_license.strip()
-                # else:
-                #     license_id = "unknown"
             """
             Step 3 - Normalize and map to score
             """
