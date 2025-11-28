@@ -6,15 +6,11 @@ along with its S3 download URL.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
+from src.artifacts.artifactory import load_all_artifacts_by_fields
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.settings import ARTIFACTS_TABLE
-from src.artifacts.artifactory import (
-    load_artifact_metadata,
-    load_all_artifacts_by_fields,
-)
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -22,7 +18,6 @@ from src.utils.http import (
     json_response,
     translate_exceptions,
 )
-
 
 # =============================================================================
 # Lambda Handler: GET /artifact/byName/{name}
