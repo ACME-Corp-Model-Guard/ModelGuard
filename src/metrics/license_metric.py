@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union, Dict
+from typing import TYPE_CHECKING, Dict
 
 from src.logger import logger
-
 from .metric import Metric
 
 if TYPE_CHECKING:
-    from src.artifacts import ModelArtifact
+    # Import only for type checking to avoid circular imports at runtime
+    from src.artifacts.model_artifact import ModelArtifact
 
 
 class LicenseMetric(Metric):
     """
-    License metric for evaluating model licensing.
+    LicenseMetric
 
-    This is a stub implementation that will be filled out when
-    S3 and SageMaker/Bedrock integration is available.
+    Computes a license compatibility score for a model based on the license information
+    captured during artifact ingestion.
+
+    The ingestion pipeline is responsible for populating license metadata (ex: from HuggingFace
+    model cards or GitHub repository metadata) into the ModelArtifact. This metric only reads
+    the metadata and does not perform any further operations.
 
     Scoring (0.0 - 1.0)
     -------------------
@@ -25,15 +29,13 @@ class LicenseMetric(Metric):
 
     Output
     ------
-    Returns a dictionary in the standard metric format:
-    {"license": <float score>}
-    So that it can be consumed by the calculate_net_score method, and
-    persisted in ModelArtifact.scores.
+        {"license": <float score>}
     """
 
     SCORE_FIELD = "license"
+    DEFAULT_SCORE = 0.5
 
-    # Mapping
+    # Map normalized license identifier scores, anything not listed will default to 0.5.
     LICENSE_COMPATIBILITY: Dict[str, float] = {
         # Compatible (1.0)
         "mit": 1.0,
@@ -54,19 +56,17 @@ class LicenseMetric(Metric):
         "proprietary": 0.0,
     }
 
-    def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
+    def score(self, model: ModelArtifact) -> Dict[str, float]:
         """
         Compute a license compatibilty score for a ModelArtifact
 
         Resolution order for the license string identifier:
-        1. model.license (top-level field populated during ingestion,
-        ex: from HuggingFace model card "license")
+        1. model.license
         2. model.metadata["license"]
-        3. model.metadata["metadata"]["license"] --> Fallback for nested shapes
+        3. model.metadata["metadata"]["license"]
 
-        The resolved license string is normalized to lowercase and mapped
-        using LICENSE_COMPATIBILITY. Any unmapped value defaults to 0.5
-        to indicate an unknown/ambiguous license.
+        The resolved string is normalized to lowercase and mapped via LICENSE_COMPATIBILITY. 
+        Any unmapped value defaults to DEFAULT_SCORE = 0.5.
 
         Returns:
             dict: {"license": <float score> }
@@ -74,10 +74,9 @@ class LicenseMetric(Metric):
         """
 
         logger.debug(
-            "[license] Scoring model %s (license=%r, metadata=%r)",
+            "Calculating license metric for artifact_id=%r license=%r",
             getattr(model, "artifact_id", None),
             getattr(model, "license", None),
-            getattr(model, "metadata", None),
         )
 
         try:
@@ -86,66 +85,50 @@ class LicenseMetric(Metric):
             """
             license_id = (getattr(model, "license", "") or "").strip()
 
-            if not license_id:
-                license_id = "unknown"
+            # if missing or obviously unknown/unrecognized., try to fall back to metadata.
+            if not license_id or license_id.lower() in (
+                "unknown",
+                "none",
+                "no-license",
+                "nolicense"
+            ):
+                metadata = getattr(model, "metadata", {}) or {}
 
-            # Treat common "unknown-ish" values as unknown
-            if license_id.lower() in ("", "unknown", "none", "no-license", "nolicense"):
-                """
-                Step 2 - Fallback to metadata if needed
-                """
-                meta = getattr(model, "metadata", {}) or {}
+                # Direct top-level metadata field
+                meta_license = metadata.get("license")
 
-                meta_license = meta.get("license") or meta.get("metadata", {}).get(
-                    "license"
-                )
-
-                if isinstance(meta_license, str) and meta_license.strip():
-                    license_id = meta_license.strip()
-                else:
-                    license_id = "unknown"
-
-            """
-            Step 2 - Fallback to metadata if needed
-            """
-            if license_id == "unknown":
-                meta = getattr(model, "metadata", {}) or {}
-
-                # Some ingestion paths may stash license alongside other metadata
-                meta_license = meta.get("license") or meta.get("metadata", {}).get(
-                    "license"
-                )
+                # Nested under "metadata" key (ex: GitHub metadata structure)
+                if not meta_license and isinstance(metadata.get("metadata"), dict):
+                    meta_license = metadata["metadata"].get("license")
 
                 if isinstance(meta_license, str) and meta_license.strip():
                     license_id = meta_license.strip()
                 else:
                     license_id = "unknown"
-
+            
             """
-            Step 3 - Normalize and map to a score
+            Step 3 - Normalize and map to score
             """
-            key = license_id.lower()
-            score = self.LICENSE_COMPATIBILITY.get(key, 0.5)
+            normalized = license_id.lower()
+            score = self.LICENSE_COMPATIBILITY.get(normalized, self.DEFAULT_SCORE)
 
             logger.debug(
-                "[license] Model %s -> license_id=%r (key=%r) -> score=%.3f",
-                getattr(model, "artifact_if", None),
-                license_id,
-                key,
-                score,
-            )
-            return {self.SCORE_FIELD: float(score)}
-
-        except Exception as exc:
-            """
-            As final resort, give a score of 0.5 to any
-            license that has not been given a score up to this point.
-            (Treating it as ambiguous)
-            """
-            logger.error(
-                "[license] Failed to score license for model %s: %s",
+                "License metric result for artifact_id=%r: "
+                "license_id=%r normalized=%r score=%.3f",
                 getattr(model, "artifact_id", None),
-                exc,
-                exc_info=True,
+                license_id,
+                normalized,
+                score
             )
-            return {self.SCORE_FIELD: 0.5}
+
+            return {self.SCORE_FIELD: float(score)}
+        
+        except Exception as exc:
+            # If anything goes wrong during scoring, treat the license as
+            # ambiguous/unknown/unrecognized, and apply a score of 0.5
+            logger.error(
+                "Failed to calculate license metric for artifact_id=%r: %s",
+                exc,
+                exc_info=True
+            )
+            return {self.SCORE_FIELD: flow(self.DEFAULT_SCORE)}
