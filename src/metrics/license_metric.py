@@ -33,6 +33,28 @@ class LicenseMetric(Metric):
     SCORE_FIELD = "license"
 
     #Mapping
+    LICENSE_COMPATIBILITY: Dict[str, float] = {
+        # Compatible License (1.0)
+        "mit": 1.0,
+        "bsd-2-clause": 1.0,
+        "bsd-3-clause": 1.0,
+        "lgpl-2.1": 1.0,
+        "lgpl-2.1-or-later": 1.0,
+        "gpl-2.0-or-later": 1.0,
+         "apache-2.0": 1.0,
+
+        #Ambiguous License (0.5)
+        "gpl-2.0": 0.5,
+        "mpl-2.0": 0.5,
+        "unlicense": 0.5,
+
+        # Incompatible License (0.0)
+        "gpl-3.0": 0.0,
+        "lgpl": 0.0,
+        "agpl-3.0": 0.0,
+        "proprietary": 0.0
+    }
+
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Score model license.
