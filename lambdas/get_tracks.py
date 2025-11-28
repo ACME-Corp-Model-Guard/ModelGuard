@@ -1,3 +1,8 @@
+"""
+GET /tracks
+Return the list of extended track(s) supported by this deployment.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -5,34 +10,40 @@ from typing import Any, Dict
 from src.logger import logger, with_logging
 from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
-# ============================================================================
-# /tracks  —  Return supported extended track(s)
-#
-# OpenAPI spec requires this endpoint and expects:
-#   200 OK
-#   { "tracks": [ "security" ] }
-#
-# Your team selected the Security Track, so we return exactly that.
-# ============================================================================
-
+# Supported track(s) for this system.
 SUPPORTED_TRACKS = ["security"]
 
 
-@with_logging
+# =============================================================================
+# Lambda Handler: GET /tracks
+# =============================================================================
+#
+# Responsibilities:
+#   1. Return the list of extended tracks (Security, Performance, High-Assurance)
+#   2. Comply with the OpenAPI v3.4.6 specification
+#
+# Error codes:
+#   None defined — this endpoint always returns 200 OK
+#   500 handled by @translate_exceptions
+# =============================================================================
+
+
 @translate_exceptions
-def handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
-    """
-    Lambda handler for GET /tracks
+@with_logging
+def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
+    logger.info("[tracks] Handling tracks listing request")
 
-    Returns the list of extended tracks supported by this deployment.
-    This endpoint is required by the OpenAPI v3.4.6 specification.
-
-    Response:
-        200 OK
-        {
-            "tracks": ["security"]
-        }
-    """
+    # ---------------------------------------------------------------------
+    # Step 1 - Log incoming request (useful for debugging)
+    # ---------------------------------------------------------------------
     logger.debug(f"[tracks] Incoming event: {event}")
 
-    return json_response(status_code=200, body={"tracks": SUPPORTED_TRACKS})
+    # ---------------------------------------------------------------------
+    # Step 2 - Build response body
+    # ---------------------------------------------------------------------
+    response_body = {"tracks": SUPPORTED_TRACKS}
+
+    # ---------------------------------------------------------------------
+    # Step 3 - Return 200 with supported tracks list
+    # ---------------------------------------------------------------------
+    return json_response(200, response_body)
