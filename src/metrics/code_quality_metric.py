@@ -135,8 +135,6 @@ This metric evaluates the overall quality of a code repository, including:
                 )
                 return {self.SCORE_FIELD: 0.0}
 
-            typed_response = cast(Dict[str, Any], response)
-
             # ------------------------------------------------------------------
             # Step 5 — Extract score using shared helper
             # ------------------------------------------------------------------

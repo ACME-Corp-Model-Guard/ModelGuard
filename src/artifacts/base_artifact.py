@@ -6,9 +6,8 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from src.logger import logger
-from src.utils.http import error_response
 from src.artifacts.types import ArtifactType
+from src.logger import logger
 
 
 class BaseArtifact(ABC):

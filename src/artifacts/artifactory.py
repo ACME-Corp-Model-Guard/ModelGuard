@@ -2,8 +2,10 @@
 Artifactory: Centralized artifact creation and loading
 
 Provides:
-- create_artifact: Factory method to create Model, Dataset, or Code artifacts, handles metadata fetching, artifact connection, and S3 upload for newly created artifacts.
-- Artifact-specific metadata storage operations: save_artifact_metadata, load_artifact_metadata, load_all_artifacts, load_all_artifacts_by_fields
+- create_artifact: Factory method to create Model, Dataset, or Code artifacts, handles metadata
+  fetching, artifact connection, and S3 upload for newly created artifacts.
+- Artifact-specific metadata storage operations: save_artifact_metadata, load_artifact_metadata,
+  load_all_artifacts, load_all_artifacts_by_fields
 """
 
 from src.artifacts.base_artifact import BaseArtifact
@@ -37,7 +39,8 @@ from typing import Any, Dict, List, Optional, Union
 
 def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
     """
-    Create the appropriate artifact subclass and handle metadata fetching, artifact connection, and S3 upload for newly created artifacts.
+    Create the appropriate artifact subclass and handle metadata fetching,
+    artifact connection, and S3 upload for newly created artifacts.
 
     Args:
         artifact_type: One of 'model', 'dataset', 'code'
@@ -217,7 +220,8 @@ def load_all_artifacts_by_fields(
 def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
     """
     Use LLM to extract connected artifact names from model files.
-    Populates code_name, dataset_name, parent_model_name, parent_model_source, parent_model_relationship fields.
+    Populates code_name, dataset_name, parent_model_name, parent_model_source,
+    parent_model_relationship fields.
     """
     try:
         download_artifact_from_s3(
@@ -266,7 +270,8 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
                 "parent_model_relationship"
             )
         logger.info(
-            f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', parent_model_name='{artifact.parent_model_name}' "
+            f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', "
+            f"parent_model_name='{artifact.parent_model_name}' "
             f"for model artifact: {artifact.artifact_id}"
         )
     except Exception as e:

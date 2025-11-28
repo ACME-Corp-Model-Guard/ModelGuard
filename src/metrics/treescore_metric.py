@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union, Dict
+from typing import Dict, Union
 
-from .metric import Metric
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.model_artifact import ModelArtifact
 from src.logger import logger
+from src.metrics.metric import Metric
 
 
 class TreescoreMetric(Metric):
