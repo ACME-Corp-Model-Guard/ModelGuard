@@ -5,7 +5,6 @@ from typing import Dict, Union
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.model_artifact import ModelArtifact
 from src.logger import logger
-
 from src.metrics.metric import Metric
 
 
