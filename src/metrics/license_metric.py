@@ -14,8 +14,25 @@ class LicenseMetric(Metric):
 
     This is a stub implementation that will be filled out when
     S3 and SageMaker/Bedrock integration is available.
-    """
 
+    Scoring (0.0 - 1.0)
+    -------------------
+    - 1.0: Known license and fully compatible (ex: MIT, Apache-2.0)
+    - 0.5: Unknown, ambiguous, or undetermined license.
+    - 0.0: Known but incompatible license (ex: GPL-3.0, AGPL-3.0, Proprietary)
+
+    Output
+    ------
+    Returns a dictionary in the standard metric format:
+    {"license": <float score>}
+    So that it can be consumed by the calculate_net_score method, and persisted 
+    in ModelArtifact.scores.
+
+    """
+    
+    SCORE_FIELD = "license"
+
+    #Mapping
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Score model license.
