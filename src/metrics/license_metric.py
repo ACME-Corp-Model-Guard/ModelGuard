@@ -38,8 +38,8 @@ class LicenseMetric(Metric):
         "bsd-2-clause": 1.0,
         "bsd-3-clause": 1.0,
         # Ambiguous
-        "apache-2.0": 1.0,
-        "apache": 1.0,
+        "apache-2.0": 0.5,
+        "apache": 0.5,
         "mpl-2.0": 0.5,
         "unlicense": 0.5,
         "unknown": 0.5,
