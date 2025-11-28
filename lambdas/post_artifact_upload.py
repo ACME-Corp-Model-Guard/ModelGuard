@@ -10,21 +10,18 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, cast
 
-from src.artifacts.base_artifact import BaseArtifact
-from src.artifacts.types import ArtifactType
 from src.artifacts.artifactory import create_artifact, save_artifact_metadata
+from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
+from src.metrics.registry import METRICS
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.storage.s3_utils import upload_artifact_to_s3
 from src.utils.http import (
     LambdaResponse,
     error_response,
     json_response,
     translate_exceptions,
 )
-from src.metrics.registry import METRICS
-
 
 # =============================================================================
 # Lambda Handler: POST /artifact/{artifact_type}
