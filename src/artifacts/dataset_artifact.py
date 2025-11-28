@@ -2,8 +2,9 @@
 Dataset artifact class.
 """
 
-from typing import Dict, Any, Optional, List
-from .base_artifact import BaseArtifact
+from typing import Any, Dict, Optional
+
+from src.artifacts.base_artifact import BaseArtifact
 
 
 class DatasetArtifact(BaseArtifact):

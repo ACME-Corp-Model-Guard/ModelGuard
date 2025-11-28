@@ -2,10 +2,9 @@
 Code artifact class.
 """
 
-from typing import Dict, Any, Optional
-from typing import List
+from typing import Any, Dict, Optional
 
-from .base_artifact import BaseArtifact
+from src.artifacts.base_artifact import BaseArtifact
 
 
 class CodeArtifact(BaseArtifact):
