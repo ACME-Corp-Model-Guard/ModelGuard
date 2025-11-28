@@ -9,6 +9,7 @@ from .metric import Metric
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
 
+
 class LicenseMetric(Metric):
     """
     License metric for evaluating model licensing.
@@ -28,12 +29,11 @@ class LicenseMetric(Metric):
     {"license": <float score>}
     So that it can be consumed by the calculate_net_score method, and persisted 
     in ModelArtifact.scores.
-
     """
     
     SCORE_FIELD = "license"
 
-    #Mapping
+    # Mapping
     LICENSE_COMPATIBILITY: Dict[str, float] = {
         # Compatible License (1.0)
         "mit": 1.0,
