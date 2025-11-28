@@ -97,14 +97,14 @@ class LicenseMetric(Metric):
                 # Direct top-level metadata field
                 meta_license = metadata.get("license")
 
-                # Nested under "metadata" key (ex: GitHub metadata structure)
-                if not meta_license and isinstance(metadata.get("metadata"), dict):
-                    meta_license = metadata["metadata"].get("license")
+                # # Nested under "metadata" key (ex: GitHub metadata structure)
+                # if not meta_license and isinstance(metadata.get("metadata"), dict):
+                #     meta_license = metadata["metadata"].get("license")
 
-                if isinstance(meta_license, str) and meta_license.strip():
-                    license_id = meta_license.strip()
-                else:
-                    license_id = "unknown"
+                # if isinstance(meta_license, str) and meta_license.strip():
+                #     license_id = meta_license.strip()
+                # else:
+                #     license_id = "unknown"
             """
             Step 3 - Normalize and map to score
             """
