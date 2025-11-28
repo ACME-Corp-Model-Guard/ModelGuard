@@ -35,42 +35,40 @@ class LicenseMetric(Metric):
 
     # Mapping
     LICENSE_COMPATIBILITY: Dict[str, float] = {
-        # Compatible License (1.0)
+        # Compatible (1.0)
         "mit": 1.0,
         "bsd-2-clause": 1.0,
         "bsd-3-clause": 1.0,
         "lgpl-2.1": 1.0,
         "lgpl-2.1-or-later": 1.0,
         "gpl-2.0-or-later": 1.0,
-         "apache-2.0": 1.0,
+        "apache-2.0": 1.0,
 
-        #Ambiguous License (0.5)
+        #Ambiguous / Limited (0.5)
         "gpl-2.0": 0.5,
         "mpl-2.0": 0.5,
         "unlicense": 0.5,
 
-        # Incompatible License (0.0)
+        # Incompatible (0.0)
         "gpl-3.0": 0.0,
-        "lgpl": 0.0,
+        "lgpl-3.0": 0.0,
         "agpl-3.0": 0.0,
-        "proprietary": 0.0
+        "proprietary": 0.0        
     }
 
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
-        Score model license.
-
         Compute a license compatibilty score for a ModelArtifact
 
-        Resolution order for the license identifier:
+        Resolution order for the license string identifier:
         1. model.license (top-level field populated during ingestion, 
         ex: from HuggingFace model card "license")
         2. model.metadata["license"]
         3. model.metadata["metadata"]["license"] --> Fallback for nested shapes
 
-        The resolved license string (SPDX-style where possible) is normalized to 
-        lowercase and mapped using LICENSE_COMPATIBILITY. Any unkonw or unmapped license falls back 
-        to the value 0.5 as an "unambiguous license"
+        The resolved license string is normalized to lowercase and mapped 
+        using LICENSE_COMPATIBILITY. Any unmapped value defaults to 0.5 
+        to indicate an unknown/ambiguous license.
 
         Returns:
             dict: {"license": <float score> }
@@ -88,11 +86,34 @@ class LicenseMetric(Metric):
             """
             Step 1 - Start with the dedicated model.license field
             """
-            license_id = (getattr(model, "license", "") or "").strip() or "unknown"
+            license_id = (getattr(model, "license", "") or "").strip()
 
-            # Treat common "unknown-ish" values as unknown
-            if license_id.lower() in ("", "unknown", "none", "no-license", "nolicense"):
+            if not license_id:
                 license_id = "unknown"
+            
+            # Treat common "unknown-ish" values as unknown
+            if license_id.lower() in (
+                "",
+                "unknown",
+                "none",
+                "no-license",
+                "nolicense"
+                ):
+                """
+                Step 2 - Fallback to metadata if needed
+                """
+                meta = getattr(model, "metadata", {}) or {}
+
+                meta_license = (
+                    meta.get("license") or meta.get("metadata", {}).get("license")
+                )
+
+                if isinstance(meta_license, str) and meta_license.strip():
+                    license_id = meta_license.strip()
+                else:
+                    license_id = "unknown"
+
+
 
             """
             Step 2 - Fallback to metadata if needed
@@ -108,26 +129,29 @@ class LicenseMetric(Metric):
 
                 if isinstance(meta_license, str) and meta_license.strip():
                     license_id = meta_license.strip()
-
+                else:
+                    license_id = "unknown"
+            
             """
             Step 3 - Normalize and map to a score
             """
-            license_key = (license_id or "unknown").lower()
-            license_score = self.LICENSE_COMPATIBILITY.get(license_key, 0.5)
+            key = license_id.lower()
+            score = self.LICENSE_COMPATIBILITY.get(key, 0.5)
 
             logger.debug(
-                "[License] Model %s -> license_id=%r -> score=%.3f",
-                getattr(model, "artifact_id", None),
-                license_key,
-                license_score
+                "[license] Model %s -> license_id=%r (key=%r) -> score=%.3f",
+                getattr(model, "artifact_if", None),
+                license_id,
+                key,
+                score
             )
-
-            return {self.SCORE_FIELD: float(license_score)}
-        
+            return {self.SCORE_FIELD: float(score)}
+    
         except Exception as exc:
-            """ 
-            Edge case/Error handling: if anything goes wrong, treat 
-            the license as ambiguous/unknown
+            """
+            As final resort, give a score of 0.5 to any 
+            license that has not been given a score up to this point. 
+            (Treating it as ambiguous)
             """
             logger.error(
                 "[license] Failed to score license for model %s: %s",
@@ -136,10 +160,3 @@ class LicenseMetric(Metric):
                 exc_info=True
             )
             return {self.SCORE_FIELD: 0.5}
-
-
-
-
-        # TODO: Implement actual license scoring when S3 integration is ready
-        # For now, return a placeholder score
-        return {"license": 0.5}
