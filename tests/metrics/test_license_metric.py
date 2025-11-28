@@ -15,7 +15,6 @@ def make_model(license_str: str | None):
         name="test-model",
         source_url="http://example.com/model",
         license=license_str,
-        auto_score=False,  # prevent scoring during initialization
     )
 
 
