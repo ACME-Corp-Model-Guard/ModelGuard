@@ -65,7 +65,7 @@ class LicenseMetric(Metric):
         2. model.metadata["license"]
         3. model.metadata["metadata"]["license"]
 
-        The resolved string is normalized to lowercase and mapped via LICENSE_COMPATIBILITY. 
+        The resolved string is normalized to lowercase and mapped via LICENSE_COMPATIBILITY.
         Any unmapped value defaults to DEFAULT_SCORE = 0.5.
 
         Returns:
@@ -90,7 +90,7 @@ class LicenseMetric(Metric):
                 "unknown",
                 "none",
                 "no-license",
-                "nolicense"
+                "nolicense",
             ):
                 metadata = getattr(model, "metadata", {}) or {}
 
@@ -105,7 +105,6 @@ class LicenseMetric(Metric):
                     license_id = meta_license.strip()
                 else:
                     license_id = "unknown"
-            
             """
             Step 3 - Normalize and map to score
             """
@@ -118,17 +117,16 @@ class LicenseMetric(Metric):
                 getattr(model, "artifact_id", None),
                 license_id,
                 normalized,
-                score
+                score,
             )
 
             return {self.SCORE_FIELD: float(score)}
-        
         except Exception as exc:
             # If anything goes wrong during scoring, treat the license as
             # ambiguous/unknown/unrecognized, and apply a score of 0.5
             logger.error(
                 "Failed to calculate license metric for artifact_id=%r: %s",
                 exc,
-                exc_info=True
+                exc_info=True,
             )
-            return {self.SCORE_FIELD: flow(self.DEFAULT_SCORE)}
+        return {self.SCORE_FIELD: float(self.DEFAULT_SCORE)}
