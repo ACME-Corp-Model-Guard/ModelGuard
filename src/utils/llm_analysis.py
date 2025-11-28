@@ -213,7 +213,8 @@ def build_extract_fields_from_files_prompt(
         fields_json[item] = "PUT VALUE HERE"
 
     instructions = f"""
-Examine the provided repository files and fill in the value for the following fields: {json.dumps(fields_json)}.
+Examine the provided repository files and fill in the value for the
+following fields: {json.dumps(fields_json)}.
 Include only one value per field, even if it appears in multiple files.
 
 Return ONLY a JSON object of the exact form:
