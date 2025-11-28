@@ -11,7 +11,6 @@ using OR semantics.
    most practical interpretation.
 """
 
-
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
@@ -35,6 +34,7 @@ from src.artifacts.base_artifact import BaseArtifact
 # Helper: Validate request body
 # =============================================================================
 
+
 def _parse_artifact_queries(body: Any) -> List[Dict[str, Any]]:
     """
     Validate that the request body is a JSON array of ArtifactQuery objects.
@@ -56,6 +56,7 @@ def _parse_artifact_queries(body: Any) -> List[Dict[str, Any]]:
 # =============================================================================
 # Artifact Filtering Logic
 # =============================================================================
+
 
 def _filter_artifacts(
     all_artifacts: List[BaseArtifact],
@@ -102,6 +103,7 @@ def _filter_artifacts(
 # =============================================================================
 # Pagination
 # =============================================================================
+
 
 def _paginate(
     items: List[Any],
@@ -182,6 +184,7 @@ def lambda_handler(
 
     if isinstance(raw_body, str):
         import json
+
         try:
             body = json.loads(raw_body)
         except Exception:
@@ -237,9 +240,7 @@ def lambda_handler(
         for a in page
     ]
 
-    headers = {
-        "offset": str(next_offset) if next_offset is not None else "null"
-    }
+    headers = {"offset": str(next_offset) if next_offset is not None else "null"}
 
     # IMPORTANT: json_response only accepts dict | str | bool as body → wrap list
     return json_response(
