@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Union, Dict
+from typing import TYPE_CHECKING, Dict, Union
 
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact

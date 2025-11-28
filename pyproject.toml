@@ -12,20 +12,26 @@ line_length = 100
 src_paths = ["src", "tests"]
 skip = [".venv", "venv", ".pytest_cache"]
 
-[tool.flake8]
-max-line-length = 100
-exclude = [".git", "__pycache__", "build", "dist", ".venv", "venv", ".pytest_cache"]
-
 [tool.mypy]
 python_version = "3.12"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 follow_imports = "silent"
+ignore_missing_imports = true
 show_error_codes = true
-exclude = "^tests/"
+exclude = "tests/"
 
 [tool.pytest.ini_options]
 addopts = "-v"
 testpaths = ["tests"]
 pythonpath = ["src"]
 python_files = "test_*.py"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "__init__.py", "src/settings.py", "src/logger.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+]

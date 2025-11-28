@@ -2,18 +2,16 @@
 Code artifact class.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from .base_artifact import BaseArtifact
-from src.logger import logger
+from src.artifacts.base_artifact import BaseArtifact
 
 
 class CodeArtifact(BaseArtifact):
     """
-    Code artifact with minimal fields.
+    Code artifact.
 
     Inherits all base functionality from BaseArtifact.
-    Future enhancements may add code-specific fields (e.g., language, framework, etc.).
     """
 
     def __init__(

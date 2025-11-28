@@ -22,11 +22,17 @@ Globals:
         PYTHONPATH: /var/task:/var/task/src
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
+        BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
+        BEDROCK_REGION: !Ref DeploymentRegion
         USER_POOL_ID: !Ref ModelGuardUserPool
+        USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
+        TOKENS_TABLE: !Ref TokensTable
     Tracing: Active
 
 Resources:
-  # DynamoDB Table - Model Metadata
+  ###########################################################
+  # DynamoDB Tables
+  ###########################################################
   ArtifactsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -35,23 +41,53 @@ Resources:
       AttributeDefinitions:
         - AttributeName: artifact_id
           AttributeType: S
-        - AttributeName: name
-          AttributeType: S
       KeySchema:
         - AttributeName: artifact_id
           KeyType: HASH  # Primary key
-      GlobalSecondaryIndexes:
-        - IndexName: NameIndex
-          KeySchema:
-            - AttributeName: name
-              KeyType: HASH
-          Projection:
-            ProjectionType: ALL
       Tags:
         - Key: Project
           Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
 
-  # S3 Bucket - Model/Code/Dataset Storage
+  TokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Tokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
+
+  ###########################################################
+  # S3 Artifact Storage
+  ###########################################################
+  ArtifactsLogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'modelguard-artifacts-logs'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 1
+            Prefix: "access-logs/"
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -61,11 +97,22 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ArtifactsLogBucket
+        LogFilePrefix: "access-logs/"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 #(free)
+      VersioningConfiguration:
+        Status: Suspended
       Tags:
         - Key: Project
           Value: ModelGuard
 
-  # Cognito User Pool
+  ###########################################################
+  # Cognito User Pool + Client + Domain + Groups
+  ###########################################################
   ModelGuardUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -80,7 +127,6 @@ Resources:
       UserPoolTags:
         Project: ModelGuard
 
-  # Cognito User Pool Client
   ModelGuardUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
@@ -92,14 +138,12 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
 
-  # Cognito User Pool Domain
   ModelGuardUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
       UserPoolId: !Ref ModelGuardUserPool
       Domain: !Sub 'modelguard-${AWS::AccountId}'
 
-  # User Groups
   AdminGroup:
     Type: AWS::Cognito::UserPoolGroup
     Properties:
@@ -116,7 +160,9 @@ Resources:
       Description: Standard user access to artifacts
       Precedence: 2
 
-  # API Gateway
+  ###########################################################
+  # API Gateway + Cognito Authorizer
+  ###########################################################
   ModelGuardApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -124,7 +170,7 @@ Resources:
       Description: ModelGuard MVP API
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,X-Authorization'"
+        AllowHeaders: "'Content-Type,X-Authorization,Authorization'"
         AllowOrigin: "'*'"
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
@@ -132,6 +178,29 @@ Resources:
           CognitoAuthorizer:
             UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
+  ###########################################################
+  # Lambda: /authenticate (no authorizer)
+  ###########################################################
+  AuthenticateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.authenticate.lambda_handler
+      Description: User authentication
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        AuthenticateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /authenticate
+            Method: PUT
+            Auth:
+              Authorizer: NONE
+
+  ###########################################################
+  # Lambda Functions for Artifact Endpoints
+  ###########################################################
   # POST /artifacts - Enumerate artifacts
   PostArtifactsFunction:
     Type: AWS::Serverless::Function

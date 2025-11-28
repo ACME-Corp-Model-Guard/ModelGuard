@@ -37,6 +37,7 @@ class BusFactorMetric(Metric):
             Bus factor score as a dictionary with value between 0.0 and 1.0
             (higher is better - more distributed contributions)
         """
+
         source_url = model.source_url
         if not source_url:
             logger.warning(f"No source_url for model {model.artifact_id}")
@@ -69,7 +70,6 @@ class BusFactorMetric(Metric):
                     exc_info=True,
                 )
                 return {"bus_factor": 0.0}
-
         # Unknown source type, return neutral score
         logger.debug(f"Unknown source URL type for bus factor: {source_url}")
         return {"bus_factor": 0.5}
