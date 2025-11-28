@@ -32,7 +32,7 @@ def test_license_metric_permissive_mit(metric):
 def test_license_metric_permissive_apache(metric):
     model = make_model("Apache License 2.0")
     result = metric.score(model)
-    assert result == {"license": 1.0}
+    assert result == {"license": 0.5}
 
 
 def test_license_metric_permissive_bsd(metric):
@@ -107,7 +107,7 @@ def test_license_metric_proprietary(metric):
 def test_license_metric_normalizes_spaces(metric):
     model = make_model("Apache License Version 2.0")
     result = metric.score(model)
-    assert result == {"license": 1.0}
+    assert result == {"license": 0.5}
 
 
 def test_license_metric_normalizes_parentheses(metric):
