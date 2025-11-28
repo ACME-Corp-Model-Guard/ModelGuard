@@ -15,13 +15,14 @@ def make_model(license_str: str | None):
         name="test-model",
         source_url="http://example.com/model",
         license=license_str,
-        auto_score=False,     # prevent scoring during initialization
+        auto_score=False,  # prevent scoring during initialization
     )
 
 
 # =============================================================================
 # BASIC SCORING TESTS
 # =============================================================================
+
 
 def test_license_metric_permissive_mit(metric):
     model = make_model("MIT")
@@ -44,6 +45,7 @@ def test_license_metric_permissive_bsd(metric):
 # =============================================================================
 # AMBIGUOUS OR UNKNOWN LICENSES
 # =============================================================================
+
 
 def test_license_metric_unknown(metric):
     model = make_model("unknown")
@@ -79,6 +81,7 @@ def test_license_metric_unlicense(metric):
 # RESTRICTIVE LICENSES
 # =============================================================================
 
+
 def test_license_metric_gpl3(metric):
     model = make_model("GPL-3.0")
     result = metric.score(model)
@@ -100,6 +103,7 @@ def test_license_metric_proprietary(metric):
 # =============================================================================
 # NORMALIZATION CASES
 # =============================================================================
+
 
 def test_license_metric_normalizes_spaces(metric):
     model = make_model("Apache License Version 2.0")
@@ -128,6 +132,7 @@ def test_license_metric_normalizes_case(metric):
 # =============================================================================
 # ERROR HANDLING
 # =============================================================================
+
 
 def test_license_metric_catches_exception(monkeypatch, metric):
     """Force the metric to throw inside score() so the fallback is triggered."""
