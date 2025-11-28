@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-import requests
-from typing import TYPE_CHECKING, Union, Dict, List, Optional
+from typing import TYPE_CHECKING, Union, Dict, Optional
 
 from .metric import Metric
 from src.logger import logger
+from src.artifacts.utils.api_ingestion import (
+    extract_github_url_from_huggingface_metadata,
+    fetch_github_contributors,
+)
 
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
@@ -39,97 +42,37 @@ class BusFactorMetric(Metric):
             logger.warning(f"No source_url for model {model.artifact_id}")
             return {"bus_factor": 0.0}
 
+        # Determine GitHub URL to use for bus factor calculation
+        github_url = None
+
         # Check if source_url is a GitHub repository
         if "github.com" in source_url:
+            github_url = source_url
+        # For HuggingFace models, extract GitHub URL from metadata
+        elif "huggingface.co" in source_url:
+            github_url = extract_github_url_from_huggingface_metadata(model.metadata)
+            if not github_url:
+                # No GitHub repo found, return neutral score
+                logger.debug(
+                    f"No GitHub repo found for HuggingFace model: {source_url}"
+                )
+                return {"bus_factor": 0.5}
+
+        # Calculate bus factor if we have a GitHub URL
+        if github_url:
             try:
-                bus_factor = self._calculate_github_bus_factor(source_url)
+                bus_factor = self._calculate_github_bus_factor(github_url)
                 return {"bus_factor": bus_factor}
             except Exception as e:
                 logger.error(
-                    f"Failed to calculate bus factor for GitHub repo {source_url}: {e}",
+                    f"Failed to calculate bus factor for GitHub repo {github_url}: {e}",
                     exc_info=True,
                 )
                 return {"bus_factor": 0.0}
 
-        # For HuggingFace models, check if there's a linked GitHub repo in metadata
-        if "huggingface.co" in source_url:
-            try:
-                github_url = self._get_github_url_from_huggingface(
-                    source_url, model.metadata
-                )
-                if github_url:
-                    bus_factor = self._calculate_github_bus_factor(github_url)
-                    return {"bus_factor": bus_factor}
-                else:
-                    # No GitHub repo found, return neutral score
-                    logger.debug(
-                        f"No GitHub repo found for HuggingFace model: {source_url}"
-                    )
-                    return {"bus_factor": 0.5}
-            except Exception as e:
-                logger.error(
-                    f"Failed to get GitHub URL for HuggingFace model {source_url}: {e}",
-                    exc_info=True,
-                )
-                return {"bus_factor": 0.5}
-
         # Unknown source type, return neutral score
         logger.debug(f"Unknown source URL type for bus factor: {source_url}")
         return {"bus_factor": 0.5}
-
-    def _get_github_url_from_huggingface(
-        self, huggingface_url: str, metadata: Dict
-    ) -> Optional[str]:
-        """
-        Extract GitHub repository URL from HuggingFace model metadata.
-
-        Args:
-            huggingface_url: HuggingFace model URL
-            metadata: Model metadata dictionary
-
-        Returns:
-            GitHub repository URL if found, None otherwise
-        """
-        # Check metadata for GitHub URL
-        if metadata:
-            # Common fields where GitHub URL might be stored
-            github_url = (
-                metadata.get("github_url")
-                or metadata.get("github")
-                or metadata.get("code_repository")
-                or metadata.get("repository")
-            )
-            if github_url and "github.com" in str(github_url):
-                return str(github_url)
-
-        # Try to fetch from HuggingFace API
-        try:
-            parts = huggingface_url.rstrip("/").split("huggingface.co/")
-            if len(parts) < 2:
-                return None
-
-            model_id = parts[1]
-            api_url = f"https://huggingface.co/api/models/{model_id}"
-            response = requests.get(api_url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-
-            # Check various fields where GitHub URL might be stored
-            github_url = (
-                data.get("cardData", {}).get("github")
-                or data.get("cardData", {}).get("code_repository")
-                or data.get("siblings", [{}])[0].get("rfilename", "").split("/")[0]
-                if data.get("siblings")
-                else None
-            )
-
-            if github_url and "github.com" in str(github_url):
-                return str(github_url)
-
-        except Exception as e:
-            logger.debug(f"Could not fetch GitHub URL from HuggingFace API: {e}")
-
-        return None
 
     def _calculate_github_bus_factor(self, github_url: str) -> float:
         """
@@ -141,31 +84,19 @@ class BusFactorMetric(Metric):
         Returns:
             Bus factor score between 0.0 and 1.0
         """
-        # Parse owner/repo from URL
-        parts = github_url.rstrip("/").split("github.com/")
-        if len(parts) < 2:
-            logger.warning(f"Invalid GitHub URL format: {github_url}")
-            return 0.0
+        logger.debug(f"Calculating bus factor for GitHub repo: {github_url}")
 
-        repo_path = parts[1].split("/")[:2]
-        if len(repo_path) < 2:
-            logger.warning(f"Invalid GitHub repository URL: {github_url}")
-            return 0.0
-
-        owner, repo = repo_path
-        logger.debug(f"Calculating bus factor for GitHub repo: {owner}/{repo}")
-
-        # Fetch contributor statistics
-        contributors = self._fetch_github_contributors(owner, repo)
+        # Fetch contributor statistics using api_ingestion
+        contributors = fetch_github_contributors(github_url)
         if not contributors:
-            logger.warning(f"No contributors found for {owner}/{repo}")
+            logger.warning(f"No contributors found for {github_url}")
             return 0.0
 
         # Calculate total contributions
         total_contributions = sum(contrib["contributions"] for contrib in contributors)
 
         if total_contributions == 0:
-            logger.warning(f"Zero total contributions for {owner}/{repo}")
+            logger.warning(f"Zero total contributions for {github_url}")
             return 0.0
 
         # Sort contributors by contributions (descending)
@@ -197,52 +128,8 @@ class BusFactorMetric(Metric):
             bus_factor = min(1.0, bus_factor + 0.1)
 
         logger.debug(
-            f"Bus factor for {owner}/{repo}: {num_contributors_needed} contributors "
+            f"Bus factor for {github_url}: {num_contributors_needed} contributors "
             f"needed for 50% (score: {bus_factor:.3f})"
         )
 
         return bus_factor
-
-    def _fetch_github_contributors(self, owner: str, repo: str) -> List[Dict[str, int]]:
-        """
-        Fetch contributor statistics from GitHub API.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-
-        Returns:
-            List of contributor dictionaries with 'contributions' field
-        """
-        try:
-            # GitHub API endpoint for contributors
-            api_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
-            response = requests.get(api_url, timeout=10, params={"per_page": 100})
-
-            # Handle rate limiting
-            if response.status_code == 403:
-                logger.warning("GitHub API rate limit exceeded")
-                return []
-
-            response.raise_for_status()
-            contributors = response.json()
-
-            # Extract contribution counts
-            result = []
-            for contrib in contributors:
-                if isinstance(contrib, dict) and "contributions" in contrib:
-                    result.append({"contributions": contrib["contributions"]})
-
-            return result
-
-        except requests.RequestException as e:
-            logger.error(
-                f"Failed to fetch contributors from GitHub API for {owner}/{repo}: {e}",
-                exc_info=True,
-            )
-            return []
-        except Exception as e:
-            logger.error(
-                f"Unexpected error fetching GitHub contributors: {e}", exc_info=True
-            )
-            return []

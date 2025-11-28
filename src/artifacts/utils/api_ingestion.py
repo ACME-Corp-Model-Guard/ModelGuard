@@ -3,7 +3,7 @@ Artifact ingestion utilities for fetching metadata from external sources.
 Supports HuggingFace Hub (models/datasets) and GitHub (code).
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import requests
 from src.logger import logger
 from .types import ArtifactType
@@ -78,6 +78,12 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
             logger.warning(f"Could not parse likes for model: {model_id}")
             likes = 0
 
+        try:
+            card_data = data.get("cardData", {})
+        except (AttributeError, TypeError):
+            logger.warning(f"Could not parse cardData for model: {model_id}")
+            card_data = {}
+
         metadata = {
             "name": name,
             "size": size,
@@ -85,6 +91,7 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
             "metadata": {
                 "downloads": downloads,
                 "likes": likes,
+                "cardData": card_data,
             },
         }
 
@@ -333,3 +340,264 @@ def fetch_artifact_metadata(url: str, artifact_type: ArtifactType) -> Dict[str, 
         raise IngestionError(
             f"Invalid artifact_type: {artifact_type}. Must be 'model', 'dataset', or 'code'"
         )
+
+
+def extract_github_url_from_huggingface_metadata(
+    metadata: Dict[str, Any]
+) -> Optional[str]:
+    """
+    Extract GitHub repository URL from HuggingFace model metadata.
+
+    Checks various fields where GitHub URL might be stored in the metadata.
+
+    Args:
+        metadata: Model metadata dictionary (from artifact.metadata or API response)
+
+    Returns:
+        GitHub repository URL if found, None otherwise
+    """
+    if not metadata:
+        return None
+
+    # Check top-level metadata fields
+    github_url = (
+        metadata.get("github_url")
+        or metadata.get("github")
+        or metadata.get("code_repository")
+        or metadata.get("repository")
+    )
+    if github_url and "github.com" in str(github_url):
+        return str(github_url)
+
+    # Check nested metadata.cardData
+    card_data = metadata.get("metadata", {}).get("cardData", {})
+    if isinstance(card_data, dict):
+        github_url = (
+            card_data.get("github")
+            or card_data.get("code_repository")
+            or card_data.get("repository")
+        )
+        if github_url and "github.com" in str(github_url):
+            return str(github_url)
+
+    # Check direct cardData (if metadata structure is different)
+    card_data = metadata.get("cardData", {})
+    if isinstance(card_data, dict):
+        github_url = (
+            card_data.get("github")
+            or card_data.get("code_repository")
+            or card_data.get("repository")
+        )
+        if github_url and "github.com" in str(github_url):
+            return str(github_url)
+
+    return None
+
+
+def fetch_github_contributors(github_url: str) -> List[Dict[str, int]]:
+    """
+    Fetch contributor statistics from GitHub API.
+
+    Args:
+        github_url: GitHub repository URL (e.g., "https://github.com/owner/repo")
+
+    Returns:
+        List of contributor dictionaries with 'contributions' field.
+        Empty list if fetching fails or URL is invalid.
+
+    Raises:
+        IngestionError: If URL format is invalid
+    """
+    logger.info(f"Fetching GitHub contributors from: {github_url}")
+
+    try:
+        # Parse owner/repo from URL
+        parts = github_url.rstrip("/").split("github.com/")
+        if len(parts) < 2:
+            raise IngestionError(f"Invalid GitHub URL format: {github_url}")
+
+        repo_path = parts[1].split("/")[:2]  # Get owner/repo, ignore subdirs
+        if len(repo_path) < 2:
+            raise IngestionError(f"Invalid GitHub repository URL: {github_url}")
+
+        owner, repo = repo_path
+        logger.debug(f"Parsed GitHub repo: {owner}/{repo}")
+
+        # GitHub API endpoint for contributors
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
+        response = requests.get(api_url, timeout=10, params={"per_page": 100})
+
+        # Handle rate limiting
+        if response.status_code == 403:
+            logger.warning("GitHub API rate limit exceeded")
+            return []
+
+        response.raise_for_status()
+        contributors = response.json()
+
+        # Extract contribution counts
+        result = []
+        for contrib in contributors:
+            if isinstance(contrib, dict) and "contributions" in contrib:
+                result.append({"contributions": contrib["contributions"]})
+
+        logger.info(
+            f"Successfully fetched {len(result)} contributors for {owner}/{repo}"
+        )
+        return result
+
+    except requests.RequestException as e:
+        logger.error(
+            f"Failed to fetch contributors from GitHub API for {github_url}: {e}",
+            exc_info=True,
+        )
+        return []
+    except IngestionError:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error fetching GitHub contributors: {e}", exc_info=True
+        )
+        return []
+
+
+def extract_performance_claims_from_metadata(
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Extract performance claims and metrics from model metadata.
+
+    Checks various fields where performance information might be stored,
+    including HuggingFace model card data. Uses structured field checking
+    to avoid false positives from keyword matching.
+
+    Args:
+        metadata: Model metadata dictionary (from artifact.metadata or API response)
+
+    Returns:
+        Dictionary with performance claims information:
+        - has_metrics: bool - whether any performance metrics were found
+        - metrics: list - list of found metric names
+        - has_benchmarks: bool - whether benchmark results were found
+        - has_papers: bool - whether papers are cited
+        - metric_count: int - number of distinct metrics found
+        - has_structured_metrics: bool - whether metrics are in structured format
+        - card_data: dict - raw cardData if available
+    """
+    result = {
+        "has_metrics": False,
+        "metrics": [],
+        "has_benchmarks": False,
+        "has_papers": False,
+        "metric_count": 0,
+        "has_structured_metrics": False,
+        "card_data": {},
+    }
+
+    if not metadata:
+        return result
+
+    # Get cardData from various possible locations
+    card_data = (
+        metadata.get("metadata", {}).get("cardData", {})
+        or metadata.get("cardData", {})
+        or {}
+    )
+
+    result["card_data"] = card_data
+
+    if not card_data:
+        return result
+
+    # Primary: Check HuggingFace model-index structure (most reliable)
+    if isinstance(card_data, dict):
+        model_index = card_data.get("model-index", {})
+        if model_index and isinstance(model_index, dict):
+            results = model_index.get("results", [])
+            if results and isinstance(results, list):
+                result["has_benchmarks"] = True
+                result["has_structured_metrics"] = True
+                
+                # Extract metrics from structured results
+                for result_item in results:
+                    if isinstance(result_item, dict):
+                        # Check for task type (indicates proper benchmark structure)
+                        task_type = result_item.get("task", {})
+                        if task_type:
+                            result["has_benchmarks"] = True
+                        
+                        # Extract metrics from results
+                        metrics = result_item.get("metrics", [])
+                        if metrics and isinstance(metrics, list):
+                            result["has_metrics"] = True
+                            for metric in metrics:
+                                if isinstance(metric, dict):
+                                    metric_name = metric.get("name", "")
+                                    metric_value = metric.get("value")
+                                    # Only count if it has both name and value (actual metric)
+                                    if metric_name and metric_value is not None:
+                                        result["metrics"].append(metric_name.lower())
+
+    # Secondary: Check for performance-related fields in cardData
+    if isinstance(card_data, dict):
+        # Check for explicit performance/evaluation sections
+        performance_fields = [
+            "performance",
+            "evaluation",
+            "metrics",
+            "results",
+            "benchmarks",
+            "scores",
+        ]
+        
+        for field in performance_fields:
+            if field in card_data:
+                field_value = card_data[field]
+                if isinstance(field_value, (dict, list)) and field_value:
+                    result["has_benchmarks"] = True
+                    # Try to extract metrics from these fields
+                    if isinstance(field_value, dict):
+                        for key, value in field_value.items():
+                            if isinstance(value, (int, float)) and key.lower() in [
+                                "accuracy",
+                                "f1",
+                                "precision",
+                                "recall",
+                                "bleu",
+                                "rouge",
+                                "perplexity",
+                                "auc",
+                            ]:
+                                result["has_metrics"] = True
+                                result["metrics"].append(key.lower())
+
+    # Tertiary: Check for paper citations (more reliable than keyword matching)
+    if isinstance(card_data, dict):
+        # Check for paper-related fields
+        paper_fields = ["paperswithcode", "arxiv", "citation", "bibtex", "paper"]
+        for field in paper_fields:
+            if field in card_data:
+                field_value = card_data[field]
+                if field_value and (
+                    isinstance(field_value, str)
+                    or (isinstance(field_value, list) and len(field_value) > 0)
+                    or (isinstance(field_value, dict) and len(field_value) > 0)
+                ):
+                    result["has_papers"] = True
+                    break
+
+        # Check for model card text fields that might contain citations
+        text_fields = ["model_card", "readme", "description", "summary"]
+        for field in text_fields:
+            if field in card_data:
+                field_value = str(card_data[field]).lower()
+                # Look for arxiv links or DOI patterns (more reliable than keywords)
+                if "arxiv.org" in field_value or "doi.org" in field_value:
+                    result["has_papers"] = True
+                    break
+
+    # Remove duplicates and set count
+    result["metrics"] = list(set(result["metrics"]))
+    result["metric_count"] = len(result["metrics"])
+
+    return result
