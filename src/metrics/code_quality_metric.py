@@ -126,7 +126,8 @@ class CodeQualityMetric(Metric):
             # Ensure JSON dictionary result
             if not isinstance(response, dict) or self.SCORE_FIELD not in response:
                 logger.error(
-                    f"[code_quality] Invalid/empty response for {code_artifact.artifact_id}: {response}"
+                    f"[code_quality] Invalid/empty response for "
+                    f"{code_artifact.artifact_id}: {response}"
                 )
                 return {self.SCORE_FIELD: 0.0}
 
