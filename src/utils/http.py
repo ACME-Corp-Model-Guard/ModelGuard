@@ -105,7 +105,7 @@ def translate_exceptions(func: F) -> Callable[[Dict[str, Any], Any], LambdaRespo
             return func(event, context)
 
         except Exception as e:
-            logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
+            logger.error(f"Error in {func.__name__}: {e}")
             return error_response(
                 500,
                 f"Internal Server Error: {e}",

@@ -40,7 +40,7 @@ def upload_file(s3_key: str, local_path: str) -> None:
         s3.upload_file(local_path, ARTIFACTS_BUCKET, s3_key)
         logger.info(f"Upload successful: s3://{ARTIFACTS_BUCKET}/{s3_key}")
     except ClientError as e:
-        logger.error(f"Failed to upload file to S3: {e}", exc_info=True)
+        logger.error(f"Failed to upload file to S3: {e}")
         raise
 
 
@@ -56,10 +56,7 @@ def download_file(s3_key: str, local_path: str) -> None:
         s3.download_file(ARTIFACTS_BUCKET, s3_key, local_path)
         logger.info(f"Downloaded: s3://{ARTIFACTS_BUCKET}/{s3_key}")
     except ClientError as e:
-        logger.error(
-            f"Failed to download s3://{ARTIFACTS_BUCKET}/{s3_key}: {e}",
-            exc_info=True,
-        )
+        logger.error(f"Failed to download s3://{ARTIFACTS_BUCKET}/{s3_key}: {e}")
         raise
 
 
@@ -83,10 +80,7 @@ def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
         logger.info(f"Presigned URL generated for {s3_key}, expires={expiration}s")
         return url
     except ClientError as e:
-        logger.error(
-            f"Failed to generate presigned URL for {s3_key}: {e}",
-            exc_info=True,
-        )
+        logger.error(f"Failed to generate presigned URL for {s3_key}: {e}")
         raise
 
 
@@ -134,13 +128,10 @@ def upload_artifact_to_s3(
     except SourceDownloadError:
         raise
     except ClientError:
-        logger.error(f"[s3_utils] Failed to upload {artifact_id} to S3", exc_info=True)
+        logger.error(f"[s3_utils] Failed to upload {artifact_id} to S3")
         raise
     except Exception:
-        logger.error(
-            f"[s3_utils] Unexpected error uploading artifact {artifact_id}",
-            exc_info=True,
-        )
+        logger.error(f"[s3_utils] Unexpected error uploading artifact {artifact_id}")
         raise
     finally:
         if tmp_path and os.path.exists(tmp_path):

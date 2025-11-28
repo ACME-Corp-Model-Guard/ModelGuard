@@ -12,10 +12,10 @@ from typing import Any, Dict, cast
 
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
+from src.artifacts.artifactory import create_artifact, save_artifact_metadata
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.storage.dynamo_utils import save_artifact_metadata
 from src.storage.s3_utils import upload_artifact_to_s3
 from src.utils.http import (
     LambdaResponse,
@@ -23,6 +23,7 @@ from src.utils.http import (
     json_response,
     translate_exceptions,
 )
+from src.metrics.registry import METRICS
 
 
 # =============================================================================
@@ -108,11 +109,11 @@ def lambda_handler(
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = BaseArtifact.from_url(url, artifact_type)
+        artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         logger.error(
-            f"[post_artifact] Upstream metadata fetch failed: {e}", exc_info=True
+            f"[post_artifact] Upstream metadata fetch failed: {e}",
         )
         return error_response(
             404,
@@ -121,7 +122,7 @@ def lambda_handler(
         )
     except Exception as e:
         logger.error(
-            f"[post_artifact] Unexpected metadata ingestion failure: {e}", exc_info=True
+            f"[post_artifact] Unexpected metadata ingestion failure: {e}",
         )
         return error_response(
             500,
@@ -132,36 +133,12 @@ def lambda_handler(
     logger.info(f"[post_artifact] Created artifact: id={artifact.artifact_id}")
 
     # ---------------------------------------------------------------------
-    # Step 4 — Download upstream content → upload packaged artifact to S3
-    # ---------------------------------------------------------------------
-    try:
-        upload_artifact_to_s3(
-            artifact_id=artifact.artifact_id,
-            artifact_type=artifact_type,
-            s3_key=artifact.s3_key,
-            source_url=url,
-        )
-    except FileDownloadError:
-        return error_response(
-            404,
-            "Upstream artifact not found or download failed",
-            error_code="SOURCE_NOT_FOUND",
-        )
-    except Exception as e:
-        logger.error(f"[post_artifact] S3 upload failed: {e}", exc_info=True)
-        return error_response(
-            500,
-            "Failed to upload artifact to S3",
-            error_code="S3_UPLOAD_ERROR",
-        )
-
-    # ---------------------------------------------------------------------
-    # Step 5 — Save metadata to DynamoDB
+    # Step 4 — Save metadata to DynamoDB
     # ---------------------------------------------------------------------
     try:
         save_artifact_metadata(artifact)
     except Exception as e:
-        logger.error(f"[post_artifact] Failed to save metadata: {e}", exc_info=True)
+        logger.error(f"[post_artifact] Failed to save metadata: {e}")
         return error_response(
             500,
             "Failed to save artifact metadata",
@@ -169,7 +146,7 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Step 6 — Build ArtifactResponse
+    # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
     response_body = {
         "metadata": {

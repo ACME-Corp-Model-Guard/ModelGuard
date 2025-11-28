@@ -131,7 +131,7 @@ def download_from_github(
         raise FileDownloadError("GitHub clone operation timed out after 300 seconds")
 
     except Exception as e:
-        logger.error(f"[GitHub] Download failed: {e}", exc_info=True)
+        logger.error(f"[GitHub] Download failed: {e}")
         raise FileDownloadError(f"GitHub download failed: {e}")
 
     finally:
@@ -177,5 +177,5 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[GitHub] Failed to fetch repo metadata: {e}", exc_info=True)
+        logger.error(f"[GitHub] Failed to fetch repo metadata: {e}")
         raise

@@ -34,6 +34,7 @@ class BusFactorMetric(Metric):
             Bus factor score as a dictionary with value between 0.0 and 1.0
             (higher is better - more distributed contributions)
         """
+
         source_url = model.source_url
         if not source_url:
             logger.warning(f"No source_url for model {model.artifact_id}")
@@ -46,8 +47,7 @@ class BusFactorMetric(Metric):
                 return {"bus_factor": bus_factor}
             except Exception as e:
                 logger.error(
-                    f"Failed to calculate bus factor for GitHub repo {source_url}: {e}",
-                    exc_info=True,
+                    f"Failed to calculate bus factor for GitHub repo {source_url}: {e}"
                 )
                 return {"bus_factor": 0.0}
 
@@ -68,8 +68,7 @@ class BusFactorMetric(Metric):
                     return {"bus_factor": 0.5}
             except Exception as e:
                 logger.error(
-                    f"Failed to get GitHub URL for HuggingFace model {source_url}: {e}",
-                    exc_info=True,
+                    f"Failed to get GitHub URL for HuggingFace model {source_url}: {e}"
                 )
                 return {"bus_factor": 0.5}
 
@@ -237,12 +236,9 @@ class BusFactorMetric(Metric):
 
         except requests.RequestException as e:
             logger.error(
-                f"Failed to fetch contributors from GitHub API for {owner}/{repo}: {e}",
-                exc_info=True,
+                f"Failed to fetch contributors from GitHub API for {owner}/{repo}: {e}"
             )
             return []
         except Exception as e:
-            logger.error(
-                f"Unexpected error fetching GitHub contributors: {e}", exc_info=True
-            )
+            logger.error(f"Unexpected error fetching GitHub contributors: {e}")
             return []

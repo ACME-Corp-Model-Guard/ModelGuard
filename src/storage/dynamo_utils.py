@@ -3,9 +3,11 @@ Unified DynamoDB utilities for ModelGuard.
 
 This module centralizes ALL DynamoDB interactions:
 - Scanning tables
+- Searching by fields
+- Saving items to tables
+- Loading items by key
 - Batch deletes
 - Clearing/resetting tables
-- Saving and loading BaseArtifact objects
 """
 
 from __future__ import annotations
@@ -13,11 +15,8 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional
 
 from botocore.exceptions import ClientError
-
-from src.artifacts.base_artifact import BaseArtifact
 from src.aws.clients import get_ddb_table
 from src.logger import logger
-from src.settings import ARTIFACTS_TABLE
 
 
 # =============================================================================
@@ -39,6 +38,70 @@ def scan_table(table_name: str) -> List[Dict[str, Any]]:
         results.extend(response.get("Items", []))
 
     return results
+
+
+def search_table_by_fields(
+    table_name: str,
+    fields: Dict[str, Any],  # multiple fields to match
+    item_list: Optional[
+        List[Dict[str, Any]]
+    ] = None,  # item_list can be used to avoid a full table scan
+) -> List[Dict[str, Any]]:
+    """
+    Search a DynamoDB table for items matching specific field values.
+
+    Args:
+        table_name: Name of the DynamoDB table to search.
+        fields: Dictionary of field names and their expected values.
+        item_list: Optional list of items to search within (avoids full table scan).
+    """
+    if not item_list:
+        rows = scan_table(table_name=table_name)
+    else:
+        rows = item_list
+    matches: List[Dict[str, Any]] = []
+
+    for row in rows:
+        for field_name, field_value in fields.items():
+            if row.get(field_name) != field_value:
+                break
+        else:
+            matches.append(row)
+
+    return matches
+
+
+def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
+    """
+    Save a generic item to a DynamoDB table.
+    """
+    table = get_ddb_table(table_name)
+    try:
+        table.put_item(Item=item)
+        logger.info(f"[DDB] Saved item to {table_name}")
+    except ClientError as e:
+        logger.error(f"[DDB] Failed to save item to {table_name}: {e}")
+        raise
+
+
+def load_item_from_key(
+    table_name: str, key: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """
+    Load a generic item from a DynamoDB table by its key.
+    """
+    table = get_ddb_table(table_name)
+    try:
+        response = table.get_item(Key=key)
+        item = response.get("Item")
+        if item:
+            logger.info(f"[DDB] Loaded item from {table_name} with key={key}")
+        else:
+            logger.warning(f"[DDB] No item found in {table_name} with key={key}")
+        return item
+    except ClientError as e:
+        logger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
+        raise
 
 
 def batch_delete(
@@ -69,63 +132,3 @@ def clear_table(table_name: str, key_name: str) -> int:
     """
     items = scan_table(table_name)
     return batch_delete(table_name, items, key_name)
-
-
-# =============================================================================
-# Artifact-Specific Metadata Storage Operations
-# =============================================================================
-def save_artifact_metadata(artifact: BaseArtifact) -> None:
-    """
-    Store artifact metadata in DynamoDB.
-    """
-    if not ARTIFACTS_TABLE:
-        raise ValueError("ARTIFACTS_TABLE environment variable not set")
-
-    artifact_id = artifact.artifact_id
-    logger.debug(f"[DDB] Saving artifact {artifact_id} to {ARTIFACTS_TABLE}")
-
-    try:
-        table = get_ddb_table(ARTIFACTS_TABLE)
-        table.put_item(Item=artifact.to_dict())
-        logger.info(f"[DDB] Saved artifact {artifact_id}")
-    except ClientError as e:
-        logger.error(f"[DDB] Failed to save {artifact_id}: {e}", exc_info=True)
-        raise
-
-
-def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
-    """
-    Retrieve artifact metadata from DynamoDB and build a BaseArtifact instance.
-
-    Returns:
-        BaseArtifact instance or None if not found.
-    """
-    if not ARTIFACTS_TABLE:
-        raise ValueError("ARTIFACTS_TABLE environment variable not set")
-
-    logger.debug(f"[DDB] Loading artifact {artifact_id} from {ARTIFACTS_TABLE}")
-
-    try:
-        table = get_ddb_table(ARTIFACTS_TABLE)
-        resp = table.get_item(Key={"artifact_id": artifact_id})
-        item = resp.get("Item")
-
-        if not item:
-            logger.warning(f"[DDB] Artifact {artifact_id} not found")
-            return None
-
-        artifact_type = item.get("artifact_type")
-        if not artifact_type:
-            raise ValueError(f"Artifact {artifact_id} missing artifact_type field")
-
-        # Don't pass artifact_type twice
-        kwargs = dict(item)
-        kwargs.pop("artifact_type", None)
-
-        artifact = BaseArtifact.create(artifact_type, **kwargs)
-        logger.info(f"[DDB] Loaded {artifact_type} artifact {artifact_id}")
-        return artifact
-
-    except ClientError as e:
-        logger.error(f"[DDB] Failed to load artifact {artifact_id}: {e}", exc_info=True)
-        raise

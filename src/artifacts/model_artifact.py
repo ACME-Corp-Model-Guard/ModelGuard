@@ -5,29 +5,12 @@ Model artifact class with scoring functionality.
 import concurrent.futures
 import time
 import traceback
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-# Import metrics module to access METRICS list
-from src import metrics as _metrics
+from src.artifacts.base_artifact import BaseArtifact
 from src.logger import logger
+from src.metrics import Metric
 from src.metrics.net_score import calculate_net_score
-
-from .base_artifact import BaseArtifact
-
-# Static list of all metrics to run on model artifacts
-METRICS: list[_metrics.Metric] = [
-    _metrics.AvailabilityMetric(),
-    _metrics.BusFactorMetric(),
-    _metrics.CodeQualityMetric(),
-    _metrics.DatasetQualityMetric(),
-    _metrics.LicenseMetric(),
-    _metrics.PerformanceClaimsMetric(),
-    _metrics.RampUpMetric(),
-    _metrics.ReproducibilityMetric(),
-    _metrics.ReviewednessMetric(),
-    _metrics.SizeMetric(),
-    _metrics.TreescoreMetric(),
-]
 
 
 class ModelArtifact(BaseArtifact):
@@ -37,24 +20,33 @@ class ModelArtifact(BaseArtifact):
     Extends BaseArtifact with:
     - Model-specific fields (size, license)
     - Scoring system (scores, scores_latency)
-    - Connection fields for lineage (dataset_artifact_id, code_artifact_id, parent_model_key)
+    - Connection fields for lineage (dataset_artifact_id, code_artifact_id, parent_model_id)
     """
 
     def __init__(
+        # Basic info
         self,
         name: str,
         source_url: str,
         artifact_id: Optional[str] = None,
-        size: float = 0.0,
-        license: str = "unknown",
         s3_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        # Model-specific fields
+        size: float = 0.0,
+        license: str = "unknown",
+        # Scoring fields
         scores: Optional[Dict[str, Union[float, Dict[str, float]]]] = None,
         scores_latency: Optional[Dict[str, float]] = None,
-        dataset_artifact_id: Optional[str] = None,
+        # Connection fields
+        code_name: Optional[str] = None,
         code_artifact_id: Optional[str] = None,
-        parent_model_key: Optional[str] = None,
-        auto_score: bool = True,
+        dataset_name: Optional[str] = None,
+        dataset_artifact_id: Optional[str] = None,
+        parent_model_name: Optional[str] = None,
+        parent_model_source: Optional[str] = None,
+        parent_model_relationship: Optional[str] = None,
+        parent_model_id: Optional[str] = None,
+        child_model_ids: Optional[List[str]] = None,
     ):
         """
         Initialize ModelArtifact.
@@ -63,16 +55,21 @@ class ModelArtifact(BaseArtifact):
             artifact_id: Optional UUID (generated if not provided)
             name: Model name
             source_url: URL where model was sourced from
-            size: Model size in bytes (default: 0.0)
-            license: Model license (default: "unknown")
             s3_key: Optional S3 storage key
             metadata: Optional dict for additional model-specific data
+            size: Model size in bytes (default: 0.0)
+            license: Model license (default: "unknown")
             scores: Optional pre-computed scores dict
             scores_latency: Optional pre-computed latencies dict
-            dataset_artifact_id: Optional link to dataset artifact (for lineage)
-            code_artifact_id: Optional link to code artifact (for lineage)
-            parent_model_key: Optional link to parent model (for lineage)
-            auto_score: Whether to automatically compute scores on creation (default: True)
+            code_name: Optional name of associated code artifact
+            code_artifact_id: Optional link to code artifact
+            dataset_name: Optional name of associated dataset artifact
+            dataset_artifact_id: Optional link to dataset artifact
+            parent_model_name: Optional name of parent model artifact (for lineage)
+            parent_model_source: Optional filename where parent model was discovered
+            parent_model_relationship: Optional relationship type to parent model
+            parent_model_id: Optional link to parent model (for lineage)
+            child_model_ids: Optional list of child model IDs (for lineage)
         """
         super().__init__(
             artifact_id=artifact_id,
@@ -83,6 +80,7 @@ class ModelArtifact(BaseArtifact):
             metadata=metadata,
         )
 
+        # Model-specific fields
         self.size = size
         self.license = license
 
@@ -90,19 +88,18 @@ class ModelArtifact(BaseArtifact):
         self.scores = scores or {}
         self.scores_latency = scores_latency or {}
 
-        # Connection fields for lineage (stored but not used in MVP)
-        self.dataset_artifact_id = dataset_artifact_id
+        # Connection fields
+        self.code_name = code_name
         self.code_artifact_id = code_artifact_id
-        self.parent_model_key = parent_model_key
+        self.dataset_name = dataset_name
+        self.dataset_artifact_id = dataset_artifact_id
+        self.parent_model_name = parent_model_name
+        self.parent_model_source = parent_model_source
+        self.parent_model_relationship = parent_model_relationship
+        self.parent_model_id = parent_model_id
+        self.child_model_ids = child_model_ids
 
-        # Automatically compute scores on creation unless explicitly disabled
-        if auto_score and not scores:
-            logger.info(f"Auto-scoring model artifact: {self.artifact_id}")
-            self._compute_scores()
-        else:
-            logger.debug(f"Skipping auto-score for model artifact: {self.artifact_id}")
-
-    def _compute_scores(self) -> None:
+    def compute_scores(self, metrics: List[Metric]) -> None:
         """
         Populate scores and scores_latency by running each metric in parallel.
 
@@ -112,11 +109,9 @@ class ModelArtifact(BaseArtifact):
         logger.info(
             f"Computing scores (parallel) for model artifact: {self.artifact_id}"
         )
-        scores: Dict[str, Union[float, Dict[str, float]]] = {}
-        latencies: Dict[str, float] = {}
 
         def run_metric(
-            metric: _metrics.Metric,
+            metric: Metric,
         ) -> tuple[str, float | dict[str, float], float]:
             metric_name = metric.__class__.__name__.replace("Metric", "")
             t0 = time.perf_counter()
@@ -134,31 +129,29 @@ class ModelArtifact(BaseArtifact):
 
         # Run all metrics concurrently
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(8, len(METRICS))
+            max_workers=min(8, len(metrics))
         ) as executor:
-            futures = {executor.submit(run_metric, m): m for m in METRICS}
+            futures = {executor.submit(run_metric, m): m for m in metrics}
             for future in concurrent.futures.as_completed(futures):
                 metric_name, value, elapsed_ms = future.result()
-                scores[metric_name] = value
-                latencies[metric_name] = elapsed_ms
+                self.scores[metric_name] = value
+                self.scores_latency[metric_name] = elapsed_ms
 
         # Compute NetScore (sequential, depends on other scores)
         t0 = time.perf_counter()
-        scores["NetScore"] = calculate_net_score(scores)
+        self.scores["NetScore"] = calculate_net_score(self.scores)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
-        latencies["NetScore"] = elapsed_ms
-
-        self.scores = scores
-        self.scores_latency = latencies
+        self.scores_latency["NetScore"] = elapsed_ms
 
         logger.info(
             f"Computed NetScore {self.scores['NetScore']:.3f} for artifact {self.artifact_id} "
-            f"({len(METRICS)} metrics in parallel)"
+            f"({len(metrics)} metrics in parallel)"
         )
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Serialize ModelArtifact to dictionary for DynamoDB storage.
+        Does not store Metric instances, only computed scores.
         """
         data = self._base_to_dict()
         data.update(
@@ -167,9 +160,15 @@ class ModelArtifact(BaseArtifact):
                 "license": self.license,
                 "scores": self.scores,
                 "scores_latency": self.scores_latency,
-                "dataset_artifact_id": self.dataset_artifact_id,
+                "code_name": self.code_name,
                 "code_artifact_id": self.code_artifact_id,
-                "parent_model_key": self.parent_model_key,
+                "dataset_name": self.dataset_name,
+                "dataset_artifact_id": self.dataset_artifact_id,
+                "parent_model_name": self.parent_model_name,
+                "parent_model_source": self.parent_model_source,
+                "parent_model_relationship": self.parent_model_relationship,
+                "parent_model_id": self.parent_model_id,
+                "child_model_ids": self.child_model_ids,
             }
         )
         return data
