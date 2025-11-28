@@ -43,12 +43,10 @@ class LicenseMetric(Metric):
         "lgpl-2.1-or-later": 1.0,
         "gpl-2.0-or-later": 1.0,
         "apache-2.0": 1.0,
-        
         # Ambiguous / Limited (0.5)
         "gpl-2.0": 0.5,
         "mpl-2.0": 0.5,
         "unlicense": 0.5,
-
         # Incompatible (0.0)
         "gpl-3.0": 0.0,
         "lgpl-3.0": 0.0,
