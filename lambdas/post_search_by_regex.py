@@ -200,19 +200,3 @@ def lambda_handler(
     preserves the top-level array required by OpenAPI.
     """
     return json_response(200, results)
-
-
-
-
-
-
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(
-            [
-                {"name": "audience-classifier", "id": "3847247294", "type": "model"},
-                {"name": "bert-base-uncased", "id": "9078563412", "type": "model"},
-            ]
-        ),
-    }
