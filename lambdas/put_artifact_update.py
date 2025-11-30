@@ -270,9 +270,9 @@ def lambda_handler(
                     f"[put_artifact_update] Failed to delete new artifact S3 key "
                     f"{new_s3_key}: {exc}"
                 )
-        return error_response(
+        return error_response (
             400,
-            "Updated artifact failed NetScore threshold; original artifact preserved."
+            "Updated artifact failed NetScore threshold; original artifact preserved.",
             error_code = "LOW_NET_SCORE"
         )
     
