@@ -180,9 +180,18 @@ jobs:
 
           if [ -n "$CHANGED_FILES" ]; then
             echo "Invalidating changed files in CloudFront..."
+
+            # Loop over each changed file and prepend a leading slash
+            INVALIDATION_PATHS=()
+            while IFS= read -r file; do
+              INVALIDATION_PATHS+=("/$file")
+            done <<< "$CHANGED_FILES"
+
+            # Call CloudFront invalidation
             aws cloudfront create-invalidation \
               --distribution-id $CLOUDFRONT_DIST_ID \
-              --paths $CHANGED_FILES
+              --paths "${INVALIDATION_PATHS[@]}"
           else
             echo "No frontend changes detected. Skipping CloudFront invalidation."
           fi
+
