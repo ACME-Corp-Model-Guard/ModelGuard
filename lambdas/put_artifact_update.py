@@ -59,15 +59,15 @@ def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
 
     if isinstance(raw_body, dict):
         return raw_body
-    
+
     if not isinstance(raw_body, str):
         raise ValueError("Request body must be a JSON object or JSON string.")
-    
+
     try:
         return json.loads(raw_body)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Request body must be valid JSON: {exc}") from exc
-    
+
 
 def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
     """
@@ -79,16 +79,16 @@ def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
     scores = getattr(artifact, "scores", None)
     if not isinstance(scores, dict):
         return None
-    
+
     raw = scores.get("NetScore")
     if raw is None:
         return None
-    
+
     try:
         return float(raw)
     except (TypeError, ValueError):
         return None
-    
+
 
 # =============================================================================
 # Lambda Handler: PUT /artifacts/{artifact_type}/{id}
@@ -101,7 +101,7 @@ def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
-    auth: AuthContext   # Use for auth side effects
+    auth: AuthContext,  # Use for auth side effects
     # ) -> Dict[str, Any]:
 ) -> LambdaResponse:
     logger.info("[put_artifact_update] Handling artifact upodate request")
@@ -117,15 +117,15 @@ def lambda_handler(
         return error_response(
             400,
             "Missing requiured path parameters: artifact_type or id",
-            error_code = "INVALID_REQUEST"
+            error_code="INVALID_REQUEST",
         )
     if artifact_type_raw not in ("model", "dataset", "code"):
         return error_response(
             400,
             f"Invalid artifact_type '{artifact_type_raw}'",
-            error_code = "INVALID_ARTIFACT_TYPE"
+            error_code="INVALID_ARTIFACT_TYPE",
         )
-    
+
     artifact_type = cast(ArtifactType, artifact_type_raw)
     logger.debug(
         f"[put_artifact_update] artifact_type = {artifact_type}, artifact_id = {artifact_id}"
@@ -138,41 +138,30 @@ def lambda_handler(
         body = _parse_body(event)
     except ValueError as exc:
         logger.warning(f"[put_artifact_update] Invalid JSON body: {exc}")
-        return error_response(
-            400,
-            str(exc),
-            error_code = "INVALID_JSON"
-        )
+        return error_response(400, str(exc), error_code="INVALID_JSON")
     url = body.get("url")
     if not isinstance(url, str) or not url.strip():
         return error_response(
-            400,
-            "Mising required field 'url'",
-            error_code = "MISSING_URL"
+            400, "Mising required field 'url'", error_code="MISSING_URL"
         )
     logger.info(f"[put_artifact_update] update_url = {url}")
-    
+
     # ------------------------------------------------------------------
     # Step 3 - Load existing artifact metadata (previous version)
     # ------------------------------------------------------------------
     old_artifact = load_artifact_metadata(artifact_id)
     if old_artifact is None:
-        logger.warning(
-            f"[put_artifact_update] Artifact '{artifact_id}' does not exist"
-        )
+        logger.warning(f"[put_artifact_update] Artifact '{artifact_id}' does not exist")
         return error_response(
-            404,
-            f"Artifact '{artifact_id}' does not exist",
-            error_code = "NOT_FOUND"
+            404, f"Artifact '{artifact_id}' does not exist", error_code="NOT_FOUND"
         )
-    
+
     old_s3_key = getattr(old_artifact, "s3_key", None)
     logger.debug(
         f"[put_artifact_update] Loaded old artifact"
         f"id = {old_artifact.artifact_id}, s3_key = {old_s3_key}"
     )
 
-    
     # ------------------------------------------------------------------
     # Step 4 - Create a new candidate artifact from the new URL
     # ------------------------------------------------------------------
@@ -183,11 +172,7 @@ def lambda_handler(
     saving metadata, so the logical artifact id stays stable.
     """
     try:
-        new_artifact = create_artifact(
-            artifact_type,
-            source_url = url,
-            metrics = METRICS
-        )
+        new_artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
     except FileDownloadError as exc:
         logger.error(
             f"[put_artifact_update] Upstream artifact download/metadata failed: {exc}"
@@ -206,19 +191,18 @@ def lambda_handler(
             "Unexpected error during artifact update",
             error_code="INGESTION_FAILURE",
         )
-    
+
     logger.info(
         f"[put_artifact_update] Created candidate artifact: "
         f"id={new_artifact.artifact_id}, type={new_artifact.artifact_type}, "
         f"s3_key={getattr(new_artifact, 's3_key', None)}"
     )
 
-    
     # ------------------------------------------------------------------
     # Step 5 - For models, compare NetScore against previous version
     # ------------------------------------------------------------------
     accept_update = True
-    
+
     if artifact_type == "model":
         new_score = _get_net_score(new_artifact)
         old_score = _get_net_score(old_artifact)
@@ -235,8 +219,7 @@ def lambda_handler(
         to avoid permanently blocking updates.
         """
         threshold = 0.0 if old_score is None else old_score
-        
-        
+
         logger.info(
             "[put_artifact_update] NetScore comparison: "
             f"old={threshold:.4f}, new={new_score:.4f}"
@@ -270,7 +253,7 @@ def lambda_handler(
             "original artifact preserved",
             error_code="LOW_NET_SCORE",
         )
-    
+
     # ------------------------------------------------------------------
     # Step 5.2 - Accept update:
     #   - Delete old S3 object
@@ -289,7 +272,7 @@ def lambda_handler(
                 f"{old_s3_key}: {exc}"
             )
 
-   # Align IDs so we overwrite the existing artifact row in DynamoDB.
+    # Align IDs so we overwrite the existing artifact row in DynamoDB.
     new_artifact.artifact_id = old_artifact.artifact_id
     new_artifact.artifact_type = old_artifact.artifact_type
 
@@ -304,7 +287,7 @@ def lambda_handler(
             "Failed to save updated artifact metadata",
             error_code="DDB_SAVE_ERROR",
         )
-    
+
     # ------------------------------------------------------------------
     # Step 6 - Build response (same shape as POST /artifact/{artifact_type})
     # ------------------------------------------------------------------

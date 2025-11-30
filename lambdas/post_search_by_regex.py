@@ -24,7 +24,7 @@ from src.utils.http import (
     LambdaResponse,
     error_response,
     json_response,
-    translate_exceptions
+    translate_exceptions,
 )
 
 # =============================================================================
@@ -56,7 +56,6 @@ def _load_body(event: Dict[str, Any]) -> Dict[str, Any]:
         return json.loads(raw_body)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Request body must be valid JSON: {exc}") from exc
-    
 
 
 def _parse_regex(event: Dict[str, Any]) -> Pattern[str]:
@@ -73,7 +72,7 @@ def _parse_regex(event: Dict[str, Any]) -> Pattern[str]:
     pattern = body.get("regex")
     if not isinstance(pattern, str) or not pattern.strip():
         raise ValueError("Missing required field: 'regex'")
-    
+
     try:
         compiled = re.compile(pattern, flags=re.IGNORECASE)
     except re.error as exc:
@@ -111,11 +110,11 @@ def _build_search_text(artifact: BaseArtifact) -> str:
 
 def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     """
-    Apply the regex to all artifacts and return a list of ArtifactMetadata-like 
+    Apply the regex to all artifacts and return a list of ArtifactMetadata-like
     dicts: {"name": ..., "id": ..., "type": ...}.
     """
     artifacts = load_all_artifacts()
-    logger.info (
+    logger.info(
         f"[post_search_by_regex] Loaded {len(artifacts)} artifacts for regex search"
     )
 
@@ -131,7 +130,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
                 {
                     "name": artifact.name,
                     "id": artifact.artifact.id,
-                    "type": artifact.artifact_type
+                    "type": artifact.artifact_type,
                 }
             )
     logger.info(f"[post_search_by_regex] Found {len(matches)} matching artifacts")
@@ -147,10 +146,8 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
 @with_logging
 @auth_required
 def lambda_handler(
-    event: Dict[str, Any],
-    context: Any,
-    auth: AuthContext
-    ) -> LambdaResponse:
+    event: Dict[str, Any], context: Any, auth: AuthContext
+) -> LambdaResponse:
     """
     Stub handler for POST /artifact/byRegEx - Search by regex
     Search for artifacts using regular expression over names and READMEs
@@ -173,13 +170,8 @@ def lambda_handler(
         pattern = _parse_regex(event)
     except ValueError as exc:
         logger.warning(f"[post_search_by_regex] Invalid request: {exc}")
-        return error_response(
-            400,
-            str(exc),
-            error_code="INVALID_ARTIFACT_REGEX"
-        )
-    
-    
+        return error_response(400, str(exc), error_code="INVALID_ARTIFACT_REGEX")
+
     # ------------------------------------------------------------------
     # Step 2 - Execute search
     # ------------------------------------------------------------------
@@ -187,11 +179,9 @@ def lambda_handler(
 
     if not results:
         return error_response(
-            404,
-            "No artifact found under this regex",
-            error_code="NOT_FOUND"
+            404, "No artifact found under this regex", error_code="NOT_FOUND"
         )
-    
+
     # ------------------------------------------------------------------
     # Step 3 - Build response
     # ------------------------------------------------------------------
