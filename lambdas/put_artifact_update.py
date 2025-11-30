@@ -37,7 +37,8 @@ from src.artifacts.artifactory import (
     load_artifact_metadata,
     save_artifact_metadata
 )
-from src.artifacts.base_artifact import BaseArtfact
+
+from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
@@ -48,7 +49,7 @@ from src.storage.downloaders.dispatchers import FileDownloadError
 from src.utils.http import (
     LambdaResponse,
     error_response,
-    json_respons,
+    json_response,
     translate_exceptions
 )
 
@@ -101,7 +102,7 @@ def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
         return None
     
     try:
-        return flow(raw)
+        return float(raw)
     except (TypeError, ValueError):
         return None
     
@@ -210,7 +211,7 @@ def lambda_handler(
         logger.error(
             f"[put_artifact_update] Upstream artifact download/metadata failed: {exc}"
         )
-        return error_respone(
+        return error_response(
             404,
             "Artifact metadata could not be fetched from the source URL.",
             error_code = "UPSTREAM_NOT_FOUND"
