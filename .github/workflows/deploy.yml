@@ -140,12 +140,12 @@ jobs:
           set -euo pipefail
 
           # --- Dry-run to get changed files (correct path extraction)
-          CHANGED_FILES=$(aws s3 sync ./frontend/build s3://$FRONTEND_BUCKET --exact-timestamps --dryrun \
+          CHANGED_FILES=$(aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps --dryrun \
             | grep "upload:" \
             | sed -E 's/.*to s3:\/\/[^/]+(.*)/\1/')
 
           # Upload actual changed files
-          aws s3 sync ./frontend/build s3://$FRONTEND_BUCKET --exact-timestamps
+          aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps
 
           echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
 
