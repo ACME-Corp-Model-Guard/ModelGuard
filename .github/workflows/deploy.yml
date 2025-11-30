@@ -55,7 +55,7 @@ jobs:
       - name: Build SAM application
         run: |
           set -euo pipefail
-          sam build
+          sam build --cached
 
       - name: Deploy SAM application
         run: |
@@ -130,6 +130,22 @@ jobs:
           EOF
 
           echo "✅ Generated frontend Cognito config"
+
+      # -----------------------------
+      # 8. Install frontend dependencies
+      # -----------------------------
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      # -----------------------------
+      # 9. Build frontend (Vite)
+      # -----------------------------
+      - name: Build frontend
+        working-directory: ./frontend
+        run: |
+          npm run build
 
       # -----------------------------
       # 10. Detect changed files and sync to S3
