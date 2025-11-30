@@ -16,7 +16,7 @@ import json
 import re
 from typing import Any, Dict, List, Pattern
 
-from src.artifacts,artifactory import load_all_artifacts
+from src.artifacts.artifactory import load_all_artifacts
 from src.artifacts.base_artifact import BaseArtifact
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
@@ -119,7 +119,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
         f"[post_search_by_regex] Loaded {len(artifacts)} artifacts for regex search"
     )
 
-    matches: List[Dict[str, str]d] = []
+    matches: List[Dict[str, str]] = []
 
     for artifact in artifacts:
         haystack = _build_search_text(artifact)
