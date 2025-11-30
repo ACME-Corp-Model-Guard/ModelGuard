@@ -61,8 +61,6 @@ def test_treescore_ancestor_chain(metric):
             return grandparent
         return None
 
-    from src.artifacts.artifactory import load_artifact_metadata
-
     with patch(
         "src.metrics.treescore_metric.load_artifact_metadata",
         side_effect=load_artifact_metadata_side_effect,
