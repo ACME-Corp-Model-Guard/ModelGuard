@@ -155,15 +155,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          # --- Dry-run to get changed files (correct path extraction)
+          # --- Dry-run to get changed files (strip S3 bucket, remove leading slash)
           CHANGED_FILES=$(aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps --dryrun \
             | grep "upload:" \
-            | sed -E 's/.*to s3:\/\/[^/]+(.*)/\1/')
+            | sed -E 's/.*to s3:\/\/[^/]+(\/?.*)/\1/' \
+            | sed 's/^\/\(.*\)/\1/')  # remove leading slash
 
           # Upload actual changed files
           aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps
 
-          echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
+          # Write safely to GitHub environment variable (handle multi-line)
+          echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
+          echo "$CHANGED_FILES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "✅ S3 sync complete. Changed files:"
+          echo "$CHANGED_FILES"
 
       # -----------------------------
       # 11. Invalidate CloudFront only if files changed
