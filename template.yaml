@@ -132,7 +132,7 @@ Resources:
           IgnorePublicAcls: true
           RestrictPublicBuckets: true
         VersioningConfiguration:
-          Status: Enabled
+          Status: Suspended
 
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
