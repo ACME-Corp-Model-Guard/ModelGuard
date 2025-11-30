@@ -2,8 +2,7 @@ name: "Deploy ModelGuard API + Frontend"
 
 on:
   push:
-    branches: [ main ]
-    workflow_dispatch:
+    branches: [ main, Frontend-Deploy ]
 
 env:
   AWS_REGION: "us-east-2"
