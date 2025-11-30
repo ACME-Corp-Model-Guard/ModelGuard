@@ -149,7 +149,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        DefaultRootObject: index.html
+        DefaultRootObject: index.tsx
         Origins:
           - Id: FrontendOrigin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
