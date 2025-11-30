@@ -23,8 +23,8 @@ from src.logger import logger, with_logging
 from src.utils.http import (
     LambdaResponse,
     error_response,
-    json_response,
     translate_exceptions,
+    DEFAULT_HEADERS,
 )
 
 # =============================================================================
@@ -111,7 +111,7 @@ def _build_search_text(artifact: BaseArtifact) -> str:
 def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     """
     Apply the regex to all artifacts and return a list of ArtifactMetadata-like
-    dicts: {"name": ..., "id": ..., "type": ...}.
+    dicts: { "name": ..., "id": ..., "type": ... }.
     """
     artifacts = load_all_artifacts()
     logger.info(
@@ -126,13 +126,18 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
             continue
 
         if pattern.search(haystack):
+            # NOTE: only use valid BaseArtifact attributes here:
+            #   - artifact.name
+            #   - artifact.artifact_id
+            #   - artifact.artifact_type
             matches.append(
                 {
                     "name": artifact.name,
-                    "id": artifact.artifact.id,
+                    "id": artifact.artifact_id,
                     "type": artifact.artifact_type,
                 }
             )
+
     logger.info(f"[post_search_by_regex] Found {len(matches)} matching artifacts")
     return matches
 
@@ -185,8 +190,11 @@ def lambda_handler(
     # ------------------------------------------------------------------
     # Step 3 - Build response
     # ------------------------------------------------------------------
-    """
-    json_response can take any JSON-serializable object, passing the list
-    preserves the top-level array required by OpenAPI.
-    """
-    return json_response(200, results)
+    # We manually construct the LambdaResponse so we can legally return
+    # a top-level JSON array (`results`) without fighting json_response's
+    # stricter type annotation.
+    return LambdaResponse(
+        statusCode=200,
+        headers=DEFAULT_HEADERS,
+        body=json.dumps(results),
+    )
