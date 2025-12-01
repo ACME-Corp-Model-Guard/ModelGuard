@@ -1,7 +1,5 @@
-# This is a basic workflow to help you get started with Actions
-name: "Deploy ModelGuard API"
+name: "Deploy ModelGuard API + Frontend"
 
-# Controls when the action will run. Invokes the workflow on push events but only for the main branch
 on:
   push:
     branches: [ main ]
@@ -9,88 +7,191 @@ on:
 env:
   AWS_REGION: "us-east-2"
 
-# Permission can be added at job level or workflow level    
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
+      # -----------------------------
+      # 1. Checkout repository
+      # -----------------------------
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
+      # -----------------------------
+      # 2. Setup Python for SAM
+      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-          
+
+      # -----------------------------
+      # 3. Configure AWS credentials
+      # -----------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::378950442938:role/GitHubAction-CI-Deploy
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
-          
+
+      # -----------------------------
+      # 4. Install dependencies
+      # -----------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install aws-sam-cli
           pip install -r requirements.txt
-          
+
+      # -----------------------------
+      # 5. Build and deploy SAM backend
+      # -----------------------------
       - name: Build SAM application
-        run: sam build
-        
-      - name: Deploy SAM application
-        run: sam deploy --no-confirm-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
-        
-      - name: Extract Cognito config from CloudFormation
         run: |
-          # Get stack name from samconfig.toml or use default
+          set -euo pipefail
+          sam build --cached
+
+      - name: Deploy SAM application
+        run: |
+          set -euo pipefail
+          sam deploy --no-confirm-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+
+      # -----------------------------
+      # 6. Extract stack outputs
+      # -----------------------------
+      - name: Extract stack outputs
+        id: outputs
+        run: |
+          set -euo pipefail
+
           STACK_NAME=$(grep -A 10 "\[default.deploy.parameters\]" samconfig.toml | grep "stack_name" | cut -d'"' -f2 || echo "modelguard-api")
-          
-          # Extract Cognito values from CloudFormation outputs
-          USER_POOL_ID=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' \
-            --output text)
-          
-          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolClientId`].OutputValue' \
-            --output text)
-          
-          COGNITO_DOMAIN=$(aws cloudformation describe-stacks \
-            --stack-name $STACK_NAME \
-            --query 'Stacks[0].Outputs[?OutputKey==`CognitoDomain`].OutputValue' \
-            --output text)
-          
-          # Validate that we got real values (not empty)
-          if [ -z "$USER_POOL_ID" ] || [ -z "$USER_POOL_CLIENT_ID" ] || [ -z "$COGNITO_DOMAIN" ]; then
-            echo "❌ ERROR: Failed to extract Cognito values from CloudFormation!"
-            echo "USER_POOL_ID: '$USER_POOL_ID'"
-            echo "USER_POOL_CLIENT_ID: '$USER_POOL_CLIENT_ID'"
-            echo "COGNITO_DOMAIN: '$COGNITO_DOMAIN'"
+
+          # Cognito outputs
+          USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' --output text)
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`UserPoolClientId`].OutputValue' --output text)
+          COGNITO_DOMAIN=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CognitoDomain`].OutputValue' --output text)
+
+          # Frontend bucket and CloudFront ID
+          FRONTEND_BUCKET=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucket`].OutputValue' --output text)
+          CLOUDFRONT_DIST_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistribution`].OutputValue' --output text)
+
+          # Hard fail if anything important is missing
+          if [ -z "$FRONTEND_BUCKET" ]; then
+            echo "❌ ERROR: FrontendBucket output missing. SAM deploy may have failed."
             exit 1
           fi
-          
-          # Create generated config file
+
+          if [ -z "$CLOUDFRONT_DIST_ID" ]; then
+            echo "❌ ERROR: CloudFrontDistribution output missing."
+            exit 1
+          fi
+
+          # Export values
+          echo "USER_POOL_ID=$USER_POOL_ID" >> $GITHUB_ENV
+          echo "USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID" >> $GITHUB_ENV
+          echo "COGNITO_DOMAIN=$COGNITO_DOMAIN" >> $GITHUB_ENV
+          echo "FRONTEND_BUCKET=$FRONTEND_BUCKET" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DIST_ID=$CLOUDFRONT_DIST_ID" >> $GITHUB_ENV
+
+      # -----------------------------
+      # 7. Generate frontend Cognito config
+      # -----------------------------
+      - name: Generate frontend Cognito config
+        run: |
+          set -euo pipefail
+
+          if [ -z "$USER_POOL_ID" ] || [ -z "$USER_POOL_CLIENT_ID" ] || [ -z "$COGNITO_DOMAIN" ]; then
+            echo "❌ ERROR: Missing Cognito outputs."
+            exit 1
+          fi
+
+          mkdir -p frontend/src/auth
+
           cat > frontend/src/auth/generated-config.ts << EOF
-          // Auto-generated from CloudFormation outputs - DO NOT EDIT MANUALLY
+          // Auto-generated from CloudFormation outputs - DO NOT EDIT
           export const cognitoConfig = {
-            userPoolId: "$USER_POOL_ID",
-            clientId: "$USER_POOL_CLIENT_ID", 
-            domain: "$COGNITO_DOMAIN",
+            userPoolId: "${USER_POOL_ID}",
+            clientId: "${USER_POOL_CLIENT_ID}", 
+            domain: "${COGNITO_DOMAIN}",
             region: "${{ env.AWS_REGION }}",
-            authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/$USER_POOL_ID"
+            authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/${USER_POOL_ID}"
           }
           EOF
-          
-          echo "✅ Generated Cognito config with User Pool ID: $USER_POOL_ID"
-          
-          # Double-check the generated file doesn't contain PLACEHOLDER
-          if grep -q "PLACEHOLDER" frontend/src/auth/generated-config.ts; then
-            echo "❌ ERROR: Generated config still contains PLACEHOLDER values!"
-            cat frontend/src/auth/generated-config.ts
-            exit 1
+
+          echo "✅ Generated frontend Cognito config"
+
+      # -----------------------------
+      # 8. Install frontend dependencies
+      # -----------------------------
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      # -----------------------------
+      # 9. Build frontend (Vite)
+      # -----------------------------
+      - name: Build frontend
+        working-directory: ./frontend
+        run: |
+          npm run build
+
+      # -----------------------------
+      # 10. Detect changed files and sync to S3
+      # -----------------------------
+      - name: Detect changes and upload
+        id: s3sync
+        run: |
+          set -euo pipefail
+
+          # --- Dry-run to get changed files (strip S3 bucket, remove leading slash)
+          CHANGED_FILES=$(aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps --dryrun \
+            | grep "upload:" \
+            | sed -E 's/.*to s3:\/\/[^/]+(\/?.*)/\1/' \
+            | sed 's/^\/\(.*\)/\1/')  # remove leading slash
+
+          # Upload actual changed files
+          aws s3 sync ./frontend/dist s3://$FRONTEND_BUCKET --exact-timestamps
+
+          # Write safely to GitHub environment variable (handle multi-line)
+          echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
+          echo "$CHANGED_FILES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "✅ S3 sync complete. Changed files:"
+          echo "$CHANGED_FILES"
+
+      # -----------------------------
+      # 11. Invalidate CloudFront only if files changed
+      # -----------------------------
+      - name: CloudFront invalidation
+        run: |
+          set -euo pipefail
+
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Invalidating changed files in CloudFront..."
+
+            # Loop over each changed file and prepend a leading slash
+            INVALIDATION_PATHS=()
+            while IFS= read -r file; do
+              INVALIDATION_PATHS+=("/$file")
+            done <<< "$CHANGED_FILES"
+
+            # Call CloudFront invalidation
+            aws cloudfront create-invalidation \
+              --distribution-id $CLOUDFRONT_DIST_ID \
+              --paths "${INVALIDATION_PATHS[@]}"
+          else
+            echo "No frontend changes detected. Skipping CloudFront invalidation."
           fi
+
