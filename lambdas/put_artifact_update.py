@@ -182,15 +182,16 @@ def lambda_handler(
             "Artifact metadata could not be fetched from the source URL",
             error_code="SOURCE_NOT_FOUND",
         )
-    except Exception as exc:  # pragma: no cover - safety net
-        logger.error(
-            f"[put_artifact_update] Unexpected error during artifact creation: {exc}"
-        )
-        return error_response(
-            500,
-            "Unexpected error during artifact update",
-            error_code="INGESTION_FAILURE",
-        )
+    
+    # except Exception as exc:  # pragma: no cover - safety net
+    #     logger.error(
+    #         f"[put_artifact_update] Unexpected error during artifact creation: {exc}"
+    #     )
+    #     return error_response(
+    #         500,
+    #         "Unexpected error during artifact update",
+    #         error_code="INGESTION_FAILURE",
+    #     )
 
     logger.info(
         f"[put_artifact_update] Created candidate artifact: "
