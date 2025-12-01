@@ -65,9 +65,7 @@ class PerformanceClaimsMetric(Metric):
             )
             return {"performance_claims": 0.0}
 
-    def _calculate_performance_claims_score(
-        self, claims_info: Dict[str, Any]
-    ) -> float:
+    def _calculate_performance_claims_score(self, claims_info: Dict[str, Any]) -> float:
         """
         Calculate performance claims score from extracted information.
 
