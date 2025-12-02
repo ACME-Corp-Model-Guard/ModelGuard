@@ -85,7 +85,9 @@ def lambda_handler(
     try:
         tokens = authenticate_user(username, password)
     except Exception as e:
-        logger.error([f"[/authenticate] Exception encountered during authentication: {e}"])
+        logger.error(
+            [f"[/authenticate] Exception encountered during authentication: {e}"]
+        )
         return error_response(401, "Invalid username or password")
 
     access_token = tokens.get("access_token")
