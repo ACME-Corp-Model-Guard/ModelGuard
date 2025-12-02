@@ -15,10 +15,10 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 15
-    MemorySize: 512  # MB of RAM (also sets /tmp to 512MB)
+    MemorySize: 512
     Environment:
       Variables:
-        LOG_LEVEL: INFO  # Change to DEBUG for verbose logging
+        LOG_LEVEL: INFO
         PYTHONPATH: /var/task:/var/task/src
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
@@ -37,17 +37,17 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: ModelGuard-Artifacts-Metadata
-      BillingMode: PAY_PER_REQUEST  # On-demand pricing
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: artifact_id
           AttributeType: S
       KeySchema:
         - AttributeName: artifact_id
-          KeyType: HASH  # Primary key
+          KeyType: HASH
       Tags:
         - Key: Project
           Value: ModelGuard
-      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+      SSESpecification:
         SSEEnabled: false
 
   TokensTable:
@@ -64,11 +64,11 @@ Resources:
       Tags:
         - Key: Project
           Value: ModelGuard
-      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+      SSESpecification:
         SSEEnabled: false
 
   ###########################################################
-  # S3 Artifact Storage
+  # S3 Buckets
   ###########################################################
   ArtifactsLogBucket:
     Type: AWS::S3::Bucket
@@ -103,7 +103,7 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256 #(free)
+              SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Suspended
       Tags:
@@ -111,7 +111,7 @@ Resources:
           Value: ModelGuard
 
   ###########################################################
-  # Cognito User Pool + Client + Domain + Groups
+  # Cognito User Pool
   ###########################################################
   ModelGuardUserPool:
     Type: AWS::Cognito::UserPool
@@ -157,12 +157,12 @@ Resources:
     Properties:
       UserPoolId: !Ref ModelGuardUserPool
       GroupName: User
-      Description: Standard user access to artifacts
+      Description: Standard user access
       Precedence: 2
 
-  ###########################################################
-  # API Gateway + Cognito Authorizer
-  ###########################################################
+  ############################################################
+  # API Gateway
+  ############################################################
   ModelGuardApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -178,14 +178,14 @@ Resources:
           CognitoAuthorizer:
             UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
-  ###########################################################
-  # Lambda: /authenticate (no authorizer)
-  ###########################################################
+  ############################################################
+  # Auth Endpoint (Unauthenticated)
+  ############################################################
   AuthenticateFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
-      Handler: lambdas.authenticate.lambda_handler
+      Handler: lambdas.put_authenticate.lambda_handler
       Description: User authentication
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
@@ -198,16 +198,17 @@ Resources:
             Auth:
               Authorizer: NONE
 
-  ###########################################################
-  # Lambda Functions for Artifact Endpoints
-  ###########################################################
-  # POST /artifacts - Enumerate artifacts
+  ############################################################
+  # Baseline Artifact Endpoints
+  ############################################################
+
+  # POST /artifacts — Enumerate
   PostArtifactsFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: lambdas.post_artifacts.lambda_handler
-      Description: Enumerate/List artifacts from registry
+      Description: Enumerate artifacts
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         ListArtifacts:
@@ -217,13 +218,13 @@ Resources:
             Path: /artifacts
             Method: POST
 
-  # POST /artifact/{artifact_type} - Upload artifact
+  # POST /artifact/{artifact_type} — Upload
   PostArtifactUploadFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: lambdas.post_artifact_upload.lambda_handler
-      Description: Upload/Create new artifact
+      Description: Upload artifact
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         CreateArtifact:
@@ -233,77 +234,45 @@ Resources:
             Path: /artifact/{artifact_type}
             Method: POST
 
-  # GET /artifacts/{artifact_type}/{id} - Download artifact
+  # GET /artifact/{artifact_type}/{id} — Download
   GetArtifactDownloadFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: lambdas.get_artifact_download.lambda_handler
-      Description: Download/Retrieve artifact by type and ID
+      Description: Download artifact
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         GetArtifact:
           Type: Api
           Properties:
             RestApiId: !Ref ModelGuardApi
-            Path: /artifacts/{artifact_type}/{id}
+            Path: /artifact/{artifact_type}/{id}
             Method: GET
 
-  # PUT /artifacts/{artifact_type}/{id} - Update artifact
-  PutArtifactUpdateFunction:
+  # GET /artifact/{artifact_type}/{id}/cost
+  GetArtifactCostFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
-      Handler: lambdas.put_artifact_update.lambda_handler
-      Description: Update existing artifact
+      Handler: lambdas.get_artifact_cost.lambda_handler
+      Description: Get artifact size cost
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
-        UpdateArtifact:
+        GetArtifactCost:
           Type: Api
           Properties:
             RestApiId: !Ref ModelGuardApi
-            Path: /artifacts/{artifact_type}/{id}
-            Method: PUT
-
-  # GET /artifact/byName/{name} - Search by name
-  GetSearchByNameFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ./
-      Handler: lambdas.get_search_by_name.lambda_handler
-      Description: Search artifacts by name
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Events:
-        SearchByName:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ModelGuardApi
-            Path: /artifact/byName/{name}
+            Path: /artifact/{artifact_type}/{id}/cost
             Method: GET
 
-  # POST /artifact/byRegEx - Search by regex
-  PostSearchByRegexFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ./
-      Handler: lambdas.post_search_by_regex.lambda_handler
-      Description: Search artifacts using regular expressions
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Events:
-        SearchByRegex:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ModelGuardApi
-            Path: /artifact/byRegEx
-            Method: POST
-
-  # GET /artifact/model/{id}/rate - Rate model
+  # GET /artifact/model/{id}/rate
   GetModelRateFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: lambdas.get_model_rate.lambda_handler
-      Description: Get ratings for model artifacts
+      Description: Get model rating
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         ModelRate:
@@ -313,13 +282,134 @@ Resources:
             Path: /artifact/model/{id}/rate
             Method: GET
 
-  # DELETE /reset - Reset system
+  # GET /artifact/model/{id}/lineage
+  GetLineageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_lineage.lambda_handler
+      Description: Get model lineage graph
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        Lineage:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/model/{id}/lineage
+            Method: GET
+
+  # POST /artifact/model/{id}/license-check
+  PostLicenseCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_license_check.lambda_handler
+      Description: License compatibility check
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        LicenseCheck:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/model/{id}/license-check
+            Method: POST
+
+  # GET /artifact/byName/{name}
+  GetSearchByNameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_search_by_name.lambda_handler
+      Description: Search artifact by name
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        SearchByName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/byName/{name}
+            Method: GET
+
+  # POST /artifact/byRegEx
+  PostSearchByRegexFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_search_by_regex.lambda_handler
+      Description: Regex search
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        SearchByRegex:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/byRegEx
+            Method: POST
+
+  ############################################################
+  # Non-spec Extension: PUT /artifact/{type}/{id} (optional)
+  ############################################################
+  PutArtifactUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.put_artifact_update.lambda_handler
+      Description: Update artifact metadata
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        UpdateArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifact/{artifact_type}/{id}
+            Method: PUT
+
+  ############################################################
+  # Health & Tracks (Unauthenticated)
+  ############################################################
+  GetHealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_health.lambda_handler
+      Description: Health probe
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /health
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  GetTracksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_tracks.lambda_handler
+      Description: Get supported tracks
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        Tracks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /tracks
+            Method: GET
+            Auth:
+              Authorizer: NONE
+
+  ############################################################
+  # DELETE /reset
+  ############################################################
   DeleteResetFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: lambdas.delete_reset.lambda_handler
-      Description: Reset system to default state
+      Description: Reset system state
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       Events:
         Reset:
@@ -331,19 +421,19 @@ Resources:
 
 Outputs:
   ModelGuardApiUrl:
-    Description: API Gateway endpoint URL for testing
+    Description: API Gateway endpoint URL
     Value: !Sub 'https://${ModelGuardApi}.execute-api.${DeploymentRegion}.amazonaws.com/dev/'
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
 
   ArtifactsTableName:
-    Description: DynamoDB table for model metadata
+    Description: DynamoDB table name
     Value: !Ref ArtifactsTable
     Export:
       Name: !Sub '${AWS::StackName}-TableName'
 
   ArtifactsBucketName:
-    Description: S3 bucket for model/code/dataset storage
+    Description: S3 bucket name
     Value: !Ref ArtifactsBucket
     Export:
       Name: !Sub '${AWS::StackName}-BucketName'
@@ -361,7 +451,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-UserPoolClientId'
 
   CognitoDomain:
-    Description: Cognito Domain for authentication
+    Description: Cognito Hosted UI Domain
     Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${DeploymentRegion}.amazoncognito.com'
     Export:
       Name: !Sub '${AWS::StackName}-CognitoDomain'
