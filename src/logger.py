@@ -62,7 +62,7 @@ def setup_logging() -> None:
                 "<level>{message}</level>"
             ),
             colorize=True,
-            enqueue=True,
+            enqueue=False,
             backtrace=True,
             diagnose=True,
         )
