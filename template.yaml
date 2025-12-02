@@ -306,7 +306,7 @@ Resources:
             Path: /artifact/{artifact_type}
             Method: POST
 
-  # GET /artifact/{artifact_type}/{id} — Download
+  # GET /artifacts/{artifact_type}/{id} — Download
   GetArtifactDownloadFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -319,7 +319,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref ModelGuardApi
-            Path: /artifact/{artifact_type}/{id}
+            Path: /artifacts/{artifact_type}/{id}
             Method: GET
 
   # GET /artifact/{artifact_type}/{id}/cost
@@ -337,6 +337,22 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /artifact/{artifact_type}/{id}/cost
             Method: GET
+            
+  # PUT /artifacts/{artifact_type}/{id}
+  PutArtifactUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.put_artifact_update.lambda_handler
+      Description: Update artifact metadata
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        UpdateArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/{artifact_type}/{id}
+            Method: PUT
 
   # GET /artifact/model/{id}/rate
   GetModelRateFunction:
@@ -417,24 +433,6 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /artifact/byRegEx
             Method: POST
-
-  ############################################################
-  # Non-spec Extension: PUT /artifact/{type}/{id} (optional)
-  ############################################################
-  PutArtifactUpdateFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ./
-      Handler: lambdas.put_artifact_update.lambda_handler
-      Description: Update artifact metadata
-      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
-      Events:
-        UpdateArtifact:
-          Type: Api
-          Properties:
-            RestApiId: !Ref ModelGuardApi
-            Path: /artifact/{artifact_type}/{id}
-            Method: PUT
 
   ############################################################
   # Health & Tracks (Unauthenticated)
