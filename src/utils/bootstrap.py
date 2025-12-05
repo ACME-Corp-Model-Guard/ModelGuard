@@ -81,6 +81,15 @@ def _ensure_user_exists(
             MessageAction="SUPPRESS",  # do not send email invite
         )
 
+        # Set password as permanent to avoid FORCE_CHANGE_PASSWORD state
+        cognito.admin_set_user_password(
+            UserPoolId=USER_POOL_ID,
+            Username=username,
+            Password=password,
+            Permanent=True,
+        )
+        logger.info(f"[bootstrap] Set permanent password for user: {username}")
+
     # Confirm the user
     try:
         cognito.admin_confirm_sign_up(UserPoolId=USER_POOL_ID, Username=username)
