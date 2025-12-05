@@ -135,7 +135,7 @@ def verify_token(token: str) -> dict:
 
     # Step 3 — Atomic TTL + usage limit check + increment
     current_timestamp = int(now)
-    
+
     try:
         tokens_table.update_item(
             Key={"token": token},
@@ -149,7 +149,7 @@ def verify_token(token: str) -> dict:
             ExpressionAttributeValues={
                 ":inc": 1,
                 ":limit": API_TOKEN_CALL_LIMIT,
-                ":min_issued_time": current_timestamp - API_TOKEN_TIME_TO_LIVE
+                ":min_issued_time": current_timestamp - API_TOKEN_TIME_TO_LIVE,
             },
         )
     except ClientError as e:
