@@ -67,7 +67,7 @@ class TokenRecord(TypedDict):
 
 
 def authenticate_user(username: str, password: str) -> dict:
-    """Authenticate via Cognito USER_PASSWORD_AUTH and record token issuance."""
+    """Authenticate via Cognito and store token with TTL."""
     try:
         logger.info(f"[auth] Authenticating user {username} via Cognito")
 
@@ -80,13 +80,16 @@ def authenticate_user(username: str, password: str) -> dict:
         auth = resp["AuthenticationResult"]
         access_token = auth["AccessToken"]
 
-        # Store token for TTL + usage-limit rules
+        current_time = int(time.time())
+
+        # Store token with DynamoDB TTL
         tokens_table.put_item(
             Item={
                 "token": access_token,
                 "username": username,
-                "issued_at": int(time.time()),
+                "issued_at": current_time,
                 "uses": 0,
+                "ttl_expiry": current_time + API_TOKEN_TIME_TO_LIVE,  # Add this field
             }
         )
 
@@ -133,8 +136,8 @@ def verify_token(token: str) -> dict:
     if now > claims["exp"]:
         raise Exception("Token expired (JWT exp claim)")
 
-    # Step 3 — Atomic TTL + usage limit check + increment
-    current_timestamp = int(now)
+    # Step 3 — Atomic usage limit check + increment (TTL handled by DynamoDB)
+    current_timestamp = int(time.time())
 
     try:
         tokens_table.update_item(
@@ -143,13 +146,13 @@ def verify_token(token: str) -> dict:
             ConditionExpression=(
                 "attribute_exists(#token) AND "
                 "uses < :limit AND "
-                "issued_at > :min_issued_time"
+                "ttl_expiry > :current_time"
             ),
             ExpressionAttributeNames={"#token": "token"},
             ExpressionAttributeValues={
                 ":inc": 1,
                 ":limit": API_TOKEN_CALL_LIMIT,
-                ":min_issued_time": current_timestamp - API_TOKEN_TIME_TO_LIVE,
+                ":current_time": current_timestamp,
             },
         )
     except ClientError as e:
