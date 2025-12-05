@@ -244,11 +244,11 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Authorization,Authorization'"
         AllowOrigin: "'*'"
-      Auth:
-        DefaultAuthorizer: CognitoAuthorizer
-        Authorizers:
-          CognitoAuthorizer:
-            UserPoolArn: !GetAtt ModelGuardUserPool.Arn
+      # Auth:
+        # DefaultAuthorizer: CognitoAuthorizer
+        # Authorizers:
+          # CognitoAuthorizer:
+            # UserPoolArn: !GetAtt ModelGuardUserPool.Arn
 
   ############################################################
   # Auth Endpoint (Unauthenticated)
@@ -267,8 +267,8 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /authenticate
             Method: PUT
-            Auth:
-              Authorizer: NONE
+            # Auth:
+              # Authorizer: NONE
 
   ############################################################
   # Baseline Artifact Endpoints
@@ -451,8 +451,8 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /health
             Method: GET
-            Auth:
-              Authorizer: NONE
+            # Auth:
+              # Authorizer: NONE
 
   GetTracksFunction:
     Type: AWS::Serverless::Function
@@ -468,8 +468,8 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /tracks
             Method: GET
-            Auth:
-              Authorizer: NONE
+            # Auth:
+              # Authorizer: NONE
 
   ############################################################
   # DELETE /reset
