@@ -134,6 +134,8 @@ def verify_token(token: str) -> dict:
         raise Exception("Token expired (JWT exp claim)")
 
     # Step 3 — Atomic TTL + usage limit check + increment
+    current_timestamp = int(now)
+    
     try:
         tokens_table.update_item(
             Key={"token": token},
@@ -141,14 +143,13 @@ def verify_token(token: str) -> dict:
             ConditionExpression=(
                 "attribute_exists(#token) AND "
                 "uses < :limit AND "
-                "(issued_at + :ttl_seconds) > :current_time"
+                "issued_at > :min_issued_time"
             ),
             ExpressionAttributeNames={"#token": "token"},
             ExpressionAttributeValues={
                 ":inc": 1,
                 ":limit": API_TOKEN_CALL_LIMIT,
-                ":ttl_seconds": API_TOKEN_TIME_TO_LIVE,
-                ":current_time": int(now),
+                ":min_issued_time": current_timestamp - API_TOKEN_TIME_TO_LIVE
             },
         )
     except ClientError as e:
