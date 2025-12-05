@@ -133,26 +133,28 @@ def verify_token(token: str) -> dict:
     if now > claims["exp"]:
         raise Exception("Token expired (JWT exp claim)")
 
-    # Step 3 — TTL enforcement
-    raw_item = tokens_table.get_item(Key={"token": token}).get("Item")
-    if raw_item is None:
-        raise Exception("Token not registered or invalid")
-
-    record: TokenRecord = raw_item  # type: ignore[assignment]
-
-    if now - record["issued_at"] > API_TOKEN_TIME_TO_LIVE:
-        raise Exception("Token expired (time-to-live exceeded)")
-
-    # Step 4 — Usage limit
-    if record["uses"] >= API_TOKEN_CALL_LIMIT:
-        raise Exception("Token expired (call limit exceeded)")
-
-    # Step 5 — Increment usage counter
-    tokens_table.update_item(
-        Key={"token": token},
-        UpdateExpression="SET uses = uses + :inc",
-        ExpressionAttributeValues={":inc": 1},
-    )
+    # Step 3 — Atomic TTL + usage limit check + increment
+    try:
+        tokens_table.update_item(
+            Key={"token": token},
+            UpdateExpression="ADD uses :inc",
+            ConditionExpression=(
+                "attribute_exists(#token) AND "
+                "uses < :limit AND "
+                "(issued_at + :ttl_seconds) > :current_time"
+            ),
+            ExpressionAttributeNames={"#token": "token"},
+            ExpressionAttributeValues={
+                ":inc": 1,
+                ":limit": API_TOKEN_CALL_LIMIT,
+                ":ttl_seconds": API_TOKEN_TIME_TO_LIVE,
+                ":current_time": int(now),
+            },
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            raise Exception("Token expired, over limit, or invalid")
+        raise Exception(f"Token validation failed: {e}")
 
     return claims
 

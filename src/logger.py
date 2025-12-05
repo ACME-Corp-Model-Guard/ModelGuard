@@ -46,7 +46,7 @@ def setup_logging() -> None:
                 "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {name}:{function}:{line} | {message}"
             ),
             serialize=True,  # JSON output for CloudWatch
-            enqueue=False,  # async logging
+            enqueue=False,  # sync logging
             backtrace=True,  # show full stack traces
             diagnose=True,  # show variable values in stack traces (may expose sensitive info)
         )
