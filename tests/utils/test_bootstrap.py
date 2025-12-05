@@ -79,6 +79,7 @@ def test_ensure_user_exists_already_present(mock_cognito):
     )
 
     mock_cognito.admin_create_user.assert_not_called()
+    mock_cognito.admin_set_user_password.assert_not_called()
     mock_cognito.admin_confirm_sign_up.assert_called_once()
     mock_cognito.admin_add_user_to_group.assert_called_once()
 
@@ -97,6 +98,12 @@ def test_ensure_user_exists_creates_when_missing(mock_cognito):
 
     # Should create
     mock_cognito.admin_create_user.assert_called_once()
+    mock_cognito.admin_set_user_password.assert_called_once_with(
+        UserPoolId="pool-123",
+        Username="admin",
+        Password="Pass123!",
+        Permanent=True,
+    )
     mock_cognito.admin_confirm_sign_up.assert_called_once()
     mock_cognito.admin_add_user_to_group.assert_called_once()
 
