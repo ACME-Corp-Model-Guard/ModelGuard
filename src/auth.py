@@ -67,7 +67,7 @@ class TokenRecord(TypedDict):
 
 
 def authenticate_user(username: str, password: str) -> dict:
-    """Authenticate via Cognito and store token with TTL."""
+    """Authenticate via Cognito USER_PASSWORD_AUTH and store token with TTL."""
     try:
         logger.info(f"[auth] Authenticating user {username} via Cognito")
 
@@ -89,7 +89,7 @@ def authenticate_user(username: str, password: str) -> dict:
                 "username": username,
                 "issued_at": current_time,
                 "uses": 0,
-                "ttl_expiry": current_time + API_TOKEN_TIME_TO_LIVE,  # Add this field
+                "ttl_expiry": current_time + API_TOKEN_TIME_TO_LIVE,
             }
         )
 
