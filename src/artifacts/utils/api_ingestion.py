@@ -484,9 +484,10 @@ def extract_performance_claims_from_metadata(
         - has_structured_metrics: bool - whether metrics are in structured format
         - card_data: dict - raw cardData if available
     """
-    result = {
+    metrics_list: List[str] = []
+    result: Dict[str, Any] = {
         "has_metrics": False,
-        "metrics": [],
+        "metrics": metrics_list,
         "has_benchmarks": False,
         "has_papers": False,
         "metric_count": 0,
@@ -536,7 +537,7 @@ def extract_performance_claims_from_metadata(
                                     metric_value = metric.get("value")
                                     # Only count if it has both name and value (actual metric)
                                     if metric_name and metric_value is not None:
-                                        result["metrics"].append(metric_name.lower())
+                                        metrics_list.append(metric_name.lower())
 
     # Secondary: Check for performance-related fields in cardData
     if isinstance(card_data, dict):
@@ -569,7 +570,7 @@ def extract_performance_claims_from_metadata(
                                 "auc",
                             ]:
                                 result["has_metrics"] = True
-                                result["metrics"].append(key.lower())
+                                metrics_list.append(key.lower())
 
     # Tertiary: Check for paper citations (more reliable than keyword matching)
     if isinstance(card_data, dict):
@@ -597,7 +598,7 @@ def extract_performance_claims_from_metadata(
                     break
 
     # Remove duplicates and set count
-    result["metrics"] = list(set(result["metrics"]))
+    result["metrics"] = list(set(metrics_list))
     result["metric_count"] = len(result["metrics"])
 
     return result
