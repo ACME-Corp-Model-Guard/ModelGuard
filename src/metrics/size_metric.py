@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union, Dict
+from typing import TYPE_CHECKING, Dict, Union
+
+from src.logger import logger
 
 from .metric import Metric
-from src.logger import logger
 
 if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
@@ -11,33 +12,37 @@ if TYPE_CHECKING:
 
 class SizeMetric(Metric):
     """
-    Size metric for evaluating model size.
+    Size metric for evaluating model size across different device types.
 
-    Scores models based on their size in bytes. Generally, smaller models
-    receive higher scores as they are easier to deploy, use less resources,
-    and are more accessible. However, very small models (<1MB) may indicate
-    incomplete or minimal models and receive lower scores.
+    Scores models based on their size in bytes for different deployment targets:
+    - Pi: 0.5GB capacity
+    - Nano: 1GB capacity
+    - Pc: 16GB capacity
+    - Server: 64GB capacity
 
-    Scoring ranges:
-    - <1MB: 0.3 (very small, may be incomplete)
-    - 1MB-100MB: 1.0 (optimal for most use cases)
-    - 100MB-500MB: 0.9 (good, still manageable)
-    - 500MB-1GB: 0.7 (acceptable, larger but usable)
-    - 1GB-5GB: 0.5 (large, harder to deploy)
-    - 5GB-10GB: 0.3 (very large, deployment challenges)
-    - >10GB: 0.1 (extremely large, significant deployment barriers)
+    Each device gets a score based on how well the model fits:
+    - Model fits comfortably (< 50% of capacity): 1.0
+    - Model fits but tight (50-80% of capacity): 0.7
+    - Model barely fits (80-95% of capacity): 0.4
+    - Model doesn't fit (> 95% of capacity): 0.0
     """
+
+    # Device capacities in bytes
+    PI_CAPACITY = 0.5 * 1024 * 1024 * 1024  # 0.5GB
+    NANO_CAPACITY = 1 * 1024 * 1024 * 1024  # 1GB
+    PC_CAPACITY = 16 * 1024 * 1024 * 1024  # 16GB
+    SERVER_CAPACITY = 64 * 1024 * 1024 * 1024  # 64GB
 
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
-        Score model size.
+        Score model size for different device types.
 
         Args:
             model: The ModelArtifact object to score
 
         Returns:
-            Size score as a dictionary with value between 0.0 and 1.0
-            (higher is better - smaller, more deployable models)
+            Dictionary with size scores for each device type (Pi, Nano, Pc, Server)
+            Each score is between 0.0 and 1.0 (higher is better - model fits better)
         """
         size_bytes = model.size
 
@@ -45,61 +50,78 @@ class SizeMetric(Metric):
         if not size_bytes or size_bytes <= 0:
             logger.debug(
                 f"No valid size information for model {model.artifact_id}, "
-                f"returning neutral score"
+                f"returning neutral scores"
             )
-            return {"size": 0.5}
+            return {
+                "size_pi": 0.5,
+                "size_nano": 0.5,
+                "size_pc": 0.5,
+                "size_server": 0.5,
+            }
 
         try:
-            score = self._calculate_size_score(size_bytes)
+            scores = {
+                "size_pi": self._calculate_device_score(size_bytes, self.PI_CAPACITY),
+                "size_nano": self._calculate_device_score(
+                    size_bytes, self.NANO_CAPACITY
+                ),
+                "size_pc": self._calculate_device_score(size_bytes, self.PC_CAPACITY),
+                "size_server": self._calculate_device_score(
+                    size_bytes, self.SERVER_CAPACITY
+                ),
+            }
 
             # Convert to human-readable format for logging
-            size_mb = size_bytes / (1024 * 1024)
+            size_gb = size_bytes / (1024 * 1024 * 1024)
             logger.debug(
-                f"Size score for {model.artifact_id}: {score:.3f} "
-                f"(size: {size_mb:.2f} MB)"
+                f"Size scores for {model.artifact_id} (size: {size_gb:.2f} GB): "
+                f"Pi={scores['size_pi']:.3f}, Nano={scores['size_nano']:.3f}, "
+                f"Pc={scores['size_pc']:.3f}, Server={scores['size_server']:.3f}"
             )
 
-            return {"size": score}
+            return scores
 
         except Exception as e:
             logger.error(
-                f"Failed to calculate size score for model {model.artifact_id}: {e}",
+                f"Failed to calculate size scores for model {model.artifact_id}: {e}",
                 exc_info=True,
             )
-            return {"size": 0.5}
+            return {
+                "size_pi": 0.5,
+                "size_nano": 0.5,
+                "size_pc": 0.5,
+                "size_server": 0.5,
+            }
 
-    def _calculate_size_score(self, size_bytes: float) -> float:
+    def _calculate_device_score(
+        self, size_bytes: float, capacity_bytes: float
+    ) -> float:
         """
-        Calculate size score based on model size in bytes.
+        Calculate size score for a specific device capacity.
 
         Args:
             size_bytes: Model size in bytes
+            capacity_bytes: Device capacity in bytes
 
         Returns:
-            Score between 0.0 and 1.0
+            Score between 0.0 and 1.0 based on how well the model fits
         """
-        # Convert to MB for easier comparison
-        size_mb = size_bytes / (1024 * 1024)
+        if size_bytes > capacity_bytes:
+            # Model doesn't fit
+            return 0.0
 
-        # Score based on size ranges
-        if size_mb < 1:
-            # Very small (<1MB) - may be incomplete or minimal
-            return 0.3
-        elif size_mb < 100:
-            # Optimal range (1MB-100MB) - excellent for deployment
+        # Calculate utilization percentage
+        utilization = size_bytes / capacity_bytes
+
+        if utilization < 0.5:
+            # Model fits comfortably (< 50% of capacity)
             return 1.0
-        elif size_mb < 500:
-            # Good range (100MB-500MB) - still very manageable
-            return 0.9
-        elif size_mb < 1024:  # 1GB
-            # Acceptable (500MB-1GB) - larger but still usable
+        elif utilization < 0.8:
+            # Model fits but tight (50-80% of capacity)
             return 0.7
-        elif size_mb < 5 * 1024:  # 5GB
-            # Large (1GB-5GB) - harder to deploy but manageable
-            return 0.5
-        elif size_mb < 10 * 1024:  # 10GB
-            # Very large (5GB-10GB) - significant deployment challenges
-            return 0.3
+        elif utilization < 0.95:
+            # Model barely fits (80-95% of capacity)
+            return 0.4
         else:
-            # Extremely large (>10GB) - major deployment barriers
+            # Model is at the limit (95-100% of capacity)
             return 0.1
