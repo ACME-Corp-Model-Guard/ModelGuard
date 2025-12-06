@@ -11,7 +11,8 @@ from src.logger import logger, with_logging
 from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 # Supported track(s) for this system.
-SUPPORTED_TRACKS = ["security"]
+# Must use exact enum values from OpenAPI spec v3.4.7
+SUPPORTED_TRACKS = ["Access control track"]
 
 
 # =============================================================================
@@ -39,9 +40,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     logger.debug(f"[tracks] Incoming event: {event}")
 
     # ---------------------------------------------------------------------
-    # Step 2 - Build response body
+    # Step 2 - Build response body (OpenAPI spec requires "plannedTracks" key)
     # ---------------------------------------------------------------------
-    response_body = {"tracks": SUPPORTED_TRACKS}
+    response_body = {"plannedTracks": SUPPORTED_TRACKS}
 
     # ---------------------------------------------------------------------
     # Step 3 - Return 200 with supported tracks list
