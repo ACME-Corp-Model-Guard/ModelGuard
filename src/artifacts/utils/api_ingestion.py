@@ -343,7 +343,7 @@ def fetch_artifact_metadata(url: str, artifact_type: ArtifactType) -> Dict[str, 
 
 
 def extract_github_url_from_huggingface_metadata(
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any],
 ) -> Optional[str]:
     """
     Extract GitHub repository URL from HuggingFace model metadata.
@@ -462,7 +462,7 @@ def fetch_github_contributors(github_url: str) -> List[Dict[str, int]]:
 
 
 def extract_performance_claims_from_metadata(
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Extract performance claims and metrics from model metadata.
@@ -517,7 +517,7 @@ def extract_performance_claims_from_metadata(
             if results and isinstance(results, list):
                 result["has_benchmarks"] = True
                 result["has_structured_metrics"] = True
-                
+
                 # Extract metrics from structured results
                 for result_item in results:
                     if isinstance(result_item, dict):
@@ -525,7 +525,7 @@ def extract_performance_claims_from_metadata(
                         task_type = result_item.get("task", {})
                         if task_type:
                             result["has_benchmarks"] = True
-                        
+
                         # Extract metrics from results
                         metrics = result_item.get("metrics", [])
                         if metrics and isinstance(metrics, list):
@@ -549,7 +549,7 @@ def extract_performance_claims_from_metadata(
             "benchmarks",
             "scores",
         ]
-        
+
         for field in performance_fields:
             if field in card_data:
                 field_value = card_data[field]
