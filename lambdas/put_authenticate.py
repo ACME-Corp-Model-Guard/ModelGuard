@@ -103,5 +103,5 @@ def lambda_handler(
     # Step 4 — Construct spec-compliant response
     # Returned value must be a JSON *string*, not an object.
     # ---------------------------------------------------------------------
-    bearer_string = f'bearer {access_token}'
+    bearer_string = f"bearer {access_token}"
     return json_response(200, bearer_string)
