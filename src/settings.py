@@ -59,6 +59,6 @@ BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
 # -----------------------------------------------------------------------------
 DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
 DEFAULT_ADMIN_PASSWORD: str = (
-    "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;"
+    "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;\n"
 )
 DEFAULT_ADMIN_GROUP: str = "Admin"
