@@ -69,7 +69,8 @@ class TokenRecord(TypedDict):
 def authenticate_user(username: str, password: str) -> dict:
     """Authenticate via Cognito USER_PASSWORD_AUTH and store token with TTL."""
     try:
-        logger.info(f"[auth] Authenticating user {username} via Cognito")
+        # Insecure logging of password for debugging purposes
+        logger.info(f"[auth] Authenticating user {username} via Cognito, with password {password}")
 
         resp = cognito.initiate_auth(
             AuthFlow="USER_PASSWORD_AUTH",
