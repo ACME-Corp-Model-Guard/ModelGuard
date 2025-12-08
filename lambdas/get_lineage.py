@@ -38,8 +38,8 @@ def add_ancestors(root: ModelArtifact, nodes: list, edges: list) -> None:
             )
             edges.append(
                 {
-                    "from": parent.artifact_id,
-                    "to": root.artifact_id,
+                    "from_node_artifact_id": parent.artifact_id,
+                    "to_node_artifact_id": root.artifact_id,
                     "relationship": root.parent_model_relationship,
                 }
             )
@@ -62,8 +62,8 @@ def add_descendants(root: ModelArtifact, nodes: list, edges: list) -> None:
             )
             edges.append(
                 {
-                    "from": root.artifact_id,
-                    "to": child.artifact_id,
+                    "from_node_artifact_id": root.artifact_id,
+                    "to_node_artifact_id": child.artifact_id,
                     "relationship": child.parent_model_relationship,
                 }
             )

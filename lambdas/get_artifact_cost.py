@@ -1,7 +1,7 @@
 """
 GET /artifact/{artifact_type}/{id}/cost
-Return the size cost (in bytes) of an artifact, measured by the S3 object size
-of the stored artifact bundle.
+Return the size cost (in MB) of an artifact and optionally its dependencies.
+Measured by the S3 object size of the stored artifact bundle.
 """
 
 from __future__ import annotations
@@ -24,15 +24,87 @@ VALID_TYPES = {"model", "dataset", "code"}
 
 
 # =============================================================================
+# Helper: Get artifact size in MB
+# =============================================================================
+
+
+def _get_artifact_size_mb(artifact_id: str, s3_key: str) -> float:
+    """
+    Get the size of an artifact in MB from S3.
+    Returns 0.0 if the object doesn't exist or an error occurs.
+    """
+    s3 = get_s3()
+    try:
+        logger.debug(f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        head = s3.head_object(Bucket=ARTIFACTS_BUCKET, Key=s3_key)
+        size_bytes = int(head.get("ContentLength", 0))
+        size_mb = size_bytes / (1024 * 1024)  # Convert bytes to MB
+        return round(size_mb, 2)
+    except Exception as e:
+        logger.warning(f"[artifact_cost] Failed HEAD for artifact {artifact_id}: {e}")
+        return 0.0
+
+
+def _calculate_costs_with_dependencies(
+    artifact_id: str,
+    visited: set[str] | None = None,
+) -> Dict[str, Dict[str, float]]:
+    """
+    Recursively calculate costs for an artifact and all its dependencies.
+    Returns a dict mapping artifact_id -> {"standalone_cost": X, "total_cost": Y}
+    """
+    if visited is None:
+        visited = set()
+
+    # Avoid circular dependencies
+    if artifact_id in visited:
+        return {}
+
+    visited.add(artifact_id)
+    costs: Dict[str, Dict[str, float]] = {}
+
+    # Load artifact metadata
+    artifact = load_artifact_metadata(artifact_id)
+    if artifact is None:
+        return {}
+
+    # Calculate standalone cost for this artifact
+    standalone_cost = _get_artifact_size_mb(artifact_id, artifact.s3_key)
+    total_cost = standalone_cost
+
+    # Get connected artifacts (dependencies)
+    connected_ids = getattr(artifact, "connected_artifacts", [])
+
+    # Recursively calculate costs for dependencies
+    for dep_id in connected_ids:
+        dep_costs = _calculate_costs_with_dependencies(dep_id, visited)
+        costs.update(dep_costs)
+
+        # Add dependency's total cost to this artifact's total
+        if dep_id in dep_costs:
+            total_cost += dep_costs[dep_id]["total_cost"]
+
+    # Store this artifact's costs
+    costs[artifact_id] = {
+        "standalone_cost": standalone_cost,
+        "total_cost": total_cost,
+    }
+
+    return costs
+
+
+# =============================================================================
 # Lambda Handler: GET /artifact/{artifact_type}/{id}/cost
 # =============================================================================
 #
 # Responsibilities:
 #   1. Authenticate user
 #   2. Validate artifact_type and id path parameters
-#   3. Load artifact metadata from DynamoDB
-#   4. Perform S3 HEAD request to fetch object size
-#   5. Return size_bytes and identifying metadata
+#   3. Parse dependency query parameter
+#   4. Load artifact metadata from DynamoDB
+#   5. Perform S3 HEAD request to fetch object size
+#   6. If dependency=true, recursively calculate costs for all dependencies
+#   7. Return ArtifactCost response per OpenAPI spec
 #
 # Error codes:
 #   400 - invalid artifact_type or missing/malformed id
@@ -74,12 +146,20 @@ def lambda_handler(
             error_code="INVALID_ARTIFACT_TYPE",
         )
 
+    # ----------------------------------------------------------------------
+    # Step 3 - Parse dependency query parameter
+    # ----------------------------------------------------------------------
+    query_params = event.get("queryStringParameters") or {}
+    dependency_param = query_params.get("dependency", "false").lower()
+    include_dependencies = dependency_param in ("true", "1", "yes")
+
     logger.debug(
-        f"[artifact_cost] artifact_type={artifact_type}, artifact_id={artifact_id}"
+        f"[artifact_cost] artifact_type={artifact_type}, artifact_id={artifact_id}, "
+        f"include_dependencies={include_dependencies}"
     )
 
     # ----------------------------------------------------------------------
-    # Step 3 - Load metadata from DynamoDB
+    # Step 4 - Load metadata from DynamoDB
     # ----------------------------------------------------------------------
     artifact = load_artifact_metadata(artifact_id)
     if artifact is None:
@@ -94,33 +174,21 @@ def lambda_handler(
         )
 
     # ----------------------------------------------------------------------
-    # Step 4 - Perform S3 HEAD to get size
+    # Step 5 - Calculate costs based on dependency parameter
     # ----------------------------------------------------------------------
-    s3 = get_s3()
+    response_body: Dict[str, Any]
 
-    try:
-        logger.debug(f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{artifact.s3_key}")
-        head = s3.head_object(Bucket=ARTIFACTS_BUCKET, Key=artifact.s3_key)
-    except Exception as e:
-        logger.error(
-            f"[artifact_cost] Failed HEAD for artifact {artifact_id}: {e}",
-            exc_info=True,
-        )
-        return error_response(
-            500,
-            "Failed to retrieve artifact size",
-            error_code="S3_ERROR",
-        )
-
-    size_bytes = int(head.get("ContentLength", 0))
-
-    # ----------------------------------------------------------------------
-    # Step 5 - Build response body
-    # ----------------------------------------------------------------------
-    response_body = {
-        "artifact_id": artifact.artifact_id,
-        "artifact_type": artifact.artifact_type,
-        "size_bytes": size_bytes,
-    }
+    if include_dependencies:
+        # Include dependencies: return all artifacts with standalone + total costs
+        costs = _calculate_costs_with_dependencies(artifact_id)
+        response_body = costs
+    else:
+        # No dependencies: return only this artifact with total_cost
+        size_mb = _get_artifact_size_mb(artifact_id, artifact.s3_key)
+        response_body = {
+            artifact_id: {
+                "total_cost": size_mb,
+            }
+        }
 
     return json_response(200, response_body)
