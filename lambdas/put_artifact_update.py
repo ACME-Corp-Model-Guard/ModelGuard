@@ -52,21 +52,83 @@ def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse the request body as JSON and return it as a dict.
 
-    The expected body format (same as POST /artifact/{artifact_type}):
-        {"url": "<new_source_url>"}
+    The expected body format per OpenAPI spec is the Artifact schema:
+        {
+            "metadata": {
+                "name": "<artifact_name>",
+                "id": "<artifact_id>",
+                "type": "<artifact_type>"
+            },
+            "data": {
+                "url": "<new_source_url>"
+            }
+        }
     """
     raw_body = event.get("body") or "{}"
 
     if isinstance(raw_body, dict):
-        return raw_body
-
-    if not isinstance(raw_body, str):
+        body = raw_body
+    elif isinstance(raw_body, str):
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Request body must be valid JSON: {exc}") from exc
+    else:
         raise ValueError("Request body must be a JSON object or JSON string.")
 
-    try:
-        return json.loads(raw_body)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Request body must be valid JSON: {exc}") from exc
+    # Validate Artifact schema structure
+    if not isinstance(body, dict):
+        raise ValueError("Request body must be an object.")
+
+    metadata = body.get("metadata")
+    data = body.get("data")
+
+    if not isinstance(metadata, dict):
+        raise ValueError("Request body must include 'metadata' object.")
+    if not isinstance(data, dict):
+        raise ValueError("Request body must include 'data' object.")
+
+    # Validate required fields
+    if "name" not in metadata:
+        raise ValueError("Request metadata must include 'name'.")
+    if "id" not in metadata:
+        raise ValueError("Request metadata must include 'id'.")
+    if "type" not in metadata:
+        raise ValueError("Request metadata must include 'type'.")
+    if "url" not in data:
+        raise ValueError("Request data must include 'url'.")
+
+    return body
+
+
+def _validate_name_id_match(
+    request_metadata: Dict[str, Any],
+    path_artifact_id: str,
+    existing_artifact: BaseArtifact,
+) -> None:
+    """
+    Validate that the request metadata name and id match the existing artifact.
+
+    Per OpenAPI spec: "The name and id must match."
+
+    Raises:
+        ValueError: If name or id don't match
+    """
+    request_name = request_metadata.get("name")
+    request_id = request_metadata.get("id")
+
+    # Validate ID matches path parameter
+    if request_id != path_artifact_id:
+        raise ValueError(
+            f"Request metadata id '{request_id}' does not match path parameter '{path_artifact_id}'"
+        )
+
+    # Validate name matches existing artifact
+    if request_name != existing_artifact.name:
+        raise ValueError(
+            f"Request metadata name '{request_name}' does not match "
+            f"existing artifact name '{existing_artifact.name}'"
+        )
 
 
 def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
@@ -132,17 +194,21 @@ def lambda_handler(
     )
 
     # ------------------------------------------------------------------
-    # Step 2 - Parse and validate request body
+    # Step 2 - Parse and validate request body (Artifact schema)
     # ------------------------------------------------------------------
     try:
         body = _parse_body(event)
     except ValueError as exc:
-        logger.warning(f"[put_artifact_update] Invalid JSON body: {exc}")
-        return error_response(400, str(exc), error_code="INVALID_JSON")
-    url = body.get("url")
+        logger.warning(f"[put_artifact_update] Invalid request body: {exc}")
+        return error_response(400, str(exc), error_code="INVALID_REQUEST")
+
+    request_metadata = body["metadata"]
+    request_data = body["data"]
+    url = request_data["url"]
+
     if not isinstance(url, str) or not url.strip():
         return error_response(
-            400, "Mising required field 'url'", error_code="MISSING_URL"
+            400, "Request data.url must be a non-empty string", error_code="MISSING_URL"
         )
     logger.info(f"[put_artifact_update] update_url = {url}")
 
@@ -161,6 +227,15 @@ def lambda_handler(
         f"[put_artifact_update] Loaded old artifact"
         f"id = {old_artifact.artifact_id}, s3_key = {old_s3_key}"
     )
+
+    # ------------------------------------------------------------------
+    # Step 3.1 - Validate "name and id must match" requirement
+    # ------------------------------------------------------------------
+    try:
+        _validate_name_id_match(request_metadata, artifact_id, old_artifact)
+    except ValueError as exc:
+        logger.warning(f"[put_artifact_update] Name/ID validation failed: {exc}")
+        return error_response(400, str(exc), error_code="NAME_ID_MISMATCH")
 
     # ------------------------------------------------------------------
     # Step 4 - Create a new candidate artifact from the new URL
@@ -289,22 +364,9 @@ def lambda_handler(
         )
 
     # ------------------------------------------------------------------
-    # Step 6 - Build response (same shape as POST /artifact/{artifact_type})
+    # Step 6 - Return success response (per OpenAPI spec: just a message)
     # ------------------------------------------------------------------
-    response_body = {
-        "metadata": {
-            "id": new_artifact.artifact_id,
-            "name": new_artifact.name,
-            "type": new_artifact.artifact_type,
-        },
-        "data": {
-            "url": new_artifact.source_url,
-            # The spec requires a download_url field; we return the stored
-            # S3 key here, consistent with POST /artifact/{artifact_type}.
-            "download_url": getattr(new_artifact, "s3_key", None),
-        },
-    }
     logger.info(
         f"[put_artifact_update] Artifact update succeeded for id={new_artifact.artifact_id}"
     )
-    return json_response(200, response_body)
+    return json_response(200, {"message": "Artifact is updated"})

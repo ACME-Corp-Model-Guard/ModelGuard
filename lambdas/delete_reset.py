@@ -18,7 +18,7 @@ from botocore.exceptions import ClientError
 
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE, TOKENS_TABLE, USER_POOL_ID
+from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE, USER_POOL_ID
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
 from src.utils.bootstrap import bootstrap_system

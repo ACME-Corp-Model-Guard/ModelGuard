@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import TYPE_CHECKING, Any, Dict, cast
+from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.code_artifact import CodeArtifact
