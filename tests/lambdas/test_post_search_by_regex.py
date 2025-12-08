@@ -2,29 +2,17 @@
 Tests for POST /artifact/byRegEx endpoint with README search support.
 """
 
-import os
+import json
+import tarfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-# Set environment variables BEFORE any imports that might trigger boto3 clients
-os.environ.setdefault("AWS_REGION", "us-east-2")
-os.environ.setdefault("ARTIFACTS_TABLE", "ArtifactsTestTable")
-os.environ.setdefault("TOKENS_TABLE", "TokensTestTable")
-os.environ.setdefault("ARTIFACTS_BUCKET", "test-bucket")
-os.environ.setdefault("USER_POOL_ID", "fakepool")
-os.environ.setdefault("USER_POOL_CLIENT_ID", "fakeclient")
-os.environ.setdefault("BEDROCK_MODEL_ID", "test-model")
-os.environ.setdefault("BEDROCK_REGION", "us-east-2")
+import boto3
+import pytest
+from moto import mock_aws
 
-import json  # noqa: E402
-import tarfile  # noqa: E402
-from pathlib import Path  # noqa: E402
-from types import SimpleNamespace  # noqa: E402
-from unittest.mock import MagicMock, patch  # noqa: E402
-
-import boto3  # noqa: E402
-import pytest  # noqa: E402
-from moto import mock_aws  # noqa: E402
-
-from src.artifacts.model_artifact import ModelArtifact  # noqa: E402
+from src.artifacts.model_artifact import ModelArtifact
 
 
 # =============================================================================
