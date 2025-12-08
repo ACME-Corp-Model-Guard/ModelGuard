@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, TypedDict, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypedDict, TypeVar, Union, List
 
 from src.logger import logger
 
@@ -42,7 +42,7 @@ DEFAULT_HEADERS: Dict[str, str] = {
 # -----------------------------------------------------------------------------
 def json_response(
     status_code: int,
-    body: Union[Dict[str, Any], str, bool],
+    body: Union[Dict[str, Any], str, bool, List[Any]],
     headers: Optional[Dict[str, str]] = None,
 ) -> LambdaResponse:
     """
