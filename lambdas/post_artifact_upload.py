@@ -14,7 +14,6 @@ from src.artifacts.artifactory import create_artifact, save_artifact_metadata
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.metrics.registry import METRICS
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.utils.http import (
     LambdaResponse,
@@ -106,7 +105,7 @@ def lambda_handler(
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
+        artifact = create_artifact(artifact_type, source_url=url)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         logger.error(
