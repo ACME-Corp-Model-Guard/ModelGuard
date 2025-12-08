@@ -242,7 +242,6 @@ def lambda_handler(
 
     headers = {"offset": str(next_offset) if next_offset is not None else "null"}
 
-    # IMPORTANT: json_response only accepts dict | str | bool as body → wrap list
     response = json_response(
         200,
         response_items,
