@@ -13,13 +13,17 @@ OpenAPI spec:
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from typing import Any, Dict, List, Pattern
 
 from src.artifacts.artifactory import load_all_artifacts
 from src.artifacts.base_artifact import BaseArtifact
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
+from src.storage.file_extraction import extract_relevant_files
+from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -85,7 +89,81 @@ def _parse_regex(event: Dict[str, Any]) -> Pattern[str]:
 # =============================================================================
 
 
-def _build_search_text(artifact: BaseArtifact) -> str:
+def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
+    """
+    Download artifact from S3 and extract README content.
+
+    Args:
+        artifact: Artifact to extract README from
+
+    Returns:
+        README text content, or empty string if no README found or error occurs
+    """
+    # Skip if no S3 key
+    if not artifact.s3_key:
+        logger.debug(
+            f"[post_search_by_regex] Artifact {artifact.artifact_id} has no s3_key, "
+            "skipping README fetch"
+        )
+        return ""
+
+    tmp_tar = None
+    try:
+        # Create temp file for download
+        tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+
+        # Download artifact from S3
+        logger.debug(
+            f"[post_search_by_regex] Downloading artifact {artifact.artifact_id} from S3"
+        )
+        download_artifact_from_s3(
+            artifact_id=artifact.artifact_id,
+            s3_key=artifact.s3_key,
+            local_path=tmp_tar,
+        )
+
+        # Extract README (prioritize README files, limit to 1 file)
+        files = extract_relevant_files(
+            tar_path=tmp_tar,
+            include_ext=[".md", ".txt"],
+            max_files=1,
+            max_chars=4000,
+            prioritize_readme=True,
+        )
+
+        if not files:
+            logger.debug(
+                f"[post_search_by_regex] No README found for artifact {artifact.artifact_id}"
+            )
+            return ""
+
+        # Get first (and only) file content
+        readme_text = list(files.values())[0]
+        logger.debug(
+            f"[post_search_by_regex] Extracted README ({len(readme_text)} chars) "
+            f"for artifact {artifact.artifact_id}"
+        )
+        return readme_text
+
+    except Exception as e:
+        logger.warning(
+            f"[post_search_by_regex] Failed to extract README for artifact "
+            f"{artifact.artifact_id}: {e}"
+        )
+        return ""
+
+    finally:
+        # Clean up temp file
+        if tmp_tar and os.path.exists(tmp_tar):
+            try:
+                os.unlink(tmp_tar)
+            except Exception as e:
+                logger.warning(
+                    f"[post_search_by_regex] Failed to remove temp file {tmp_tar}: {e}"
+                )
+
+
+def _build_search_text(artifact: BaseArtifact, readme_text: str = "") -> str:
     """
     Build a text blob to run the regex against.
 
@@ -93,6 +171,14 @@ def _build_search_text(artifact: BaseArtifact) -> str:
     - artifact.name
     - any string-valued metadata fields (this is where README-like content or descriptions
     are likely to reside).
+    - README text (if provided)
+
+    Args:
+        artifact: Artifact to build search text for
+        readme_text: Optional README content to include in search text
+
+    Returns:
+        Concatenated text blob for regex matching
     """
 
     parts: List[str] = []
@@ -105,6 +191,10 @@ def _build_search_text(artifact: BaseArtifact) -> str:
         for value in metadata.values():
             parts.append(value)
 
+    # Include README if provided
+    if readme_text:
+        parts.append(readme_text)
+
     return "\n".join(parts)
 
 
@@ -112,6 +202,8 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     """
     Apply the regex to all artifacts and return a list of ArtifactMetadata-like
     dicts: { "name": ..., "id": ..., "type": ... }.
+
+    Searches artifact name, metadata, and README content (fetched from S3).
     """
     artifacts = load_all_artifacts()
     logger.info(
@@ -121,7 +213,11 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     matches: List[Dict[str, str]] = []
 
     for artifact in artifacts:
-        haystack = _build_search_text(artifact)
+        # Extract README from S3 for this artifact
+        readme_text = _extract_readme_from_s3(artifact)
+
+        # Build searchable text including README
+        haystack = _build_search_text(artifact, readme_text=readme_text)
         if not haystack:
             continue
 
