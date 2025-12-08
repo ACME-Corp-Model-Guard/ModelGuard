@@ -113,35 +113,29 @@ def lambda_handler(
     clear_table(ARTIFACTS_TABLE, key_name="artifact_id")
 
     # ---------------------------------------------------------------------
-    # Step 2 — Clear DynamoDB tokens table
-    # ---------------------------------------------------------------------
-    # logger.info(f"[/reset] Clearing DynamoDB table: {TOKENS_TABLE}")
-    # clear_table(TOKENS_TABLE, key_name="token")
-
-    # ---------------------------------------------------------------------
-    # Step 3 — Clear S3 artifacts bucket
+    # Step 2 — Clear S3 artifacts bucket
     # ---------------------------------------------------------------------
     logger.info(f"[/reset] Clearing S3 bucket: {ARTIFACTS_BUCKET}")
     clear_bucket(ARTIFACTS_BUCKET)
 
     # ---------------------------------------------------------------------
-    # Step 4 — Delete all Cognito users
+    # Step 3 — Delete all Cognito users
     # ---------------------------------------------------------------------
     # _clear_cognito_users()
 
     # ---------------------------------------------------------------------
-    # Step 5 — Delete all Cognito groups
+    # Step 4 — Delete all Cognito groups
     # ---------------------------------------------------------------------
     # _clear_cognito_groups()
 
     # ---------------------------------------------------------------------
-    # Step 6 — Run system bootstrap initialization
+    # Step 5 — Run system bootstrap initialization
     # ---------------------------------------------------------------------
     logger.info("[/reset] Running system bootstrap...")
     bootstrap_system()
 
     # ---------------------------------------------------------------------
-    # Step 7 — Success response
+    # Step 6 — Success response
     # ---------------------------------------------------------------------
     return json_response(
         status_code=200,
