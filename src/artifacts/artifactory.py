@@ -80,7 +80,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
             raise
 
     # Create artifact instance
-    artifact = artifact_class(artifact_type=artifact_type, **kwargs)
+    artifact = artifact_class(**kwargs)
 
     # Only upload/connect if s3_key was not provided (new artifact)
     if not kwargs.get("s3_key"):
