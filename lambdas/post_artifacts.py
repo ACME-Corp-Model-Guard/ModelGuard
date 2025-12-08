@@ -38,6 +38,10 @@ from src.artifacts.base_artifact import BaseArtifact
 def _parse_artifact_queries(body: Any) -> List[Dict[str, Any]]:
     """
     Validate that the request body is a JSON array of ArtifactQuery objects.
+
+    Per OpenAPI spec:
+    - Each query must have a "name" field (required)
+    - Each query may optionally have a "types" array field
     """
     if not isinstance(body, list):
         raise ValueError("Request body must be an array of ArtifactQuery objects.")
@@ -45,10 +49,26 @@ def _parse_artifact_queries(body: Any) -> List[Dict[str, Any]]:
     for i, q in enumerate(body):
         if not isinstance(q, dict):
             raise ValueError(f"ArtifactQuery at index {i} must be an object.")
-        if "name" not in q and "type" not in q:
-            raise ValueError(
-                f"ArtifactQuery at index {i} must include at least 'name' or 'type'."
-            )
+
+        # Per spec, "name" is required (line 884)
+        if "name" not in q:
+            raise ValueError(f"ArtifactQuery at index {i} must include 'name' field.")
+
+        # Validate types array if present
+        if "types" in q:
+            types_value = q["types"]
+            if not isinstance(types_value, list):
+                raise ValueError(
+                    f"ArtifactQuery at index {i}: 'types' must be an array."
+                )
+            # Validate each type value
+            valid_types = {"model", "dataset", "code"}
+            for t in types_value:
+                if t not in valid_types:
+                    raise ValueError(
+                        f"ArtifactQuery at index {i}: invalid type '{t}'. "
+                        f"Must be one of: {valid_types}"
+                    )
 
     return body
 
@@ -65,29 +85,53 @@ def _filter_artifacts(
     """
     Apply ArtifactQuery filters using existing helpers.
 
+    Special case: name="*" enumerates all artifacts (per OpenAPI spec line 133).
+
     OR semantics:
         - If multiple queries are provided, results are unioned.
+        - If types array is provided, matches any of those types.
     """
     results: List[BaseArtifact] = []
 
     for q in queries:
         name = q.get("name")
-        artifact_type = q.get("type")
+        types_filter = q.get("types", [])  # Plural "types" per spec
 
-        fields: Dict[str, Any] = {}
-        if name:
-            fields["name"] = name
+        # Special case: "*" means enumerate all artifacts
+        if name == "*":
+            # If types filter is specified, filter by those types
+            if types_filter:
+                for artifact_type in types_filter:
+                    matched = [
+                        a for a in all_artifacts if a.artifact_type == artifact_type
+                    ]
+                    results.extend(matched)
+            else:
+                # No type filter: return all artifacts
+                results.extend(all_artifacts)
+        else:
+            # Normal name-based filtering
+            fields: Dict[str, Any] = {}
+            if name:
+                fields["name"] = name
 
-        # load_all_artifacts_by_fields supports:
-        #   - optional artifact type
-        #   - searching within an existing artifact list
-        matched = load_all_artifacts_by_fields(
-            fields=fields,
-            artifact_type=artifact_type,
-            artifact_list=all_artifacts,
-        )
-
-        results.extend(matched)
+            # If types filter provided, query each type separately
+            if types_filter:
+                for artifact_type in types_filter:
+                    matched = load_all_artifacts_by_fields(
+                        fields=fields,
+                        artifact_type=artifact_type,
+                        artifact_list=all_artifacts,
+                    )
+                    results.extend(matched)
+            else:
+                # No type filter: search across all types
+                matched = load_all_artifacts_by_fields(
+                    fields=fields,
+                    artifact_type=None,
+                    artifact_list=all_artifacts,
+                )
+                results.extend(matched)
 
     # Deduplicate by artifact_id
     seen = set()
