@@ -153,6 +153,7 @@ def _paginate(
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
+    auth: AuthContext,
 ) -> LambdaResponse:
     logger.info("[post_artifacts] Handling artifact enumeration request")
 
@@ -195,13 +196,22 @@ def lambda_handler(
     else:
         body = raw_body
 
+    try:
+        artifact_queries = _parse_artifact_queries(body)
+    except ValueError as e:
+        return error_response(
+            400,
+            str(e),
+            error_code="INVALID_REQUEST_BODY",
+        )
+
+    logger.debug(f"[post_artifacts] Received {len(artifact_queries)} queries")
+
     # ---------------------------------------------------------------------
     # Step 3 - Load all artifacts from DynamoDB
     # ---------------------------------------------------------------------
     try:
         all_artifacts = load_all_artifacts()
-        if all_artifacts is None:
-            all_artifacts = []
     except Exception as e:
         logger.error(f"[post_artifacts] Failed to load artifact list: {e}")
         return error_response(
@@ -213,7 +223,7 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 4 - Apply ArtifactQuery filters
     # ---------------------------------------------------------------------
-    filtered = _filter_artifacts(all_artifacts, body)
+    filtered = _filter_artifacts(all_artifacts, artifact_queries)
 
     # ---------------------------------------------------------------------
     # Step 5 - Apply pagination
@@ -239,5 +249,5 @@ def lambda_handler(
         headers=headers,
     )
 
-    logger.info(f"Returning: {response}")
+    logger.info(f"Returning {response}")
     return response
