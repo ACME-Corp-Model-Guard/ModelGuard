@@ -92,7 +92,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
         )
         connect_artifact(artifact)
 
-    # If it's a model artifact, compute scores if metrics provided
+    # If it's a model artifact, compute scores
     if isinstance(artifact, ModelArtifact):
         from src.metrics.registry import (
             METRICS,
@@ -102,6 +102,10 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
 
     logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
     return artifact
+
+    # Determine if model artifact is suspected of package confusion
+    if isinstance(artifact, ModelArtifact):
+        artifact.suspected_package_confusion = False
 
 
 # =============================================================================

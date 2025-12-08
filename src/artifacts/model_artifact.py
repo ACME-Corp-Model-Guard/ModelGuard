@@ -47,6 +47,8 @@ class ModelArtifact(BaseArtifact):
         parent_model_relationship: Optional[str] = None,
         parent_model_id: Optional[str] = None,
         child_model_ids: Optional[List[str]] = None,
+        # Security fields
+        suspected_package_confusion: bool = False,
     ):
         """
         Initialize ModelArtifact.
@@ -70,6 +72,7 @@ class ModelArtifact(BaseArtifact):
             parent_model_relationship: Optional relationship type to parent model
             parent_model_id: Optional link to parent model (for lineage)
             child_model_ids: Optional list of child model IDs (for lineage)
+            suspected_package_confusion: is this model suspected of package confusion
         """
         super().__init__(
             artifact_id=artifact_id,
