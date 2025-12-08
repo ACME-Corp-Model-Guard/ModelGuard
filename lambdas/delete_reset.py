@@ -115,8 +115,8 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 2 — Clear DynamoDB tokens table
     # ---------------------------------------------------------------------
-    logger.info(f"[/reset] Clearing DynamoDB table: {TOKENS_TABLE}")
-    clear_table(TOKENS_TABLE, key_name="token")
+    # logger.info(f"[/reset] Clearing DynamoDB table: {TOKENS_TABLE}")
+    # clear_table(TOKENS_TABLE, key_name="token")
 
     # ---------------------------------------------------------------------
     # Step 3 — Clear S3 artifacts bucket
@@ -127,12 +127,12 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 4 — Delete all Cognito users
     # ---------------------------------------------------------------------
-    _clear_cognito_users()
+    # _clear_cognito_users()
 
     # ---------------------------------------------------------------------
     # Step 5 — Delete all Cognito groups
     # ---------------------------------------------------------------------
-    _clear_cognito_groups()
+    # _clear_cognito_groups()
 
     # ---------------------------------------------------------------------
     # Step 6 — Run system bootstrap initialization
