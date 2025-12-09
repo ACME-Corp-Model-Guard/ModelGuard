@@ -91,6 +91,9 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
+        # Initialize repo_id for error handling
+        repo_id = None
+
         # Parse repo ID (existing logic)
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
@@ -172,7 +175,8 @@ def download_from_huggingface(
         return tar_path
 
     except RepositoryNotFoundError:
-        raise FileDownloadError(f"HuggingFace repository '{repo_id}' not found")
+        identifier = repo_id if repo_id else source_url
+        raise FileDownloadError(f"HuggingFace repository '{identifier}' not found")
     except RevisionNotFoundError as e:
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
     except Exception as e:
