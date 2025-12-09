@@ -39,6 +39,11 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
         raise FileDownloadError(f"Invalid GitHub repository URL: {source_url}")
 
     owner, repo = repo_parts
+
+    # Strip .git suffix if present
+    if repo.endswith(".git"):
+        repo = repo[:-4]  # Remove last 4 characters (".git")
+
     return owner, repo
 
 
@@ -107,17 +112,11 @@ def download_from_github(
 # Code Metadata
 # =====================================================================================
 def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
-    """
-    Fetch code repository metadata from the GitHub REST API.
-    """
+    """Fetch code repository metadata from the GitHub REST API."""
     logger.info(f"[GitHub] Fetching code metadata: {url}")
 
     try:
-        parts = url.rstrip("/").split("github.com/")
-        if len(parts) < 2:
-            raise ValueError(f"Invalid GitHub URL: {url}")
-
-        owner, repo = parts[1].split("/")[:2]
+        owner, repo = _parse_github_url(url)  # ← Use the same parsing logic
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
         response = requests.get(api_url, timeout=10)
