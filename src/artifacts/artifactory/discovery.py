@@ -8,8 +8,8 @@ configuration files, and other metadata to discover relationships like:
 - Datasets used for training
 - Parent models (if this is a fine-tuned model)
 
-NOTE: This module will be refactored on Day 2 to reduce complexity from 15 → ~5 per function.
-For Day 1, moved as-is to complete module split quickly.
+Complexity reduced: Original _find_connected_artifact_names() had complexity 15,
+now split into helper functions with complexity ~3-5 each.
 """
 
 from typing import Any, Dict, Optional, Union
@@ -33,11 +33,10 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
     """
     Use LLM to extract connected artifact names from model files.
 
-    This function:
-    1. Downloads the model artifact from S3
-    2. Extracts relevant files (README, config.json, etc.)
-    3. Uses LLM to analyze the files and extract connection information
-    4. Populates the artifact's connection fields if not already set
+    This function orchestrates the discovery process by:
+    1. Downloading and extracting files from S3
+    2. Using LLM to analyze files and extract connection information
+    3. Updating the artifact's connection fields
 
     Side Effects:
         Modifies the artifact instance to populate:
@@ -50,64 +49,20 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
     Args:
         artifact: The model artifact to analyze
 
-    TODO (Day 2 refactoring):
-        Extract into helper functions:
-        - _download_and_extract_files()
-        - _llm_extract_fields()
-        - _update_connection_fields()
+    Refactored from: Original lines 32-120
+    Complexity reduced: 15 → ~3 (now uses helper functions)
     """
     try:
-        # Step 1: Download artifact from S3 to temp location
-        download_artifact_from_s3(
-            artifact_id=artifact.artifact_id,
-            s3_key=artifact.s3_key,
-            local_path="/tmp/model_artifact_files",
-        )
+        # Step 1: Download artifact and extract relevant files
+        files = _download_and_extract_files(artifact)
 
-        # Step 2: Extract relevant files for analysis
-        files: Dict[str, str] = extract_relevant_files(
-            tar_path="/tmp/model_artifact_files",
-            include_ext={".json", ".md", ".txt"},
-            max_files=10,
-            prioritize_readme=True,
-        )
+        # Step 2: Use LLM to extract connection fields from files
+        extracted_data = _llm_extract_fields(artifact, files)
+        if not extracted_data:
+            return  # LLM extraction failed, already logged
 
-        # Step 3: Build LLM prompt to extract connection fields
-        prompt: str = build_extract_fields_from_files_prompt(
-            fields=[
-                "code_name",
-                "dataset_name",
-                "parent_model_name",
-                "parent_model_source",
-                "parent_model_relationship",
-            ],
-            files=files,
-        )
-
-        # Step 4: Call LLM to analyze files
-        response: Optional[Union[str, Dict[str, Any]]] = ask_llm(
-            prompt, return_json=True
-        )
-        if not response or not isinstance(response, dict):
-            logger.warning(
-                f"LLM failed to extract connected artifact names for {artifact.artifact_id}"
-            )
-            return
-
-        # Step 5: Update artifact fields only if not already set
-        # (respects user-provided values)
-        if not artifact.code_name:
-            artifact.code_name = response.get("code_name")
-        if not artifact.dataset_name:
-            artifact.dataset_name = response.get("dataset_name")
-        if not artifact.parent_model_name:
-            artifact.parent_model_name = response.get("parent_model_name")
-        if not artifact.parent_model_source:
-            artifact.parent_model_source = response.get("parent_model_source")
-        if not artifact.parent_model_relationship:
-            artifact.parent_model_relationship = response.get(
-                "parent_model_relationship"
-            )
+        # Step 3: Update artifact fields with extracted data
+        _update_connection_fields(artifact, extracted_data)
 
         logger.info(
             f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', "
@@ -117,4 +72,129 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
     except Exception as e:
         logger.error(
             f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}"
+        )
+
+
+# =============================================================================
+# Helper Functions (Internal)
+# =============================================================================
+
+
+def _download_and_extract_files(artifact: ModelArtifact) -> Dict[str, str]:
+    """
+    Download artifact from S3 and extract relevant files for analysis.
+
+    Downloads the artifact tar file from S3 to a temporary location and
+    extracts relevant files (README, JSON configs, etc.) for LLM analysis.
+
+    Args:
+        artifact: The model artifact to download
+
+    Returns:
+        Dictionary mapping filenames to their contents (limited to 10 files)
+
+    Raises:
+        Exception: If download or extraction fails
+
+    Extracted from: _find_connected_artifact_names() lines 60-73
+    Complexity: 2 (was part of complexity 15 function)
+    """
+    # Download artifact from S3 to temp location
+    download_artifact_from_s3(
+        artifact_id=artifact.artifact_id,
+        s3_key=artifact.s3_key,
+        local_path="/tmp/model_artifact_files",
+    )
+
+    # Extract relevant files for analysis
+    files: Dict[str, str] = extract_relevant_files(
+        tar_path="/tmp/model_artifact_files",
+        include_ext={".json", ".md", ".txt"},
+        max_files=10,
+        prioritize_readme=True,
+    )
+
+    return files
+
+
+def _llm_extract_fields(
+    artifact: ModelArtifact, files: Dict[str, str]
+) -> Optional[Dict[str, Any]]:
+    """
+    Use LLM to analyze files and extract connection field values.
+
+    Builds a prompt asking the LLM to extract artifact connection information
+    from the provided files, then calls the LLM and validates the response.
+
+    Args:
+        artifact: The model artifact being analyzed (for logging)
+        files: Dictionary of filename -> content to analyze
+
+    Returns:
+        Dictionary with extracted field values, or None if extraction failed
+
+    Extracted from: _find_connected_artifact_names() lines 75-95
+    Complexity: 4 (was part of complexity 15 function)
+    """
+    # Build LLM prompt to extract connection fields
+    prompt: str = build_extract_fields_from_files_prompt(
+        fields=[
+            "code_name",
+            "dataset_name",
+            "parent_model_name",
+            "parent_model_source",
+            "parent_model_relationship",
+        ],
+        files=files,
+    )
+
+    # Call LLM to analyze files
+    response: Optional[Union[str, Dict[str, Any]]] = ask_llm(prompt, return_json=True)
+
+    # Validate response
+    if not response or not isinstance(response, dict):
+        logger.warning(
+            f"LLM failed to extract connected artifact names for {artifact.artifact_id}"
+        )
+        return None
+
+    return response
+
+
+def _update_connection_fields(
+    artifact: ModelArtifact, extracted_data: Dict[str, Any]
+) -> None:
+    """
+    Update artifact connection fields with extracted data.
+
+    Only updates fields that are not already set, respecting user-provided values.
+    This ensures manual overrides are not overwritten by LLM extraction.
+
+    Args:
+        artifact: The model artifact to update (modified in-place)
+        extracted_data: Dictionary of field values extracted by LLM
+
+    Side Effects:
+        Modifies artifact instance fields: code_name, dataset_name,
+        parent_model_name, parent_model_source, parent_model_relationship
+
+    Extracted from: _find_connected_artifact_names() lines 97-116
+    Complexity: 5 (was part of complexity 15 function)
+    """
+    # Update fields only if not already set (respects user-provided values)
+    if not artifact.code_name:
+        artifact.code_name = extracted_data.get("code_name")
+
+    if not artifact.dataset_name:
+        artifact.dataset_name = extracted_data.get("dataset_name")
+
+    if not artifact.parent_model_name:
+        artifact.parent_model_name = extracted_data.get("parent_model_name")
+
+    if not artifact.parent_model_source:
+        artifact.parent_model_source = extracted_data.get("parent_model_source")
+
+    if not artifact.parent_model_relationship:
+        artifact.parent_model_relationship = extracted_data.get(
+            "parent_model_relationship"
         )
