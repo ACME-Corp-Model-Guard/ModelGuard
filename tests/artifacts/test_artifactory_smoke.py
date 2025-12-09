@@ -6,7 +6,7 @@ still work after splitting artifactory.py into a multi-file module.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.artifacts.artifactory import (
     create_artifact,
@@ -254,7 +254,7 @@ def test_load_all_artifacts_by_fields_with_type_filter():
 @patch("src.artifacts.artifactory.factory.upload_artifact_to_s3")
 def test_create_new_artifact_triggers_upload_and_connect(mock_upload, mock_connect):
     """Test that creating NEW artifact (no s3_key) triggers S3 upload and connection."""
-    artifact = create_artifact(
+    create_artifact(
         artifact_type="model",
         name="new-model",
         source_url="https://example.com",
@@ -272,9 +272,13 @@ def test_create_new_artifact_triggers_upload_and_connect(mock_upload, mock_conne
 
 def test_create_existing_artifact_skips_upload():
     """Test that loading existing artifact (with s3_key) skips S3 upload and connection."""
-    with patch("src.artifacts.artifactory.factory.upload_artifact_to_s3") as mock_upload:
-        with patch("src.artifacts.artifactory.connections.connect_artifact") as mock_connect:
-            artifact = create_artifact(
+    with patch(
+        "src.artifacts.artifactory.factory.upload_artifact_to_s3"
+    ) as mock_upload:
+        with patch(
+            "src.artifacts.artifactory.connections.connect_artifact"
+        ) as mock_connect:
+            create_artifact(
                 artifact_type="model",
                 name="existing-model",
                 source_url="https://example.com",
