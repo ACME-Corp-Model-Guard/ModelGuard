@@ -45,8 +45,28 @@ def download_from_huggingface(
     download_dir: Optional[str] = None
 
     try:
-        # Import huggingface_hub lazily
+        # Create download directory first
+        download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
+
+        # ⭐ SET ENVIRONMENT VARIABLES BEFORE IMPORTING HF
+        original_env = {}
+        hf_env_vars = {
+            "HF_HOME": download_dir,
+            "HF_HUB_CACHE": download_dir,
+            "HF_DATASETS_CACHE": download_dir,
+            "TRANSFORMERS_CACHE": download_dir,
+            "HF_HUB_OFFLINE": "0",  # Allow downloads
+        }
+
+        # Save original values and set new ones
+        for key, value in hf_env_vars.items():
+            original_env[key] = os.environ.get(key)
+            os.environ[key] = value
+
+        logger.debug(f"[HF] Set HF environment variables to: {download_dir}")
+
         try:
+            # NOW import huggingface_hub (after setting env vars)
             from huggingface_hub import snapshot_download
             from huggingface_hub.errors import (
                 RepositoryNotFoundError,
@@ -57,7 +77,7 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
-        # Parse repo ID (your existing logic)
+        # Parse repo ID
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
@@ -65,24 +85,22 @@ def download_from_huggingface(
         repo_path_parts = parts[1].split("/")
 
         if len(repo_path_parts) == 1:
-            # Single-part repo (e.g., "modelname")
             repo_id = repo_path_parts[0]
         elif len(repo_path_parts) >= 2:
-            # Two-part repo (e.g., "owner/modelname")
             repo_id = f"{repo_path_parts[0]}/{repo_path_parts[1]}"
         else:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
         logger.debug(f"[HF] Parsed repo_id={repo_id}")
 
-        # Create download directory directly in /tmp
-        download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
-
-        # Download DIRECTLY to our directory - no caching
+        # Download with explicit parameters to avoid caching issues
         snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,
-            local_dir=download_dir,  # Direct download here
+            local_dir=download_dir,
+            cache_dir=download_dir,  # Also set cache_dir to same location
+            resume_download=False,  # Don't try to resume
+            local_files_only=False,  # Allow network downloads
         )
 
         logger.debug(f"[HF] Downloaded to: {download_dir}")
@@ -91,7 +109,6 @@ def download_from_huggingface(
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         with tarfile.open(tar_path, "w:gz") as tar:
-            # Add entire download directory
             for root, dirs, files in os.walk(download_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -110,6 +127,13 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
+        # Restore original environment variables
+        for key, original_value in original_env.items():
+            if original_value is not None:
+                os.environ[key] = original_value
+            elif key in os.environ:
+                del os.environ[key]
+
         # Clean up download directory
         if download_dir and os.path.exists(download_dir):
             try:
