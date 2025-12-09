@@ -41,19 +41,25 @@ def test_hf_invalid_url_format():
 def test_download_from_huggingface_success(monkeypatch, tmp_path):
     """
     Full pipeline:
-    - mock snapshot_download
-    - mock tarfile creation
+    - mock snapshot_download with cache_dir
+    - mock tarfile creation  
     - mock cleanup
     """
     # ------------------------------------------------------------------
     # Mock snapshot_download
     # ------------------------------------------------------------------
 
-    def fake_snapshot_download(repo_id: str, repo_type: str, local_dir: str, **kwargs):
-        # snapshot path (directory with files)
-        os.makedirs(local_dir, exist_ok=True)
-        Path(local_dir, "config.json").write_text("{}")
-        return local_dir
+    def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
+        # Create HF-style cache structure inside cache_dir
+        cache_subdir = Path(cache_dir) / f"models--{repo_id.replace('/', '--')}" / "snapshots" / "abc123"
+        cache_subdir.mkdir(parents=True, exist_ok=True)
+        
+        # Create fake model files
+        (cache_subdir / "config.json").write_text('{"model_type": "bert"}')
+        (cache_subdir / "pytorch_model.bin").write_text("FAKE MODEL DATA")
+        
+        # Return the snapshot directory path (what HF actually returns)
+        return str(cache_subdir)
 
     # Fake huggingface_hub module
     class FakeErrors:
@@ -91,18 +97,20 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
         def __exit__(self, *a):
             pass
 
-        def add(self, *a, **k):
-            pass
+        def add(self, file_path, arcname=None, **k):
+            # Verify that files are being added correctly
+            assert Path(file_path).exists()
 
     monkeypatch.setattr(tarfile, "open", lambda *a, **k: FakeTar())
 
     # ------------------------------------------------------------------
     # Mock tempfile so we control created paths
     # ------------------------------------------------------------------
-    def fake_mkdtemp(prefix=""):
-        path = tmp_path / "hf_tmp"
-        path.mkdir(exist_ok=True)
-        return path.as_posix()
+    def fake_mkdtemp(prefix="", dir=None):  # Added dir parameter
+        # Create cache directory in pytest's temp space
+        cache_path = tmp_path / "hf_cache"
+        cache_path.mkdir(exist_ok=True)
+        return str(cache_path)
 
     monkeypatch.setattr(tempfile, "mkdtemp", fake_mkdtemp)
 
@@ -110,7 +118,7 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     def fake_namedtempfile(**kwargs):
         file_path = tmp_path / "artifact.tar.gz"
         file_path.write_text("FAKE TAR")
-        return type("Tmp", (), {"name": file_path.as_posix()})()
+        return type("Tmp", (), {"name": str(file_path)})()
 
     monkeypatch.setattr(
         tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile()

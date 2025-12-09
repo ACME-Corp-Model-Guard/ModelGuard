@@ -176,6 +176,7 @@ def test_download_from_github_network_timeout(monkeypatch):
 
     def timeout_get(url, **kwargs):
         import requests
+
         raise requests.Timeout("Request timed out")
 
     monkeypatch.setattr(requests, "get", timeout_get)
@@ -220,6 +221,7 @@ def test_fetch_github_code_metadata_success(monkeypatch):
 
 def test_fetch_github_code_metadata_with_git_suffix(monkeypatch):
     """Test metadata fetch with .git suffix URL."""
+
     class FakeResponse:
         def raise_for_status(self):
             pass

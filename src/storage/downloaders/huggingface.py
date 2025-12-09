@@ -55,7 +55,7 @@ def download_from_huggingface(
     if artifact_type == "code":
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
-    download_dir: Optional[str] = None
+    cache_dir: Optional[str] = None
 
     try:
         # Import huggingface_hub lazily
@@ -97,24 +97,32 @@ def download_from_huggingface(
 
         logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
-        # Download to temporary directory
-        download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
+        # Create cache directory in /tmp - let HF manage subdirectories
+        cache_dir = tempfile.mkdtemp(prefix=f"hf_cache_{artifact_id}_", dir="/tmp")
 
-        snapshot_download(
+        # Use cache_dir - HF creates the proper directory structure
+        snapshot_path = snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,
-            local_dir=download_dir,
+            cache_dir=cache_dir,  # HF manages internal structure
         )
+        # snapshot_path will be something like: cache_dir/models--owner--repo/snapshots/abc123/
 
-        # Create tar.gz archive
+        logger.debug(f"[HF] Downloaded to: {snapshot_path}")
+
+        # Create tar.gz archive from the actual snapshot directory
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
-        logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
-
         with tarfile.open(tar_path, "w:gz") as tar:
-            tar.add(download_dir, arcname=os.path.basename(download_dir))
+            # Add all contents of the snapshot directory
+            for root, dirs, files in os.walk(snapshot_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Preserve relative structure in archive
+                    arcname = os.path.relpath(file_path, snapshot_path)
+                    tar.add(file_path, arcname=arcname)
 
-        logger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
+        logger.info(f"[HF] Successfully packaged {artifact_id} → {tar_path}")
         return tar_path
 
     except RepositoryNotFoundError:
@@ -126,13 +134,13 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up download directory
-        if download_dir and os.path.exists(download_dir):
+        # Clean up entire cache directory
+        if cache_dir and os.path.exists(cache_dir):
             try:
-                shutil.rmtree(download_dir)
-                logger.debug(f"[HF] Cleaned up: {download_dir}")
+                shutil.rmtree(cache_dir)
+                logger.debug(f"[HF] Cleaned up cache: {cache_dir}")
             except Exception as e:
-                logger.warning(f"[HF] Failed to clean up {download_dir}: {e}")
+                logger.warning(f"[HF] Failed to clean up cache {cache_dir}: {e}")
 
 
 # =====================================================================================
