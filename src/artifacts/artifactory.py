@@ -325,13 +325,15 @@ def _(artifact: ModelArtifact) -> None:
 
     # Connect to dataset (first matching)
     if artifact.dataset_name and not artifact.dataset_artifact_id:
-        dataset_artifact: BaseArtifact = load_all_artifacts_by_fields(
+        dataset_artifacts = load_all_artifacts_by_fields(
             fields={"name": artifact.dataset_name},
             artifact_type="dataset",
             artifact_list=all_artifacts,
-        )[0]
-        if dataset_artifact and isinstance(dataset_artifact, DatasetArtifact):
-            artifact.dataset_artifact_id = dataset_artifact.artifact_id
+        )
+        if dataset_artifacts:
+            dataset_artifact = dataset_artifacts[0]
+            if isinstance(dataset_artifact, DatasetArtifact):
+                artifact.dataset_artifact_id = dataset_artifact.artifact_id
 
     # Connect to parent model (first matching)
     if artifact.parent_model_name and not artifact.parent_model_id:
