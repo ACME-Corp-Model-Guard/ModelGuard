@@ -101,12 +101,11 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
 
         artifact.compute_scores(METRICS)  # Compute scores with provided metrics
 
+        # Determine if model artifact is suspected of package confusion
+        artifact.suspected_package_confusion = False
+
     logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
     return artifact
-
-    # Determine if model artifact is suspected of package confusion
-    if isinstance(artifact, ModelArtifact):
-        artifact.suspected_package_confusion = False
 
 
 # =============================================================================
