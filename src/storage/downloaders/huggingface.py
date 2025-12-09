@@ -14,6 +14,8 @@ import tempfile
 from typing import Any, Dict, Optional
 
 import requests
+import shutil
+import tarfile
 
 from src.artifacts.types import ArtifactType
 from src.logger import logger
@@ -53,7 +55,7 @@ def download_from_huggingface(
     if artifact_type == "code":
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
-    cache_dir: Optional[str] = None
+    download_dir: Optional[str] = None
 
     try:
         # Import huggingface_hub lazily
@@ -81,60 +83,56 @@ def download_from_huggingface(
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
 
-        repo_path = parts[1].split("/")
-        if len(repo_path) < 2:
-            raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
+        repo_path_parts = parts[1].split("/")
 
-        repo_id = f"{repo_path[0]}/{repo_path[1]}"
+        if len(repo_path_parts) == 1:
+            # Single name = official HuggingFace model
+            # (e.g., "distilbert-base-uncased-distilled-squad")
+            repo_id = repo_path_parts[0]
+        elif len(repo_path_parts) >= 2:
+            # Organization/repo format (e.g., "microsoft/DialoGPT-medium")
+            repo_id = f"{repo_path_parts[0]}/{repo_path_parts[1]}"
+        else:
+            raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
         logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
-        # Download HF snapshot into temporary directory
-        cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
+        # Download to temporary directory
+        download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
 
-        snapshot_path = snapshot_download(
+        snapshot_download(
             repo_id=repo_id,
-            repo_type=artifact_type,  # "model" or "dataset"
-            cache_dir=cache_dir,
-            local_dir=cache_dir,
+            repo_type=artifact_type,
+            local_dir=download_dir,
         )
 
-        # Package into tar archive
-        import tarfile
-
+        # Create tar.gz archive
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
 
         with tarfile.open(tar_path, "w:gz") as tar:
-            tar.add(snapshot_path, arcname=os.path.basename(snapshot_path))
+            tar.add(download_dir, arcname=os.path.basename(download_dir))
 
         logger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
-
         return tar_path
 
     except RepositoryNotFoundError:
         raise FileDownloadError(f"HuggingFace repository '{repo_id}' not found")
-
     except RevisionNotFoundError as e:
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
-
     except Exception as e:
         logger.error(f"[HF] Download failed: {e}")
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up temporary cache directory
-        if cache_dir and os.path.exists(cache_dir):
+        # Clean up download directory
+        if download_dir and os.path.exists(download_dir):
             try:
-                import shutil
-
-                shutil.rmtree(cache_dir)
-                logger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
-            except Exception as cleanup_err:
-                logger.warning(
-                    f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
-                )
+                shutil.rmtree(download_dir)
+                logger.debug(f"[HF] Cleaned up: {download_dir}")
+            except Exception as e:
+                logger.warning(f"[HF] Failed to clean up {download_dir}: {e}")
 
 
 # =====================================================================================

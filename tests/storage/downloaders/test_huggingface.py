@@ -49,12 +49,11 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     # Mock snapshot_download
     # ------------------------------------------------------------------
 
-    def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
+    def fake_snapshot_download(repo_id: str, repo_type: str, local_dir: str, **kwargs):
         # snapshot path (directory with files)
-        snapshot_path = os.path.join(cache_dir, "snapshot")
-        os.makedirs(snapshot_path, exist_ok=True)
-        Path(snapshot_path, "config.json").write_text("{}")
-        return snapshot_path
+        os.makedirs(local_dir, exist_ok=True)
+        Path(local_dir, "config.json").write_text("{}")
+        return local_dir
 
     # Fake huggingface_hub module
     class FakeErrors:
@@ -80,7 +79,7 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     )
 
     # ------------------------------------------------------------------
-    # Mock tarfile.open so we don’t create a real tarball
+    # Mock tarfile.open so we don't create a real tarball
     # ------------------------------------------------------------------
     class FakeTar:
         def __init__(self, *a, **k):
