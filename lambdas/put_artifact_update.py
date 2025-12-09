@@ -31,7 +31,6 @@ from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
-from src.metrics.registry import METRICS
 from src.settings import ARTIFACTS_BUCKET
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.storage.s3_utils import delete_objects
@@ -41,7 +40,6 @@ from src.utils.http import (
     json_response,
     translate_exceptions,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

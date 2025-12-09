@@ -296,14 +296,17 @@ def test_hf_url_parsing_edge_cases():
             artifact_id="123",
             artifact_type="model",
         )
-    except FileDownloadError as e:
+    except FileDownloadError:
         # Should still work - might fail on download, not parsing
         pass
 
     # Very long single name
     try:
         download_from_huggingface(
-            source_url="https://huggingface.co/very-long-model-name-with-many-hyphens-and-underscores_123",
+            source_url=(
+                "https://huggingface.co"
+                "/very-long-model-name-with-many-hyphens-and-underscores_123"
+            ),
             artifact_id="123",
             artifact_type="model",
         )
