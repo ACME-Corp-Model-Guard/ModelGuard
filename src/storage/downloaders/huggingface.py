@@ -43,6 +43,7 @@ def download_from_huggingface(
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
     download_dir: Optional[str] = None
+    tar_path: Optional[str] = None
     original_env = {}
 
     try:
@@ -176,11 +177,32 @@ def download_from_huggingface(
 
     except RepositoryNotFoundError:
         identifier = repo_id if repo_id else source_url
+        # Cleanup tar file if it was created
+        if tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                logger.debug(f"[HF] Cleaned up temp tar file: {tar_path}")
+            except Exception:
+                pass
         raise FileDownloadError(f"HuggingFace repository '{identifier}' not found")
     except RevisionNotFoundError as e:
+        # Cleanup tar file if it was created
+        if tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                logger.debug(f"[HF] Cleaned up temp tar file: {tar_path}")
+            except Exception:
+                pass
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
     except Exception as e:
         logger.error(f"[HF] Download failed: {e}")
+        # Cleanup tar file if it was created
+        if tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                logger.debug(f"[HF] Cleaned up temp tar file: {tar_path}")
+            except Exception:
+                pass
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
