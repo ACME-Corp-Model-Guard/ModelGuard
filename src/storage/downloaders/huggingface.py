@@ -119,15 +119,11 @@ def download_from_huggingface(
                 repo_id=repo_id,
                 repo_type=artifact_type,
                 local_dir=download_dir,
-                # ⭐ REMOVE cache_dir - causes duplicate storage
-                # cache_dir=download_dir,  # Remove this line
                 local_files_only=False,
-                resume_download=False,  # Don't resume - saves space
-                # ⭐ ADD SIZE CONTROL
                 allow_patterns=None,  # Download all files
                 ignore_patterns=["*.git*", "*.DS_Store", "*.tmp"],  # Skip junk files
             )
-        except Exception as download_error:
+        except Exception:
             # Check if it's a space issue during download
             _, _, free_after = shutil.disk_usage("/tmp")
             free_after_mb = free_after // (1024**2)
