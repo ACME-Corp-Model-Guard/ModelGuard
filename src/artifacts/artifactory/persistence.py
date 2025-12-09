@@ -6,9 +6,6 @@ This module contains functions for:
 - Loading single artifacts by ID
 - Loading all artifacts (full table scan)
 - Filtering artifacts by field values with case-insensitive matching
-
-Complexity reduced: Original load_all_artifacts_by_fields() had complexity 16,
-now split into helper functions with complexity ~3 each.
 """
 
 from typing import Any, Dict, List, Optional
@@ -148,9 +145,6 @@ def load_all_artifacts_by_fields(
         results = load_all_artifacts_by_fields(
             fields={"name": "bert-base-uncased"}
         )
-
-    Refactored from: Original load_all_artifacts_by_fields() lines 181-219
-    Complexity reduced: 16 → ~3 per function
     """
     # Get candidate artifacts (from provided list or load all)
     candidates = artifact_list if artifact_list else load_all_artifacts()
@@ -180,9 +174,6 @@ def _filter_by_type(
 
     Returns:
         Filtered list containing only artifacts of the specified type
-
-    Extracted from: load_all_artifacts_by_fields() lines 203-205
-    Complexity: 1 (was part of complexity 16 function)
     """
     return [a for a in artifacts if a.artifact_type == artifact_type]
 
@@ -199,9 +190,6 @@ def _filter_by_fields(
 
     Returns:
         List of artifacts matching all field criteria
-
-    Extracted from: load_all_artifacts_by_fields() lines 203-217
-    Complexity: 2 (was part of complexity 16 function)
     """
     return [a for a in artifacts if _matches_all_fields(a, fields)]
 
@@ -218,9 +206,6 @@ def _matches_all_fields(artifact: BaseArtifact, fields: Dict[str, Any]) -> bool:
 
     Returns:
         True if artifact matches all criteria, False otherwise
-
-    Extracted from: load_all_artifacts_by_fields() lines 207-215
-    Complexity: 3 (was part of complexity 16 function)
     """
     for field_name, expected_value in fields.items():
         actual_value = getattr(artifact, field_name, None)
@@ -250,9 +235,6 @@ def _values_equal_ignoring_case(actual: Any, expected: Any) -> bool:
         True
         >>> _values_equal_ignoring_case("Apache-2.0", "apache-2.0")
         True
-
-    Extracted from: load_all_artifacts_by_fields() lines 209-214
-    Complexity: 2 (was part of complexity 16 function)
     """
     # Convert strings to lowercase for case-insensitive comparison
     if isinstance(actual, str):

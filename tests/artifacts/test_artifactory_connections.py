@@ -20,6 +20,7 @@ from src.artifacts.base_artifact import BaseArtifact
 
 def test_connect_artifact_raises_for_unknown_type():
     """Unknown artifact type fails in BaseArtifact constructor, not dispatcher."""
+
     class UnknownArtifact(BaseArtifact):
         def __init__(self):
             super().__init__(
@@ -179,7 +180,8 @@ def test_connect_model_skips_already_connected_code(
     connect_artifact(artifact)
 
     calls = [
-        c for c in mock_load_by_fields.call_args_list
+        c
+        for c in mock_load_by_fields.call_args_list
         if c[1].get("artifact_type") == "code"
     ]
     assert len(calls) == 0
@@ -204,7 +206,8 @@ def test_connect_model_skips_when_no_code_name(
     connect_artifact(artifact)
 
     calls = [
-        c for c in mock_load_by_fields.call_args_list
+        c
+        for c in mock_load_by_fields.call_args_list
         if c[1].get("artifact_type") == "code"
     ]
     assert len(calls) == 0
@@ -213,6 +216,7 @@ def test_connect_model_skips_when_no_code_name(
 # ================================
 # CODE ARTIFACT TESTS
 # ================================
+
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
@@ -319,6 +323,7 @@ def test_connect_code_recomputes_metrics(mock_load_by_fields, mock_save):
 # ================================
 # DATASET ARTIFACT TESTS
 # ================================
+
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
@@ -440,6 +445,7 @@ def test_connect_dataset_handles_no_matches(mock_load_by_fields, mock_save):
 # ================================
 # EDGE-CASE TESTS (unchanged)
 # ================================
+
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")

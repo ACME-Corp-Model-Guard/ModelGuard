@@ -8,9 +8,6 @@ This module uses Python's singledispatch to implement type-specific connection l
 
 Connections are bidirectional - when a code artifact is uploaded, it automatically
 links to existing models that reference it by name, and vice versa.
-
-NOTE: This module can be further refactored on Day 2 if time permits.
-For Day 1, moved as-is to complete module split quickly.
 """
 
 from functools import singledispatch

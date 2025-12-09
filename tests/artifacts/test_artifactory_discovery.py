@@ -6,7 +6,7 @@ from 15 to ~3-5 per function and improve testability.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from src.artifacts.artifactory.discovery import (
     _find_connected_artifact_names,
@@ -430,9 +430,7 @@ def test_update_connection_fields_handles_none_values():
 @patch("src.artifacts.artifactory.discovery._update_connection_fields")
 @patch("src.artifacts.artifactory.discovery._llm_extract_fields")
 @patch("src.artifacts.artifactory.discovery._download_and_extract_files")
-def test_find_connected_artifact_names_full_flow(
-    mock_download, mock_llm, mock_update
-):
+def test_find_connected_artifact_names_full_flow(mock_download, mock_llm, mock_update):
     """Test full discovery flow with successful extraction."""
     artifact = ModelArtifact(
         artifact_id="test-id", name="test", source_url="https://example.com"

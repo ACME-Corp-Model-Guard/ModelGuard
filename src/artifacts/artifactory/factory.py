@@ -8,9 +8,6 @@ The factory handles:
 - S3 upload orchestration for new artifacts
 - Artifact connection (linking models to datasets/code)
 - Metric computation for model artifacts
-
-Complexity reduced: Original create_artifact() had complexity 21, now split into
-functions with complexity ~5 each for better debugging and maintainability.
 """
 
 from typing import Any, Dict
@@ -151,9 +148,6 @@ def _enrich_kwargs_with_metadata(
     Raises:
         FileDownloadError: If metadata fetch fails
         KeyError: If expected metadata fields are missing
-
-    Extracted from: create_artifact() lines 67-80
-    Complexity: 4 (was part of complexity 21 function)
     """
     # Remove artifact_type from kwargs if accidentally passed
     # (it's not a constructor parameter)
@@ -191,9 +185,6 @@ def _is_new_artifact(kwargs: Dict[str, Any]) -> bool:
 
     Returns:
         True if this is a new artifact, False if loading existing
-
-    Extracted from: create_artifact() line 87 check
-    Complexity: 1 (was part of complexity 21 function)
     """
     return not kwargs.get("s3_key")
 
@@ -215,9 +206,6 @@ def _initialize_new_artifact(artifact: BaseArtifact) -> None:
         - Modifies artifact to add connection IDs (code_artifact_id, etc.)
         - Computes and stores metric scores (models only)
         - May modify related artifacts (updates parent/child relationships)
-
-    Extracted from: create_artifact() lines 86-105
-    Complexity: 3 (was part of complexity 21 function)
     """
     logger.debug(f"Initializing new artifact: {artifact.artifact_id}")
 
@@ -253,9 +241,6 @@ def _compute_initial_scores(artifact: ModelArtifact) -> None:
         - Populates artifact.scores dict
         - Populates artifact.scores_latency dict
         - Sets artifact.suspected_package_confusion = False
-
-    Extracted from: create_artifact() lines 97-102 + fix for unreachable code bug
-    Complexity: 2 (was part of complexity 21 function)
     """
     # Lazy import to avoid circular dependency (metrics imports artifactory)
     from src.metrics.registry import METRICS

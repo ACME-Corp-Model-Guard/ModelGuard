@@ -7,9 +7,6 @@ configuration files, and other metadata to discover relationships like:
 - Code repositories used to train the model
 - Datasets used for training
 - Parent models (if this is a fine-tuned model)
-
-Complexity reduced: Original _find_connected_artifact_names() had complexity 15,
-now split into helper functions with complexity ~3-5 each.
 """
 
 from typing import Any, Dict, Optional, Union
@@ -48,9 +45,6 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
 
     Args:
         artifact: The model artifact to analyze
-
-    Refactored from: Original lines 32-120
-    Complexity reduced: 15 → ~3 (now uses helper functions)
     """
     try:
         # Step 1: Download artifact and extract relevant files
@@ -95,9 +89,6 @@ def _download_and_extract_files(artifact: ModelArtifact) -> Dict[str, str]:
 
     Raises:
         Exception: If download or extraction fails
-
-    Extracted from: _find_connected_artifact_names() lines 60-73
-    Complexity: 2 (was part of complexity 15 function)
     """
     # Download artifact from S3 to temp location
     download_artifact_from_s3(
@@ -132,9 +123,6 @@ def _llm_extract_fields(
 
     Returns:
         Dictionary with extracted field values, or None if extraction failed
-
-    Extracted from: _find_connected_artifact_names() lines 75-95
-    Complexity: 4 (was part of complexity 15 function)
     """
     # Build LLM prompt to extract connection fields
     prompt: str = build_extract_fields_from_files_prompt(
@@ -177,9 +165,6 @@ def _update_connection_fields(
     Side Effects:
         Modifies artifact instance fields: code_name, dataset_name,
         parent_model_name, parent_model_source, parent_model_relationship
-
-    Extracted from: _find_connected_artifact_names() lines 97-116
-    Complexity: 5 (was part of complexity 15 function)
     """
     # Update fields only if not already set (respects user-provided values)
     if not artifact.code_name:
