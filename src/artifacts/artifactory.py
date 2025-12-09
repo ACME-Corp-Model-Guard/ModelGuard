@@ -313,13 +313,15 @@ def _(artifact: ModelArtifact) -> None:
 
     # Connect to code (first matching)
     if artifact.code_name and not artifact.code_artifact_id:
-        code_artifact: BaseArtifact = load_all_artifacts_by_fields(
+        code_artifacts = load_all_artifacts_by_fields(
             fields={"name": artifact.code_name},
             artifact_type="code",
             artifact_list=all_artifacts,
-        )[0]
-        if code_artifact and isinstance(code_artifact, CodeArtifact):
-            artifact.code_artifact_id = code_artifact.artifact_id
+        )
+        if code_artifacts:
+            code_artifact = code_artifacts[0]
+            if isinstance(code_artifact, CodeArtifact):
+                artifact.code_artifact_id = code_artifact.artifact_id
 
     # Connect to dataset (first matching)
     if artifact.dataset_name and not artifact.dataset_artifact_id:
