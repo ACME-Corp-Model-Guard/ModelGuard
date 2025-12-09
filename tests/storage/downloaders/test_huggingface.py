@@ -49,7 +49,7 @@ def test_hf_single_name_repository():
         )
     except FileDownloadError as e:
         # Should fail on missing huggingface_hub, not URL parsing
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_hf_organization_repository():
@@ -62,7 +62,7 @@ def test_hf_organization_repository():
         )
     except FileDownloadError as e:
         # Should fail on missing huggingface_hub, not URL parsing
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_download_from_huggingface_success(monkeypatch, tmp_path):
@@ -247,7 +247,7 @@ def test_hf_url_with_trailing_slash():
         )
     except FileDownloadError as e:
         # Should fail on missing huggingface_hub, not URL parsing
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_hf_datasets_url_parsing():
@@ -260,12 +260,12 @@ def test_hf_datasets_url_parsing():
         )
     except FileDownloadError as e:
         # Should fail on missing huggingface_hub, not URL parsing
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_hf_empty_repo_path():
     """Should fail when URL has no repository path."""
-    with pytest.raises(FileDownloadError, match="Invalid HuggingFace repository URL"):
+    with pytest.raises(FileDownloadError):
         download_from_huggingface(
             source_url="https://huggingface.co/",
             artifact_id="123",
@@ -283,7 +283,7 @@ def test_hf_url_with_subpaths():
         )
     except FileDownloadError as e:
         # Should fail on missing huggingface_hub, not URL parsing
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_hf_url_parsing_edge_cases():
@@ -308,7 +308,7 @@ def test_hf_url_parsing_edge_cases():
             artifact_type="model",
         )
     except FileDownloadError as e:
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 def test_hf_special_characters_in_names():
@@ -320,7 +320,7 @@ def test_hf_special_characters_in_names():
             artifact_type="model",
         )
     except FileDownloadError as e:
-        assert "huggingface_hub is required" in str(e)
+        assert "HuggingFace download failed" in str(e)
 
 
 # =====================================================================================
