@@ -226,7 +226,7 @@ def test_fetch_github_code_metadata_with_git_suffix(monkeypatch):
 
         def json(self):
             return {
-                "name": "ptm-recommendation-with-transformers",
+                "name": "project",
                 "description": "desc",
                 "language": "Python",
                 "size": 1,
@@ -246,7 +246,7 @@ def test_fetch_github_code_metadata_with_git_suffix(monkeypatch):
 
 
 def test_fetch_github_code_metadata_invalid_url():
-    with pytest.raises(ValueError):
+    with pytest.raises(FileDownloadError):
         fetch_github_code_metadata("https://example.com/notgithub")
 
 
