@@ -243,11 +243,11 @@ def lambda_handler(
 
     """
     Note: Let create_artifact generate a fresh artifact_id.
-    - If the updaete is accepted, we will overwwrite it with the original id before
+    - If the update is accepted, we will overwrite it with the original id before
     saving metadata, so the logical artifact id stays stable.
     """
     try:
-        new_artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
+        new_artifact = create_artifact(artifact_type, source_url=url)
     except FileDownloadError as exc:
         logger.error(
             f"[put_artifact_update] Upstream artifact download/metadata failed: {exc}"
