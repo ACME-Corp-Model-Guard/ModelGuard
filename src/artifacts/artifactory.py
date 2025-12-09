@@ -337,13 +337,15 @@ def _(artifact: ModelArtifact) -> None:
 
     # Connect to parent model (first matching)
     if artifact.parent_model_name and not artifact.parent_model_id:
-        parent_model_artifact: BaseArtifact = load_all_artifacts_by_fields(
+        parent_model_artifacts = load_all_artifacts_by_fields(
             fields={"name": artifact.parent_model_name},
             artifact_type="model",
             artifact_list=all_artifacts,
-        )[0]
-        if parent_model_artifact and isinstance(parent_model_artifact, ModelArtifact):
-            artifact.parent_model_id = parent_model_artifact.artifact_id
+        )
+        if parent_model_artifacts:
+            parent_model_artifact = parent_model_artifacts[0]
+            if isinstance(parent_model_artifact, ModelArtifact):
+                artifact.parent_model_id = parent_model_artifact.artifact_id
 
     # Check if this model is the parent model of other existing models
     if artifact.child_model_ids is None:
