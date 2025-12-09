@@ -102,6 +102,9 @@ class ModelArtifact(BaseArtifact):
         self.parent_model_id = parent_model_id
         self.child_model_ids = child_model_ids
 
+        # Security fields
+        self.suspected_package_confusion = suspected_package_confusion
+
     def compute_scores(self, metrics: List[Metric]) -> None:
         """
         Populate scores and scores_latency by running each metric in parallel.
@@ -172,6 +175,7 @@ class ModelArtifact(BaseArtifact):
                 "parent_model_relationship": self.parent_model_relationship,
                 "parent_model_id": self.parent_model_id,
                 "child_model_ids": self.child_model_ids,
+                "suspected_package_confusion": self.suspected_package_confusion,
             }
         )
         return data
