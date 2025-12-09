@@ -35,33 +35,20 @@ def download_from_huggingface(
     artifact_id: str,
     artifact_type: ArtifactType,
 ) -> str:
-    """
-    Download a HuggingFace model/dataset and package it into a tar.gz archive.
-
-    Args:
-        source_url: HuggingFace URL (e.g., "https://huggingface.co/owner/repo")
-        artifact_id: Artifact ID for logging
-        artifact_type: "model" or "dataset" (NOT "code")
-
-    Returns:
-        str: Local path to temporary .tar.gz file
-
-    Raises:
-        FileDownloadError: If URL parsing fails, HF download fails, or packaging fails
-    """
+    """Download a HuggingFace model/dataset and package it into a tar.gz archive."""
 
     logger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
 
     if artifact_type == "code":
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
-    cache_dir: Optional[str] = None
+    download_dir: Optional[str] = None
 
     try:
         # Import huggingface_hub lazily
         try:
-            from huggingface_hub import snapshot_download  # type: ignore
-            from huggingface_hub.errors import (  # type: ignore
+            from huggingface_hub import snapshot_download
+            from huggingface_hub.errors import (
                 RepositoryNotFoundError,
                 RevisionNotFoundError,
             )
@@ -70,15 +57,7 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
-        # ------------------------------------------------------------
-        # Parse HuggingFace repo ID from URL
-        # ------------------------------------------------------------
-        # URL examples:
-        #   https://huggingface.co/owner/model
-        #   https://huggingface.co/owner/dataset
-        #
-        # We want: "owner/model"
-        # ------------------------------------------------------------
+        # Parse repo ID (your existing logic)
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
@@ -86,40 +65,37 @@ def download_from_huggingface(
         repo_path_parts = parts[1].split("/")
 
         if len(repo_path_parts) == 1:
-            # Single name = official HuggingFace model
-            # (e.g., "distilbert-base-uncased-distilled-squad")
+            # Single-part repo (e.g., "modelname")
             repo_id = repo_path_parts[0]
         elif len(repo_path_parts) >= 2:
-            # Organization/repo format (e.g., "microsoft/DialoGPT-medium")
+            # Two-part repo (e.g., "owner/modelname")
             repo_id = f"{repo_path_parts[0]}/{repo_path_parts[1]}"
         else:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
-        logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
+        logger.debug(f"[HF] Parsed repo_id={repo_id}")
 
-        # Create cache directory in /tmp - let HF manage subdirectories
-        cache_dir = tempfile.mkdtemp(prefix=f"hf_cache_{artifact_id}_", dir="/tmp")
+        # Create download directory directly in /tmp
+        download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
 
-        # Use cache_dir - HF creates the proper directory structure
-        snapshot_path = snapshot_download(
+        # Download DIRECTLY to our directory - no caching
+        snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,
-            cache_dir=cache_dir,  # HF manages internal structure
+            local_dir=download_dir,  # Direct download here
         )
-        # snapshot_path will be something like: cache_dir/models--owner--repo/snapshots/abc123/
 
-        logger.debug(f"[HF] Downloaded to: {snapshot_path}")
+        logger.debug(f"[HF] Downloaded to: {download_dir}")
 
-        # Create tar.gz archive from the actual snapshot directory
+        # Create tar.gz from the download directory
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         with tarfile.open(tar_path, "w:gz") as tar:
-            # Add all contents of the snapshot directory
-            for root, dirs, files in os.walk(snapshot_path):
+            # Add entire download directory
+            for root, dirs, files in os.walk(download_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
-                    # Preserve relative structure in archive
-                    arcname = os.path.relpath(file_path, snapshot_path)
+                    arcname = os.path.relpath(file_path, download_dir)
                     tar.add(file_path, arcname=arcname)
 
         logger.info(f"[HF] Successfully packaged {artifact_id} → {tar_path}")
@@ -134,13 +110,13 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up entire cache directory
-        if cache_dir and os.path.exists(cache_dir):
+        # Clean up download directory
+        if download_dir and os.path.exists(download_dir):
             try:
-                shutil.rmtree(cache_dir)
-                logger.debug(f"[HF] Cleaned up cache: {cache_dir}")
+                shutil.rmtree(download_dir)
+                logger.debug(f"[HF] Cleaned up: {download_dir}")
             except Exception as e:
-                logger.warning(f"[HF] Failed to clean up cache {cache_dir}: {e}")
+                logger.warning(f"[HF] Failed to clean up {download_dir}: {e}")
 
 
 # =====================================================================================

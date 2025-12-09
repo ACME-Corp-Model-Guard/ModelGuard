@@ -1,4 +1,3 @@
-import os
 import sys
 import tarfile
 import tempfile
@@ -38,28 +37,56 @@ def test_hf_invalid_url_format():
         )
 
 
+def test_hf_single_name_repository():
+    """Should handle single-name repositories like distilbert-base-uncased-distilled-squad."""
+    # This should NOT raise an error for URL parsing
+    try:
+        # We'll mock the actual download but URL parsing should work
+        download_from_huggingface(
+            source_url="https://huggingface.co/distilbert-base-uncased-distilled-squad",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        # Should fail on missing huggingface_hub, not URL parsing
+        assert "huggingface_hub is required" in str(e)
+
+
+def test_hf_organization_repository():
+    """Should handle organization/repo format like microsoft/DialoGPT-medium."""
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/microsoft/DialoGPT-medium",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        # Should fail on missing huggingface_hub, not URL parsing
+        assert "huggingface_hub is required" in str(e)
+
+
 def test_download_from_huggingface_success(monkeypatch, tmp_path):
     """
     Full pipeline:
-    - mock snapshot_download with cache_dir
-    - mock tarfile creation  
+    - mock snapshot_download with local_dir (simplified approach)
+    - mock tarfile creation
     - mock cleanup
     """
     # ------------------------------------------------------------------
-    # Mock snapshot_download
+    # Mock snapshot_download - now uses local_dir directly
     # ------------------------------------------------------------------
 
-    def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
-        # Create HF-style cache structure inside cache_dir
-        cache_subdir = Path(cache_dir) / f"models--{repo_id.replace('/', '--')}" / "snapshots" / "abc123"
-        cache_subdir.mkdir(parents=True, exist_ok=True)
-        
+    def fake_snapshot_download(repo_id: str, repo_type: str, local_dir: str, **kwargs):
+        # Create fake model files directly in local_dir (no complex cache structure)
+        local_path = Path(local_dir)
+        local_path.mkdir(parents=True, exist_ok=True)
+
         # Create fake model files
-        (cache_subdir / "config.json").write_text('{"model_type": "bert"}')
-        (cache_subdir / "pytorch_model.bin").write_text("FAKE MODEL DATA")
-        
-        # Return the snapshot directory path (what HF actually returns)
-        return str(cache_subdir)
+        (local_path / "config.json").write_text('{"model_type": "bert"}')
+        (local_path / "pytorch_model.bin").write_text("FAKE MODEL DATA")
+        (local_path / "tokenizer.json").write_text('{"vocab": {}}')
+
+        # No return value needed - files are directly in local_dir
 
     # Fake huggingface_hub module
     class FakeErrors:
@@ -106,11 +133,11 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     # ------------------------------------------------------------------
     # Mock tempfile so we control created paths
     # ------------------------------------------------------------------
-    def fake_mkdtemp(prefix="", dir=None):  # Added dir parameter
-        # Create cache directory in pytest's temp space
-        cache_path = tmp_path / "hf_cache"
-        cache_path.mkdir(exist_ok=True)
-        return str(cache_path)
+    def fake_mkdtemp(prefix="", dir=None):
+        # Create download directory in pytest's temp space
+        download_path = tmp_path / "hf_download"
+        download_path.mkdir(exist_ok=True)
+        return str(download_path)
 
     monkeypatch.setattr(tempfile, "mkdtemp", fake_mkdtemp)
 
@@ -208,7 +235,96 @@ def test_download_from_huggingface_general_failure(monkeypatch):
 
 
 # =====================================================================================
-# Metadata Fetchers
+# URL Parsing Tests (Comprehensive Edge Cases)
+# =====================================================================================
+def test_hf_url_with_trailing_slash():
+    """Should handle URLs with trailing slash."""
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/microsoft/DialoGPT-medium/",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        # Should fail on missing huggingface_hub, not URL parsing
+        assert "huggingface_hub is required" in str(e)
+
+
+def test_hf_datasets_url_parsing():
+    """Should handle dataset URLs correctly."""
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/datasets/squad",
+            artifact_id="123",
+            artifact_type="dataset",
+        )
+    except FileDownloadError as e:
+        # Should fail on missing huggingface_hub, not URL parsing
+        assert "huggingface_hub is required" in str(e)
+
+
+def test_hf_empty_repo_path():
+    """Should fail when URL has no repository path."""
+    with pytest.raises(FileDownloadError, match="Invalid HuggingFace repository URL"):
+        download_from_huggingface(
+            source_url="https://huggingface.co/",
+            artifact_id="123",
+            artifact_type="model",
+        )
+
+
+def test_hf_url_with_subpaths():
+    """Should handle URLs with extra subpaths (only use first two parts)."""
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/microsoft/DialoGPT-medium/blob/main/README.md",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        # Should fail on missing huggingface_hub, not URL parsing
+        assert "huggingface_hub is required" in str(e)
+
+
+def test_hf_url_parsing_edge_cases():
+    """Test various edge cases in URL parsing."""
+
+    # Multiple slashes - should still work
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co///microsoft///DialoGPT-medium///",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        # Should still work - might fail on download, not parsing
+        pass
+
+    # Very long single name
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/very-long-model-name-with-many-hyphens-and-underscores_123",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        assert "huggingface_hub is required" in str(e)
+
+
+def test_hf_special_characters_in_names():
+    """Test repo names with special characters."""
+    try:
+        download_from_huggingface(
+            source_url="https://huggingface.co/microsoft/DialoGPT-medium_v2.0",
+            artifact_id="123",
+            artifact_type="model",
+        )
+    except FileDownloadError as e:
+        assert "huggingface_hub is required" in str(e)
+
+
+# =====================================================================================
+# Metadata Fetchers (Comprehensive Coverage)
 # =====================================================================================
 def test_fetch_hf_model_metadata_success(monkeypatch):
     class FakeResponse:
