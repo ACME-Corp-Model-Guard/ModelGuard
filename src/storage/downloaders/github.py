@@ -76,6 +76,8 @@ def download_from_github(
     if artifact_type != "code":
         raise FileDownloadError("Only 'code' artifacts may be downloaded from GitHub")
 
+    tar_path: Optional[str] = None
+
     try:
         # Step 1 — Parse repo identifier
         owner, repo = _parse_github_url(source_url)
@@ -101,10 +103,24 @@ def download_from_github(
 
     except requests.RequestException as e:
         logger.error(f"[GitHub] HTTP request failed: {e}")
+        # Cleanup tar file if it was created
+        if tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                logger.debug(f"[GitHub] Cleaned up temp file: {tar_path}")
+            except Exception:
+                pass
         raise FileDownloadError(f"Failed to download from GitHub API: {e}")
 
     except Exception as e:
         logger.error(f"[GitHub] Download failed: {e}")
+        # Cleanup tar file if it was created
+        if tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                logger.debug(f"[GitHub] Cleaned up temp file: {tar_path}")
+            except Exception:
+                pass
         raise FileDownloadError(f"GitHub download failed: {e}")
 
 
