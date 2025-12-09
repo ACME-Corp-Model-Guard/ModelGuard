@@ -168,7 +168,7 @@ def lambda_handler(
 
     """
     Note: Let create_artifact generate a fresh artifact_id.
-    - If the updaete is accepted, we will overwrite it with the original id before
+    - If the update is accepted, we will overwrite it with the original id before
     saving metadata, so the logical artifact id stays stable.
     """
     try:
