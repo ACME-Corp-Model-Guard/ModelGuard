@@ -43,19 +43,33 @@ def download_from_huggingface(
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
     download_dir: Optional[str] = None
+    original_env = {}
 
     try:
+        # CHECK AVAILABLE DISK SPACE FIRST
+        total, used, free = shutil.disk_usage("/tmp")
+        free_mb = free // (1024**2)
+
+        if free_mb < 50:  # Less than 50MB free
+            raise FileDownloadError(
+                f"Insufficient disk space: {free_mb}MB available (need at least 50MB)"
+            )
+
+        logger.debug(f"[HF] Available disk space: {free_mb}MB")
+
         # Create download directory first
         download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
 
-        # ⭐ SET ENVIRONMENT VARIABLES BEFORE IMPORTING HF
-        original_env = {}
+        # SET ENVIRONMENT VARIABLES BEFORE IMPORTING HF
         hf_env_vars = {
             "HF_HOME": download_dir,
             "HF_HUB_CACHE": download_dir,
             "HF_DATASETS_CACHE": download_dir,
             "TRANSFORMERS_CACHE": download_dir,
             "HF_HUB_OFFLINE": "0",  # Allow downloads
+            # DISABLE HF CACHING COMPLETELY
+            "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+            "HF_HUB_DISABLE_SYMLINKS": "1",
         }
 
         # Save original values and set new ones
@@ -77,7 +91,7 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
-        # Parse repo ID
+        # Parse repo ID (existing logic)
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
@@ -85,25 +99,58 @@ def download_from_huggingface(
         repo_path_parts = parts[1].split("/")
 
         if len(repo_path_parts) == 1:
+            # Single-part repo (e.g., "modelname")
             repo_id = repo_path_parts[0]
         elif len(repo_path_parts) >= 2:
+            # Two-part repo (e.g., "owner/modelname")
             repo_id = f"{repo_path_parts[0]}/{repo_path_parts[1]}"
         else:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
         logger.debug(f"[HF] Parsed repo_id={repo_id}")
 
-        # Download with explicit parameters to avoid caching issues
-        snapshot_download(
-            repo_id=repo_id,
-            repo_type=artifact_type,
-            local_dir=download_dir,
-            cache_dir=download_dir,  # Also set cache_dir to same location
-            resume_download=False,  # Don't try to resume
-            local_files_only=False,  # Allow network downloads
-        )
+        # ⭐ DOWNLOAD WITH MINIMAL CACHING AND SIZE LIMITS
+        try:
+            snapshot_download(
+                repo_id=repo_id,
+                repo_type=artifact_type,
+                local_dir=download_dir,
+                # ⭐ REMOVE cache_dir - causes duplicate storage
+                # cache_dir=download_dir,  # Remove this line
+                local_files_only=False,
+                resume_download=False,  # Don't resume - saves space
+                # ⭐ ADD SIZE CONTROL
+                allow_patterns=None,  # Download all files
+                ignore_patterns=["*.git*", "*.DS_Store", "*.tmp"],  # Skip junk files
+            )
+        except Exception as download_error:
+            # Check if it's a space issue during download
+            _, _, free_after = shutil.disk_usage("/tmp")
+            free_after_mb = free_after // (1024**2)
+
+            if free_after_mb < 10:
+                raise FileDownloadError(
+                    f"Download failed - out of disk space: {free_after_mb}MB remaining"
+                )
+            else:
+                raise  # Re-raise original error
 
         logger.debug(f"[HF] Downloaded to: {download_dir}")
+
+        # CHECK DOWNLOAD SIZE BEFORE CREATING TAR
+        download_size = sum(
+            os.path.getsize(os.path.join(root, file))
+            for root, dirs, files in os.walk(download_dir)
+            for file in files
+        )
+        download_size_mb = download_size // (1024**2)
+
+        if download_size_mb > 200:  # More than 200MB
+            raise FileDownloadError(
+                f"Downloaded model too large: {download_size_mb}MB (max 200MB)"
+            )
+
+        logger.debug(f"[HF] Download size: {download_size_mb}MB")
 
         # Create tar.gz from the download directory
         tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
@@ -115,7 +162,13 @@ def download_from_huggingface(
                     arcname = os.path.relpath(file_path, download_dir)
                     tar.add(file_path, arcname=arcname)
 
-        logger.info(f"[HF] Successfully packaged {artifact_id} → {tar_path}")
+        # CHECK FINAL TAR SIZE
+        tar_size = os.path.getsize(tar_path)
+        tar_size_mb = tar_size // (1024**2)
+
+        logger.info(
+            f"[HF] Successfully packaged {artifact_id} → {tar_path} ({tar_size_mb}MB)"
+        )
         return tar_path
 
     except RepositoryNotFoundError:
@@ -134,13 +187,27 @@ def download_from_huggingface(
             elif key in os.environ:
                 del os.environ[key]
 
-        # Clean up download directory
+        # AGGRESSIVE CLEANUP
         if download_dir and os.path.exists(download_dir):
             try:
+                # Get size before cleanup for logging
+                dir_size = sum(
+                    os.path.getsize(os.path.join(root, file))
+                    for root, dirs, files in os.walk(download_dir)
+                    for file in files
+                ) // (1024**2)
+
                 shutil.rmtree(download_dir)
-                logger.debug(f"[HF] Cleaned up: {download_dir}")
+                logger.debug(f"[HF] Cleaned up {dir_size}MB: {download_dir}")
             except Exception as e:
                 logger.warning(f"[HF] Failed to clean up {download_dir}: {e}")
+                # Try force cleanup if normal cleanup fails
+                try:
+                    import subprocess
+
+                    subprocess.run(["rm", "-rf", download_dir], check=False)
+                except Exception:
+                    pass
 
 
 # =====================================================================================
