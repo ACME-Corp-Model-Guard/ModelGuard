@@ -139,6 +139,35 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
 
+        # Fetch contributors for bus factor metric
+        contributors = []
+        try:
+            contributors_url = (
+                f"https://api.github.com/repos/{owner}/{repo}/contributors"
+            )
+            contributors_response = requests.get(
+                contributors_url, timeout=10, params={"per_page": 100}
+            )
+            # Handle rate limiting gracefully
+            if contributors_response.status_code == 403:
+                logger.warning(
+                    f"[GitHub] Rate limit exceeded when fetching contributors for {owner}/{repo}"
+                )
+            else:
+                contributors_response.raise_for_status()
+                contributors_data = contributors_response.json()
+                # Extract contribution counts
+                for contrib in contributors_data:
+                    if isinstance(contrib, dict) and "contributions" in contrib:
+                        contributors.append({"contributions": contrib["contributions"]})
+                logger.debug(
+                    f"[GitHub] Fetched {len(contributors)} contributors for {owner}/{repo}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}"
+            )
+
         metadata = {
             "name": data.get("name", repo),
             "metadata": {
@@ -151,6 +180,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
                 "open_issues": data.get("open_issues_count", 0),
                 "default_branch": data.get("default_branch", "main"),
                 "clone_url": data.get("clone_url"),
+                "contributors": contributors,
             },
         }
 

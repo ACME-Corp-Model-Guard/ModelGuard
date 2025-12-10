@@ -55,12 +55,30 @@ jobs:
       - name: Build SAM application
         run: |
           set -euo pipefail
-          sam build --cached
+          # Use parallel builds and skip unchanged resources
+          sam build --cached --parallel
 
       - name: Deploy SAM application
         run: |
           set -euo pipefail
-          sam deploy --no-confirm-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+          
+          # Check if template.yaml changed anywhere in this push
+          if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -q "template.yaml"; then
+            echo "🏗️  Infrastructure changes detected (template.yaml modified in push)"
+            echo "Using full SAM deploy..."
+            sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+          else
+            echo "🚀 No infrastructure changes, using SAM sync for faster deployment..."
+            STACK_NAME=$(grep -A 10 "\[default.deploy.parameters\]" samconfig.toml | grep "stack_name" | cut -d'"' -f2 || echo "modelguard-api")
+            
+            # SAM sync is faster for Lambda code-only changes
+            if sam sync --stack-name $STACK_NAME --code; then
+              echo "✅ SAM sync completed successfully"
+            else
+              echo "⚠️  SAM sync failed, falling back to full deploy"
+              sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+            fi
+          fi
 
       # -----------------------------
       # 6. Extract stack outputs

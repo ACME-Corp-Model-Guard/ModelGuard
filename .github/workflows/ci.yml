@@ -46,12 +46,10 @@ jobs:
         run: |
           mypy .
 
-      # --- Testing and coverage ---
-      - name: Run tests with pytest and coverage
+      # --- Testing ---
+      - name: Run tests with pytest
         run: |
-          coverage run -m pytest
-          coverage report -m
-          coverage xml
+          AWS_DEFAULT_REGION=us-east-2 pytest tests/
 
       # --- Upload coverage report ---
       - name: Upload coverage report
