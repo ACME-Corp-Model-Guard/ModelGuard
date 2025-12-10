@@ -301,6 +301,7 @@ Resources:
       Handler: lambdas.post_artifact_upload.lambda_handler
       Description: Upload artifact
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      MemorySize: 1536  # MB of RAM (also sets /tmp to 1.5GB)
       Events:
         CreateArtifact:
           Type: Api
