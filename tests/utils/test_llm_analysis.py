@@ -37,8 +37,15 @@ def test_ask_llm_returns_string(mock_bedrock):
     """
     ask_llm should extract the model text content and return it.
     """
-    # Fake Bedrock response structure
-    response_json = {"content": [{"text": "Hello world"}]}
+    # Fake Titan Text Lite response structure
+    response_json = {
+        "inputTextTokenCount": 10,
+        "results": [{
+            "tokenCount": 5,
+            "outputText": "Hello world",
+            "completionReason": "FINISH"
+        }]
+    }
 
     mock_bedrock.invoke_model.return_value = {
         "body": MagicMock(read=lambda: json.dumps(response_json).encode("utf-8"))
@@ -54,7 +61,14 @@ def test_ask_llm_returns_json_parsed(mock_bedrock):
     """
     ask_llm(return_json=True) should JSON-decode the model output.
     """
-    response_json = {"content": [{"text": '{"score": 0.95}'}]}
+    response_json = {
+        "inputTextTokenCount": 10,
+        "results": [{
+            "tokenCount": 15,
+            "outputText": '{"score": 0.95}',
+            "completionReason": "FINISH"
+        }]
+    }
 
     mock_bedrock.invoke_model.return_value = {
         "body": MagicMock(read=lambda: json.dumps(response_json).encode("utf-8"))
@@ -86,7 +100,7 @@ def test_ask_llm_missing_keys(mock_bedrock):
     ask_llm should handle KeyError if the Bedrock response is missing expected fields.
     """
     mock_bedrock.invoke_model.return_value = {
-        "body": MagicMock(read=lambda: json.dumps({}).encode("utf-8"))
+        "body": MagicMock(read=lambda: json.dumps({"inputTextTokenCount": 10}).encode("utf-8"))
     }
 
     result = llm.ask_llm("prompt")
