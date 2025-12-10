@@ -12,6 +12,11 @@ from jose import jwk, jwt
 from jose.utils import base64url_decode
 
 from src.logger import logger
+from src.replay_prevention import (
+    extract_resource_path,
+    is_request_replayed,
+    record_request_fingerprint,
+)
 from src.utils.http import LambdaResponse, error_response
 
 # ====================================================================================
@@ -215,6 +220,16 @@ def authorize(
     raw_token = token_header.split(" ", 1)[1].strip()
 
     claims = verify_token(raw_token)
+
+    # Replay detection
+    http_method = event.get("httpMethod", "GET")
+    resource_path = extract_resource_path(event)
+    request_body = event.get("body")
+
+    if is_request_replayed(raw_token, http_method, resource_path, request_body):
+        raise Exception("Replay attack detected: duplicate request within 60s window")
+
+    record_request_fingerprint(raw_token, http_method, resource_path, request_body)
 
     if allowed_roles:
         require_roles(claims, allowed_roles)

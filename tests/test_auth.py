@@ -46,6 +46,9 @@ def mock_boto_clients(mocker):
 # ====================================================================================
 @pytest.fixture
 def auth_module(mock_jwks, mock_boto_clients):
+    # Reload both modules to ensure clean state
+    if "src.replay_prevention" in sys.modules:
+        del sys.modules["src.replay_prevention"]
     if "src.auth" in sys.modules:
         del sys.modules["src.auth"]
     import src.auth as auth
