@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import requests
 
@@ -53,7 +53,9 @@ def _download_repo_tarball(
     """
     # Try main branch first, fall back to master if it fails
     for branch_name in [branch, "main", "master"]:
-        tarball_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch_name}.tar.gz"
+        tarball_url = (
+            f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch_name}.tar.gz"
+        )
 
         logger.debug(
             f"[GitHub] Attempting to download from branch '{branch_name}': {tarball_url}"
@@ -85,8 +87,6 @@ def _download_repo_tarball(
     raise FileDownloadError(
         f"Repository {owner}/{repo} not found or no valid branch (tried: main, master)"
     )
-
-
 
 
 # ==============================================================================
