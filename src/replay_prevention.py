@@ -11,7 +11,6 @@ Completely transparent to clients - no new headers or API changes required.
 from __future__ import annotations
 
 import hashlib
-import os
 import time
 from typing import Any, Dict, Optional
 
@@ -19,13 +18,11 @@ import boto3
 from botocore.exceptions import ClientError
 
 from src.logger import logger
+from src.settings import FINGERPRINTS_TABLE
 
 # ==============================================================================
 # Environment Configuration
 # ==============================================================================
-FINGERPRINTS_TABLE = os.environ.get(
-    "FINGERPRINTS_TABLE", "ModelGuard-Request-Fingerprints"
-)
 REPLAY_WINDOW_SECONDS = 60
 
 # DynamoDB client
