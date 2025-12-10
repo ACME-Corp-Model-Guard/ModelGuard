@@ -39,6 +39,11 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
         raise FileDownloadError(f"Invalid GitHub repository URL: {source_url}")
 
     owner, repo = repo_parts
+
+    # Strip .git suffix if present
+    if repo.endswith(".git"):
+        repo = repo[:-4]  # Remove last 4 characters (".git")
+
     return owner, repo
 
 

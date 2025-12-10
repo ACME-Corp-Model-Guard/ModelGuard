@@ -33,6 +33,13 @@ def test_parse_github_url_invalid_format():
         _parse_github_url("https://example.com/user/project")
 
 
+def test_parse_github_url_strips_git_suffix():
+    """Test that .git suffix is properly stripped from repository names."""
+    owner, repo = _parse_github_url("https://github.com/user/project.git")
+    assert owner == "user"
+    assert repo == "project"  # .git should be stripped
+
+
 # =============================================================================
 # _download_repo_tarball
 # =============================================================================
