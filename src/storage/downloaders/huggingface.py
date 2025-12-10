@@ -22,11 +22,8 @@ os.environ["HF_HOME"] = "/tmp/huggingface"
 os.environ["HF_HUB_CACHE"] = "/tmp/huggingface"
 
 from huggingface_hub import snapshot_download  # noqa: E402
-from huggingface_hub.errors import (
-    RepositoryNotFoundError,
-    RevisionNotFoundError,
-)  # noqa: E402
-
+from huggingface_hub.errors import (RepositoryNotFoundError)  # noqa: E402
+from huggingface_hub.errors import (RevisionNotFoundError)  # noqa: E402
 from src.artifacts.types import ArtifactType  # noqa: E402
 from src.logger import logger  # noqa: E402
 
