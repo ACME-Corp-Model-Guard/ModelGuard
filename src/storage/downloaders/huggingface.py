@@ -16,11 +16,16 @@ import sys
 import tarfile
 import tempfile
 from typing import Any, Dict
-from huggingface_hub import snapshot_download
-from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
 
-from src.artifacts.types import ArtifactType
-from src.logger import logger
+# Force HuggingFace to use /tmp for caching in Lambda
+os.environ['HF_HOME'] = '/tmp/huggingface'
+os.environ['HF_HUB_CACHE'] = '/tmp/huggingface'
+
+from huggingface_hub import snapshot_download  # noqa: E402
+from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError  # noqa: E402
+
+from src.artifacts.types import ArtifactType  # noqa: E402
+from src.logger import logger  # noqa: E402
 
 
 class FileDownloadError(Exception):
@@ -61,6 +66,10 @@ def download_from_huggingface(
     tar_path = None
 
     try:
+        # Ensure HuggingFace cache directory exists in /tmp
+        hf_cache_dir = '/tmp/huggingface'
+        os.makedirs(hf_cache_dir, exist_ok=True)
+
         # Create temporary download directory
         download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
 
@@ -71,6 +80,7 @@ def download_from_huggingface(
             local_dir=download_dir,
             local_files_only=False,
             ignore_patterns=["*.git*", "*.DS_Store", "*.tmp"],
+            cache_dir=hf_cache_dir,  # Explicitly set cache directory
         )
 
         # Check download size
@@ -116,7 +126,7 @@ def download_from_huggingface(
             except Exception as e:
                 logger.warning(f"Failed to clean up download directory: {e}")
 
-        # Clean up tar file on error - sys is now available at module level
+        # Clean up tar file on error
         if tar_path and os.path.exists(tar_path) and sys.exc_info()[0] is not None:
             try:
                 os.unlink(tar_path)
