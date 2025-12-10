@@ -21,8 +21,9 @@ from src.logger import logger
 from src.settings import FINGERPRINTS_TABLE
 
 # ==============================================================================
-# Environment Configuration
+# Configuration
 # ==============================================================================
+
 REPLAY_WINDOW_SECONDS = 60
 
 
