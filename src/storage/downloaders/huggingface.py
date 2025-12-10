@@ -18,11 +18,14 @@ import tempfile
 from typing import Any, Dict
 
 # Force HuggingFace to use /tmp for caching in Lambda
-os.environ['HF_HOME'] = '/tmp/huggingface'
-os.environ['HF_HUB_CACHE'] = '/tmp/huggingface'
+os.environ["HF_HOME"] = "/tmp/huggingface"
+os.environ["HF_HUB_CACHE"] = "/tmp/huggingface"
 
 from huggingface_hub import snapshot_download  # noqa: E402
-from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError  # noqa: E402
+from huggingface_hub.errors import (
+    RepositoryNotFoundError,
+    RevisionNotFoundError,
+)  # noqa: E402
 
 from src.artifacts.types import ArtifactType  # noqa: E402
 from src.logger import logger  # noqa: E402
@@ -43,6 +46,9 @@ def download_from_huggingface(
     artifact_type: ArtifactType,
 ) -> str:
     """Download a HuggingFace model/dataset and package it into a tar.gz archive."""
+
+    # Clean up /tmp at start to ensure space
+    _cleanup_tmp_space()
 
     logger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
 
@@ -66,21 +72,26 @@ def download_from_huggingface(
     tar_path = None
 
     try:
-        # Ensure HuggingFace cache directory exists in /tmp
-        hf_cache_dir = '/tmp/huggingface'
-        os.makedirs(hf_cache_dir, exist_ok=True)
+        # Check available space before starting
+        free_mb = _get_free_space_mb()
+        if free_mb < 100:
+            raise FileDownloadError(f"Insufficient disk space: {free_mb}MB available")
+
+        # Create unique cache directory per invocation
+        unique_cache_dir = f"/tmp/hf_cache_{artifact_id}_{os.getpid()}"
+        os.makedirs(unique_cache_dir, exist_ok=True)
 
         # Create temporary download directory
         download_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_", dir="/tmp")
 
-        # Download the repository
+        # Download the repository with isolated cache
         snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,
             local_dir=download_dir,
             local_files_only=False,
             ignore_patterns=["*.git*", "*.DS_Store", "*.tmp"],
-            cache_dir=hf_cache_dir,  # Explicitly set cache directory
+            cache_dir=unique_cache_dir,
         )
 
         # Check download size
@@ -91,13 +102,16 @@ def download_from_huggingface(
         )
         download_size_mb = download_size // (1024**2)
 
-        if download_size_mb > 1000:
+        # Reduced limit for Lambda constraints
+        if download_size_mb > 350:
             raise FileDownloadError(
-                f"Downloaded artifact too large: {download_size_mb}MB (max 1000MB)"
+                f"Downloaded artifact too large: {download_size_mb}MB (max 350MB for Lambda)"
             )
 
         # Create tar.gz archive
-        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz", dir="/tmp").name
+        tar_path = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".tar.gz", dir="/tmp"
+        ).name
 
         with tarfile.open(tar_path, "w:gz") as tar:
             for root, _, files in os.walk(download_dir):
@@ -119,19 +133,93 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up download directory
-        if download_dir and os.path.exists(download_dir):
-            try:
-                shutil.rmtree(download_dir)
-            except Exception as e:
-                logger.warning(f"Failed to clean up download directory: {e}")
+        # ALWAYS clean up, regardless of success/failure
+        _cleanup_download_artifacts(
+            download_dir,
+            unique_cache_dir if "unique_cache_dir" in locals() else None,
+            tar_path if sys.exc_info()[0] is not None else None,
+        )
 
-        # Clean up tar file on error
-        if tar_path and os.path.exists(tar_path) and sys.exc_info()[0] is not None:
+
+def _cleanup_tmp_space():
+    """Clean up /tmp directory to ensure available space."""
+    try:
+        # Remove old HuggingFace cache directories
+        import glob
+
+        for old_cache in glob.glob("/tmp/hf_cache_*"):
             try:
-                os.unlink(tar_path)
+                shutil.rmtree(old_cache)
+                logger.debug(f"Cleaned up old cache: {old_cache}")
             except Exception:
                 pass
+
+        # Remove old temp directories
+        for old_temp in glob.glob("/tmp/hf_*"):
+            try:
+                if os.path.isdir(old_temp):
+                    shutil.rmtree(old_temp)
+                else:
+                    os.unlink(old_temp)
+            except Exception:
+                pass
+
+        # Clean up global HF cache if it exists and is large
+        global_hf_cache = "/tmp/huggingface"
+        if os.path.exists(global_hf_cache):
+            try:
+                cache_size = sum(
+                    os.path.getsize(os.path.join(root, file))
+                    for root, _, files in os.walk(global_hf_cache)
+                    for file in files
+                ) // (1024 * 1024)
+
+                if cache_size > 50:  # If > 50MB, remove it
+                    shutil.rmtree(global_hf_cache)
+                    logger.info(f"Cleaned up large global HF cache: {cache_size}MB")
+            except Exception as e:
+                logger.warning(f"Failed to clean global HF cache: {e}")
+
+    except Exception as e:
+        logger.warning(f"Failed to clean /tmp space: {e}")
+
+
+def _get_free_space_mb() -> int:
+    """Get available free space in /tmp in MB."""
+    try:
+        total, used, free = shutil.disk_usage("/tmp")
+        return free // (1024 * 1024)
+    except Exception:
+        return 0
+
+
+def _cleanup_download_artifacts(
+    download_dir: str | None, cache_dir: str | None, tar_path: str | None
+):
+    """Clean up all download artifacts."""
+    # Clean up download directory
+    if download_dir and os.path.exists(download_dir):
+        try:
+            shutil.rmtree(download_dir)
+            logger.debug(f"Cleaned up download directory: {download_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up download directory: {e}")
+
+    # Clean up cache directory
+    if cache_dir and os.path.exists(cache_dir):
+        try:
+            shutil.rmtree(cache_dir)
+            logger.debug(f"Cleaned up cache directory: {cache_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up cache directory: {e}")
+
+    # Clean up tar file on error
+    if tar_path and os.path.exists(tar_path):
+        try:
+            os.unlink(tar_path)
+            logger.debug(f"Cleaned up error tar file: {tar_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up tar file: {e}")
 
 
 # =====================================================================================
