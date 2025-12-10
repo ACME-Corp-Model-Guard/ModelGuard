@@ -77,15 +77,26 @@ def download_from_huggingface(
         # ------------------------------------------------------------
         # URL examples:
         #   https://huggingface.co/owner/model
-        #   https://huggingface.co/owner/dataset
+        #   https://huggingface.co/datasets/owner/dataset
         #
-        # We want: "owner/model"
+        # We want: "owner/model" or "owner/dataset" (without the datasets/ prefix)
         # ------------------------------------------------------------
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
 
-        repo_path = parts[1].split("/")
+        # Get the path after the domain
+        path_after_domain = parts[1]
+
+        # Remove 'datasets/' or 'models/' prefix if present
+        # This ensures consistent parsing regardless of URL format
+        if path_after_domain.startswith("datasets/"):
+            path_after_domain = path_after_domain[len("datasets/") :]
+        elif path_after_domain.startswith("models/"):
+            path_after_domain = path_after_domain[len("models/") :]
+
+        # Parse owner/repo from the remaining path
+        repo_path = path_after_domain.split("/")
         if len(repo_path) < 2:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
