@@ -126,6 +126,12 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
             "bert-base-uncased/bert-base-uncased",
         ),
         ("https://huggingface.co/models/facebook/bart-large", "facebook/bart-large"),
+        # Models without organization prefix (no "models/" and no org/)
+        (
+            "https://huggingface.co/distilbert-base-uncased-distilled-squad",
+            "distilbert-base-uncased-distilled-squad",
+        ),
+        ("https://huggingface.co/bert-base-uncased", "bert-base-uncased"),
     ]
 
     for url, expected_repo_id in test_cases:

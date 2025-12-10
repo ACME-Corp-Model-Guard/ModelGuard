@@ -95,12 +95,20 @@ def download_from_huggingface(
         elif path_after_domain.startswith("models/"):
             path_after_domain = path_after_domain[len("models/") :]
 
-        # Parse owner/repo from the remaining path
+        # Parse repo_id from the remaining path
+        # HuggingFace repos can be:
+        #   - "organization/model" (e.g., "google/bert-base-uncased")
+        #   - "model" (e.g., "distilbert-base-uncased-distilled-squad")
         repo_path = path_after_domain.split("/")
-        if len(repo_path) < 2:
-            raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
-        repo_id = f"{repo_path[0]}/{repo_path[1]}"
+        if len(repo_path) >= 2:
+            # Standard format: organization/model
+            repo_id = f"{repo_path[0]}/{repo_path[1]}"
+        elif len(repo_path) == 1 and repo_path[0]:
+            # Single segment: just model name (no organization)
+            repo_id = repo_path[0]
+        else:
+            raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
         logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
