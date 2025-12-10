@@ -47,51 +47,34 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
     return owner, repo
 
 
-def _download_repo_tarball(
-    owner: str, repo: str, dest_dir: str, branch: str = "main"
-) -> str:
+def _download_repo_tarball(owner: str, repo: str, dest_dir: str) -> str:
     """
-    Download repository as tarball from GitHub.
+    Download repository as tarball from GitHub API.
 
-    Uses GitHub's archive API which doesn't require git binary.
+    Uses GitHub's official REST API which doesn't require git binary.
+    Automatically uses the repository's default branch.
     Returns the path to the downloaded tarball file.
     """
-    # Try main branch first, fall back to master if it fails
-    for branch_name in [branch, "main", "master"]:
-        tarball_url = (
-            f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch_name}.tar.gz"
-        )
+    tarball_url = f"https://api.github.com/repos/{owner}/{repo}/tarball"
 
-        logger.debug(
-            f"[GitHub] Attempting to download from branch '{branch_name}': {tarball_url}"
-        )
+    logger.debug(f"[GitHub] Downloading from API: {tarball_url}")
 
-        try:
-            response = requests.get(tarball_url, timeout=300, stream=True)
+    try:
+        response = requests.get(tarball_url, timeout=300, stream=True)
+        response.raise_for_status()
 
-            if response.status_code == 404:
-                # Branch doesn't exist, try next one
-                continue
-
-            response.raise_for_status()
-
-            # Download tarball directly to /tmp
-            tarball_path = os.path.join(dest_dir, f"{repo}-{branch_name}.tar.gz")
-            with open(tarball_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
+        # Download tarball directly to /tmp
+        tarball_path = os.path.join(dest_dir, f"{repo}.tar.gz")
+        with open(tarball_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
                     f.write(chunk)
 
-            logger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
-            return tarball_path
+        logger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
+        return tarball_path
 
-        except requests.RequestException as e:
-            if branch_name == "master":  # Last attempt
-                raise FileDownloadError(f"Failed to download repository: {e}")
-            continue
-
-    raise FileDownloadError(
-        f"Repository {owner}/{repo} not found or no valid branch (tried: main, master)"
-    )
+    except requests.RequestException as e:
+        raise FileDownloadError(f"Failed to download repository from API: {e}")
 
 
 # ==============================================================================

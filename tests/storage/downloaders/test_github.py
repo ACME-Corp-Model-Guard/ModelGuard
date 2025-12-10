@@ -62,7 +62,7 @@ def test_download_repo_tarball_success(monkeypatch, tmp_path):
 
     assert os.path.exists(result_path)
     assert result_path.endswith(".tar.gz")
-    assert "repo-main" in result_path
+    assert "repo.tar.gz" in result_path
 
 
 def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
@@ -71,52 +71,15 @@ def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
     class FakeResponse:
         status_code = 404
 
+        def raise_for_status(self):
+            raise requests.HTTPError("404 Client Error: Not Found")
+
     monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
 
-    with pytest.raises(FileDownloadError, match="not found"):
+    with pytest.raises(
+        FileDownloadError, match="Failed to download repository from API"
+    ):
         _download_repo_tarball("user", "nonexistent", tmp_path.as_posix())
-
-
-def test_download_repo_tarball_branch_fallback(monkeypatch, tmp_path):
-    """Test that it falls back to master branch when main doesn't exist."""
-
-    def fake_get(*args, **kwargs):
-        url = args[0] if args else kwargs.get("url", "")
-
-        # All calls with "main" in URL return 404
-        if "main" in url:
-
-            class NotFound:
-                status_code = 404
-
-            return NotFound()
-
-        # Calls with "master" succeed
-        if "master" in url:
-
-            class Success:
-                status_code = 200
-
-                def raise_for_status(self):
-                    pass
-
-                def iter_content(self, chunk_size=8192):
-                    yield b"fake tarball for master branch"
-
-            return Success()
-
-        # Shouldn't get here
-        class NotFound:
-            status_code = 404
-
-        return NotFound()
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
-    result = _download_repo_tarball("user", "repo", tmp_path.as_posix())
-    assert "repo-master" in result
-    assert result.endswith(".tar.gz")
-    assert os.path.exists(result)
 
 
 # =============================================================================
@@ -129,11 +92,9 @@ def test_download_from_github_success(monkeypatch, tmp_path):
         lambda url: ("user", "repo"),
     )
 
-    def fake_download_tarball(
-        owner: str, repo: str, dest_dir: str, branch: str = "main"
-    ):
+    def fake_download_tarball(owner: str, repo: str, dest_dir: str):
         # Create a fake tarball file
-        tar_path = os.path.join(dest_dir, f"{repo}-main.tar.gz")
+        tar_path = os.path.join(dest_dir, f"{repo}.tar.gz")
         Path(tar_path).write_text("fake tarball content")
         return tar_path
 
