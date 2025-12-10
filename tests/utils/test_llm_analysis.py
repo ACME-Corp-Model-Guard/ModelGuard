@@ -40,11 +40,9 @@ def test_ask_llm_returns_string(mock_bedrock):
     # Fake Titan Text Lite response structure
     response_json = {
         "inputTextTokenCount": 10,
-        "results": [{
-            "tokenCount": 5,
-            "outputText": "Hello world",
-            "completionReason": "FINISH"
-        }]
+        "results": [
+            {"tokenCount": 5, "outputText": "Hello world", "completionReason": "FINISH"}
+        ],
     }
 
     mock_bedrock.invoke_model.return_value = {
@@ -63,11 +61,13 @@ def test_ask_llm_returns_json_parsed(mock_bedrock):
     """
     response_json = {
         "inputTextTokenCount": 10,
-        "results": [{
-            "tokenCount": 15,
-            "outputText": '{"score": 0.95}',
-            "completionReason": "FINISH"
-        }]
+        "results": [
+            {
+                "tokenCount": 15,
+                "outputText": '{"score": 0.95}',
+                "completionReason": "FINISH",
+            }
+        ],
     }
 
     mock_bedrock.invoke_model.return_value = {
@@ -100,7 +100,9 @@ def test_ask_llm_missing_keys(mock_bedrock):
     ask_llm should handle KeyError if the Bedrock response is missing expected fields.
     """
     mock_bedrock.invoke_model.return_value = {
-        "body": MagicMock(read=lambda: json.dumps({"inputTextTokenCount": 10}).encode("utf-8"))
+        "body": MagicMock(
+            read=lambda: json.dumps({"inputTextTokenCount": 10}).encode("utf-8")
+        )
     }
 
     result = llm.ask_llm("prompt")
