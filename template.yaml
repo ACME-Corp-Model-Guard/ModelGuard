@@ -27,6 +27,7 @@ Globals:
         USER_POOL_ID: !Ref ModelGuardUserPool
         USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
         TOKENS_TABLE: !Ref TokensTable
+        FINGERPRINTS_TABLE: !Ref FingerprintsTable
     Tracing: Active
 
 Resources:
@@ -67,6 +68,28 @@ Resources:
       Tags:
         - Key: Project
           Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
+
+  FingerprintsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Request-Fingerprints
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: fingerprint
+          AttributeType: S
+      KeySchema:
+        - AttributeName: fingerprint
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl_expiry
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+        - Key: Purpose
+          Value: Replay-Attack-Prevention
       SSESpecification: # Set server-side encryption to use AWS owned key (free)
         SSEEnabled: false
 
