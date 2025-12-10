@@ -47,11 +47,11 @@ LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 # BEDROCK_MODEL_ID is optional but we provide a safe default to avoid breakage.
 BEDROCK_MODEL_ID: str = os.environ.get(
     "BEDROCK_MODEL_ID",
-    "anthropic.claude-haiku-4-5-20251001-v1:0",
+    "amazon.titan-text-lite-v1",
 )
 
 # BEDROCK_REGION defaults to AWS_REGION if not explicitly defined.
-BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
+BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", "us-east-1")
 
 
 # -----------------------------------------------------------------------------
