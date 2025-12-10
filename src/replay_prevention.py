@@ -28,17 +28,9 @@ FINGERPRINTS_TABLE = os.environ.get(
 )
 REPLAY_WINDOW_SECONDS = 60
 
-# DynamoDB client (lazy initialization to avoid import-time AWS connection)
-_fingerprints_table = None
-
-
-def _get_fingerprints_table():
-    """Get or create the DynamoDB table reference (lazy initialization)."""
-    global _fingerprints_table
-    if _fingerprints_table is None:
-        ddb = boto3.resource("dynamodb")
-        _fingerprints_table = ddb.Table(FINGERPRINTS_TABLE)
-    return _fingerprints_table
+# DynamoDB client
+ddb = boto3.resource("dynamodb")
+fingerprints_table = ddb.Table(FINGERPRINTS_TABLE)
 
 
 # ==============================================================================
@@ -168,7 +160,7 @@ def is_request_replayed(
     )
 
     try:
-        response = _get_fingerprints_table().get_item(Key={"fingerprint": fingerprint})
+        response = fingerprints_table.get_item(Key={"fingerprint": fingerprint})
 
         if "Item" in response:
             logger.warning(
@@ -223,7 +215,7 @@ def record_request_fingerprint(
     ttl_expiry = current_time + REPLAY_WINDOW_SECONDS
 
     try:
-        _get_fingerprints_table().put_item(
+        fingerprints_table.put_item(
             Item={
                 "fingerprint": fingerprint,
                 "timestamp": current_time,
