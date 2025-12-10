@@ -14,9 +14,9 @@ import hashlib
 import time
 from typing import Any, Dict, Optional
 
-import boto3
 from botocore.exceptions import ClientError
 
+from src.aws.clients import get_ddb_table
 from src.logger import logger
 from src.settings import FINGERPRINTS_TABLE
 
@@ -24,10 +24,6 @@ from src.settings import FINGERPRINTS_TABLE
 # Environment Configuration
 # ==============================================================================
 REPLAY_WINDOW_SECONDS = 60
-
-# DynamoDB client
-ddb = boto3.resource("dynamodb")
-fingerprints_table = ddb.Table(FINGERPRINTS_TABLE)
 
 
 # ==============================================================================
@@ -157,7 +153,8 @@ def is_request_replayed(
     )
 
     try:
-        response = fingerprints_table.get_item(Key={"fingerprint": fingerprint})
+        table = get_ddb_table(FINGERPRINTS_TABLE)
+        response = table.get_item(Key={"fingerprint": fingerprint})
 
         if "Item" in response:
             logger.warning(
@@ -212,7 +209,8 @@ def record_request_fingerprint(
     ttl_expiry = current_time + REPLAY_WINDOW_SECONDS
 
     try:
-        fingerprints_table.put_item(
+        table = get_ddb_table(FINGERPRINTS_TABLE)
+        table.put_item(
             Item={
                 "fingerprint": fingerprint,
                 "timestamp": current_time,

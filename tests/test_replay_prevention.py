@@ -155,8 +155,8 @@ def test_replay_detection_first_request():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    # Patch the module-level table reference
-    with patch("src.replay_prevention.fingerprints_table", table):
+    # Patch get_ddb_table to return our mocked table
+    with patch("src.aws.clients.get_ddb_table", return_value=table):
         is_replay = is_request_replayed(
             token="token1",
             http_method="POST",
@@ -170,6 +170,8 @@ def test_replay_detection_first_request():
 @mock_aws
 def test_replay_detection_immediate_retry():
     """Immediate retry should be detected as replayed."""
+
+    # Create the moto DynamoDB resource + table
     dynamodb = boto3.resource("dynamodb", region_name="us-east-2")
     table = dynamodb.create_table(
         TableName=os.environ["FINGERPRINTS_TABLE"],
@@ -178,8 +180,14 @@ def test_replay_detection_immediate_retry():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention.fingerprints_table", table):
-        # First request
+    # Reset cached DDB resource inside clients.py
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         record_request_fingerprint(
             token="token1",
             http_method="POST",
@@ -187,7 +195,6 @@ def test_replay_detection_immediate_retry():
             request_body='{"url":"example.com"}',
         )
 
-        # Immediate replay
         is_replay = is_request_replayed(
             token="token1",
             http_method="POST",
@@ -209,7 +216,14 @@ def test_replay_detection_different_token():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention.fingerprints_table", table):
+    # Reset cached DynamoDB so replay_prevention binds to Moto
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         # First request with token1
         record_request_fingerprint(
             token="token1",
@@ -218,7 +232,7 @@ def test_replay_detection_different_token():
             request_body='{"url":"example.com"}',
         )
 
-        # Request with token2 (same path/body)
+        # Different token should *not* be replay
         is_replay = is_request_replayed(
             token="token2",
             http_method="POST",
@@ -226,7 +240,7 @@ def test_replay_detection_different_token():
             request_body='{"url":"example.com"}',
         )
 
-    assert is_replay is False  # Different token = different fingerprint
+    assert is_replay is False
 
 
 @mock_aws
@@ -240,8 +254,14 @@ def test_replay_detection_different_path():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention.fingerprints_table", table):
-        # Request to /artifact/model
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
+        # Request A
         record_request_fingerprint(
             token="token1",
             http_method="GET",
@@ -249,7 +269,7 @@ def test_replay_detection_different_path():
             request_body="",
         )
 
-        # Request to /artifact/dataset (same token, different path)
+        # Different path should not be replay
         is_replay = is_request_replayed(
             token="token1",
             http_method="GET",
@@ -271,7 +291,13 @@ def test_replay_detection_different_method():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention.fingerprints_table", table):
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         # POST request
         record_request_fingerprint(
             token="token1",
@@ -280,7 +306,7 @@ def test_replay_detection_different_method():
             request_body='{"url":"example.com"}',
         )
 
-        # GET request (same token, path, and body)
+        # GET should *not* be replay
         is_replay = is_request_replayed(
             token="token1",
             http_method="GET",
@@ -288,7 +314,7 @@ def test_replay_detection_different_method():
             request_body='{"url":"example.com"}',
         )
 
-    assert is_replay is False  # Different method = different fingerprint
+    assert is_replay is False
 
 
 # =============================================================================
@@ -299,6 +325,7 @@ def test_replay_detection_different_method():
 @mock_aws
 def test_fingerprint_recording_sets_ttl():
     """Recording should set TTL for automatic cleanup."""
+
     dynamodb = boto3.resource("dynamodb", region_name="us-east-2")
     table = dynamodb.create_table(
         TableName=os.environ["FINGERPRINTS_TABLE"],
@@ -307,7 +334,14 @@ def test_fingerprint_recording_sets_ttl():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention.fingerprints_table", table):
+    # Reset cached resource
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         record_request_fingerprint(
             token="token1",
             http_method="POST",
@@ -315,19 +349,18 @@ def test_fingerprint_recording_sets_ttl():
             request_body='{"url":"example.com"}',
         )
 
-    # Verify TTL was set (roughly 60 seconds in future)
-    current_time = int(time.time())
     items = table.scan()["Items"]
-
     assert len(items) == 1
-    assert "ttl_expiry" in items[0]
-    assert items[0]["ttl_expiry"] >= current_time + 59
-    assert items[0]["ttl_expiry"] <= current_time + 61
+
+    ttl = items[0]["ttl_expiry"]
+    now = int(time.time())
+    assert now + 59 <= ttl <= now + 61
 
 
 @mock_aws
 def test_fingerprint_recording_preserves_metadata():
     """Recording should preserve token, method, path for audit."""
+
     dynamodb = boto3.resource("dynamodb", region_name="us-east-2")
     table = dynamodb.create_table(
         TableName=os.environ["FINGERPRINTS_TABLE"],
@@ -336,8 +369,16 @@ def test_fingerprint_recording_preserves_metadata():
         BillingMode="PAY_PER_REQUEST",
     )
 
+    # Reset cached resource
+    from src.aws import clients
+    clients._dynamodb_resource = None
+
     token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-    with patch("src.replay_prevention.fingerprints_table", table):
+
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         record_request_fingerprint(
             token=token,
             http_method="PUT",
@@ -347,6 +388,8 @@ def test_fingerprint_recording_preserves_metadata():
 
     items = table.scan()["Items"]
     assert len(items) == 1
-    assert items[0]["token_partial"] == token[:16]
-    assert items[0]["method"] == "PUT"
-    assert items[0]["path"] == "/artifacts/model/abc123"
+
+    item = items[0]
+    assert item["token_partial"] == token[:16]
+    assert item["method"] == "PUT"
+    assert item["path"] == "/artifacts/model/abc123"
