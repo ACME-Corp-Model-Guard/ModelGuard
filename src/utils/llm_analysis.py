@@ -57,7 +57,6 @@ def ask_llm(
 
         request_body = {
             "inputText": prompt,
-            "inputText": prompt,
             "textGenerationConfig": {
                 "maxTokenCount": max_tokens,
                 "temperature": temperature,
