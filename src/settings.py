@@ -51,7 +51,7 @@ BEDROCK_MODEL_ID: str = os.environ.get(
 )
 
 # BEDROCK_REGION defaults to AWS_REGION if not explicitly defined.
-BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", AWS_REGION)
+BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", "us-east-1")
 
 
 # -----------------------------------------------------------------------------

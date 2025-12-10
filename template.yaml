@@ -23,7 +23,7 @@ Globals:
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
         BEDROCK_MODEL_ID: amazon.titan-text-lite-v1
-        BEDROCK_REGION: !Ref DeploymentRegion
+        BEDROCK_REGION: us-east-1
         USER_POOL_ID: !Ref ModelGuardUserPool
         USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
         TOKENS_TABLE: !Ref TokensTable
