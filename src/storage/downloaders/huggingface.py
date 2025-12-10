@@ -91,9 +91,9 @@ def download_from_huggingface(
         # Remove 'datasets/' or 'models/' prefix if present
         # This ensures consistent parsing regardless of URL format
         if path_after_domain.startswith("datasets/"):
-            path_after_domain = path_after_domain[len("datasets/"):]
+            path_after_domain = path_after_domain[len("datasets/") :]
         elif path_after_domain.startswith("models/"):
-            path_after_domain = path_after_domain[len("models/"):]
+            path_after_domain = path_after_domain[len("models/") :]
 
         # Parse owner/repo from the remaining path
         repo_path = path_after_domain.split("/")
