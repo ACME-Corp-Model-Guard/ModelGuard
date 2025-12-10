@@ -1,5 +1,10 @@
 """
 HuggingFace artifact download utilities.
+
+This module downloads a HuggingFace model or dataset snapshot, bundles it
+into a local .tar.gz archive, and returns the path to that temporary file.
+
+It is used during artifact ingestion before uploading artifacts to S3.
 """
 
 from __future__ import annotations
