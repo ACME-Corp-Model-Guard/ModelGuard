@@ -1,5 +1,4 @@
 import os
-import subprocess
 import tarfile
 from pathlib import Path
 
@@ -9,7 +8,7 @@ import requests
 from src.storage.downloaders.github import (
     FileDownloadError,
     _cleanup_temp_dir,
-    _clone_repo,
+    _download_repo_zip,
     _make_tarball,
     _parse_github_url,
     download_from_github,
@@ -38,31 +37,107 @@ def test_parse_github_url_invalid_format():
 
 
 # =============================================================================
-# _clone_repo
+# _download_repo_zip
 # =============================================================================
-def test_clone_repo_success(monkeypatch, tmp_path):
-    """Simulate successful git clone by mocking subprocess.run()."""
+def test_download_repo_zip_success(monkeypatch, tmp_path):
+    """Test successful repo download via GitHub REST API."""
+    import zipfile
+    import io
 
-    class FakeCompleted:
-        returncode = 0
-        stderr = ""
+    # Create a fake zip file in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        zip_file.writestr("repo-main/README.md", "# Test Repo")
+        zip_file.writestr("repo-main/src/code.py", "print('hello')")
+    zip_buffer.seek(0)
 
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompleted())
+    class FakeResponse:
+        status_code = 200
 
-    _clone_repo("https://github.com/user/repo.git", tmp_path.as_posix())
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, chunk_size=8192):
+            while True:
+                chunk = zip_buffer.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
+
+    result_path = _download_repo_zip("user", "repo", tmp_path.as_posix())
+
+    assert os.path.exists(result_path)
+    assert "repo-main" in result_path
+    assert os.path.exists(os.path.join(result_path, "README.md"))
 
 
-def test_clone_repo_failure(monkeypatch, tmp_path):
-    """Simulate failing git clone."""
+def test_download_repo_zip_not_found(monkeypatch, tmp_path):
+    """Test handling of 404 (repository not found)."""
 
-    class FakeCompleted:
-        returncode = 1
-        stderr = "fatal: repository not found"
+    class FakeResponse:
+        status_code = 404
 
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompleted())
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
 
-    with pytest.raises(FileDownloadError):
-        _clone_repo("https://github.com/bad/repo.git", tmp_path.as_posix())
+    with pytest.raises(FileDownloadError, match="not found"):
+        _download_repo_zip("user", "nonexistent", tmp_path.as_posix())
+
+
+def test_download_repo_zip_branch_fallback(monkeypatch, tmp_path):
+    """Test that it falls back to master branch when main doesn't exist."""
+    import zipfile
+    import io
+
+    call_count = {"count": 0}
+
+    def fake_get(*args, **kwargs):
+        call_count["count"] += 1
+        url = args[0] if args else kwargs.get("url", "")
+
+        # All calls with "main" in URL return 404
+        if "main" in url:
+
+            class NotFound:
+                status_code = 404
+
+            return NotFound()
+
+        # Calls with "master" succeed
+        if "master" in url:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                zip_file.writestr("repo-master/README.md", "# Test")
+            zip_buffer.seek(0)
+
+            class Success:
+                status_code = 200
+
+                def raise_for_status(self):
+                    pass
+
+                def iter_content(self, chunk_size=8192):
+                    while True:
+                        chunk = zip_buffer.read(chunk_size)
+                        if not chunk:
+                            break
+                        yield chunk
+
+            return Success()
+
+        # Shouldn't get here
+        class NotFound:
+            status_code = 404
+
+        return NotFound()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    result = _download_repo_zip("user", "repo", tmp_path.as_posix())
+    assert "repo-master" in result
+    assert os.path.exists(result)
+    assert call_count["count"] >= 2  # Should have tried main (1-2 times), then master
 
 
 # =============================================================================
@@ -114,11 +189,16 @@ def test_download_from_github_success(monkeypatch, tmp_path):
         lambda url: ("user", "repo"),
     )
 
-    def fake_clone(clone_url: str, dest: str):
-        os.makedirs(dest, exist_ok=True)
-        Path(dest, "a.txt").write_text("abc")
+    def fake_download_zip(owner: str, repo: str, dest_dir: str, branch: str = "main"):
+        # Create a fake extracted directory
+        extracted_dir = os.path.join(dest_dir, f"{repo}-main")
+        os.makedirs(extracted_dir, exist_ok=True)
+        Path(extracted_dir, "a.txt").write_text("abc")
+        return extracted_dir
 
-    monkeypatch.setattr("src.storage.downloaders.github._clone_repo", fake_clone)
+    monkeypatch.setattr(
+        "src.storage.downloaders.github._download_repo_zip", fake_download_zip
+    )
 
     def fake_make_tar(repo_path: str, repo_name: str):
         tar_path = tmp_path / "fake.tar.gz"
@@ -160,23 +240,6 @@ def test_download_from_github_parse_failure(monkeypatch):
     with pytest.raises(FileDownloadError):
         download_from_github(
             source_url="https://github.com/user",
-            artifact_id="123",
-            artifact_type="code",
-        )
-
-
-def test_download_from_github_clone_timeout(monkeypatch):
-    def fake_clone(*a, **k):
-        raise subprocess.TimeoutExpired(cmd="git", timeout=300)
-
-    monkeypatch.setattr(
-        "src.storage.downloaders.github._clone_repo",
-        fake_clone,
-    )
-
-    with pytest.raises(FileDownloadError):
-        download_from_github(
-            source_url="https://github.com/user/repo",
             artifact_id="123",
             artifact_type="code",
         )

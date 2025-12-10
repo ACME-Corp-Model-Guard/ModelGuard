@@ -10,8 +10,8 @@ Used during artifact ingestion before uploading artifacts to S3.
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
+import zipfile
 from typing import Any, Dict, Optional, Tuple
 
 import requests
@@ -43,28 +43,82 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
     return owner, repo
 
 
-def _clone_repo(clone_url: str, dest: str) -> None:
-    """Clone the repository into dest."""
-    result = subprocess.run(
-        ["git", "clone", "--depth", "1", clone_url, dest],
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
+def _download_repo_zip(
+    owner: str, repo: str, dest_dir: str, branch: str = "main"
+) -> str:
+    """
+    Download repository as zip archive from GitHub and extract it.
 
-    if result.returncode != 0:
-        stderr = result.stderr.strip() or "Unknown Git error"
-        raise FileDownloadError(f"Git clone failed: {stderr}")
+    Uses GitHub's archive API which doesn't require git binary.
+    Returns the path to the extracted repository directory.
+    """
+    # Try main branch first, fall back to master if it fails
+    for branch_name in [branch, "main", "master"]:
+        zip_url = (
+            f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch_name}.zip"
+        )
+
+        logger.debug(
+            f"[GitHub] Attempting to download from branch '{branch_name}': {zip_url}"
+        )
+
+        try:
+            response = requests.get(zip_url, timeout=300, stream=True)
+
+            if response.status_code == 404:
+                # Branch doesn't exist, try next one
+                continue
+
+            response.raise_for_status()
+
+            # Download zip to temp file
+            zip_path = os.path.join(dest_dir, f"{repo}.zip")
+            with open(zip_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            # Extract zip
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(dest_dir)
+
+            # Remove zip file
+            os.unlink(zip_path)
+
+            # GitHub creates a directory named {repo}-{branch}
+            extracted_dir = os.path.join(dest_dir, f"{repo}-{branch_name}")
+
+            if not os.path.exists(extracted_dir):
+                raise FileDownloadError(
+                    f"Expected directory {extracted_dir} not found after extraction"
+                )
+
+            logger.debug(
+                f"[GitHub] Successfully downloaded and extracted to {extracted_dir}"
+            )
+            return extracted_dir
+
+        except requests.RequestException as e:
+            if branch_name == "master":  # Last attempt
+                raise FileDownloadError(f"Failed to download repository: {e}")
+            continue
+
+    raise FileDownloadError(
+        f"Repository {owner}/{repo} not found or no valid branch (tried: main, master)"
+    )
 
 
 def _make_tarball(repo_path: str, repo_name: str) -> str:
-    """Create a tar.gz archive from a cloned repo."""
+    """Create a tar.gz archive from a downloaded repo."""
     import tarfile
 
-    tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+    # Use /tmp for Lambda environment compatibility
+    tar_path = tempfile.NamedTemporaryFile(
+        delete=False, suffix=".tar.gz", dir="/tmp"
+    ).name
 
     with tarfile.open(tar_path, "w:gz") as tar:
         for root, dirs, files in os.walk(repo_path):
+            # Skip .git directory if it exists (shouldn't with zip download)
             if ".git" in dirs:
                 dirs.remove(".git")
             for file in files:
@@ -99,7 +153,9 @@ def download_from_github(
     """
     High-level function that downloads a GitHub repo as a tar.gz archive.
 
-    Orchestrates all steps using the helper functions above.
+    Downloads the repository as a zip archive using GitHub's REST API,
+    then repackages it as a tar.gz file. This approach doesn't require
+    the git binary, making it suitable for Lambda environments.
     """
     logger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
 
@@ -111,24 +167,19 @@ def download_from_github(
     try:
         # Step 1 — Parse repo identifier
         owner, repo = _parse_github_url(source_url)
-        clone_url = f"https://github.com/{owner}/{repo}.git"
 
-        # Step 2 — Clone to temp dir
-        temp_dir = tempfile.mkdtemp(prefix=f"gh_{artifact_id}_")
-        clone_path = os.path.join(temp_dir, repo)
+        # Step 2 — Download zip archive to temp dir (use /tmp for Lambda)
+        temp_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"gh_{artifact_id}_")
 
-        logger.debug(f"[GitHub] Cloning {clone_url} → {clone_path}")
-        _clone_repo(clone_url, clone_path)
+        logger.debug(f"[GitHub] Downloading {owner}/{repo} as zip archive")
+        extracted_path = _download_repo_zip(owner, repo, temp_dir)
 
         # Step 3 — Package into tar.gz
         logger.debug(f"[GitHub] Creating tar archive for {artifact_id}")
-        tar_path = _make_tarball(clone_path, repo)
+        tar_path = _make_tarball(extracted_path, repo)
 
         logger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
         return tar_path
-
-    except subprocess.TimeoutExpired:
-        raise FileDownloadError("GitHub clone operation timed out after 300 seconds")
 
     except Exception as e:
         logger.error(f"[GitHub] Download failed: {e}")
