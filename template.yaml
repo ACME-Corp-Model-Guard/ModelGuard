@@ -15,7 +15,9 @@ Globals:
   Function:
     Runtime: python3.12
     Timeout: 15
-    MemorySize: 512  # MB of RAM (also sets /tmp to 512MB)
+    MemorySize: 512  # MB of RAM
+    EphemeralStorage:
+      Size: 10240  # 10GB /tmp storage (max allowed, up from 512MB default)
     Environment:
       Variables:
         LOG_LEVEL: INFO  # Change to DEBUG for verbose logging

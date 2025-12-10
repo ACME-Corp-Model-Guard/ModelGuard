@@ -12,11 +12,43 @@ This module centralizes ALL DynamoDB interactions:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional
 
 from botocore.exceptions import ClientError
 from src.aws.clients import get_ddb_table
 from src.logger import logger
+
+
+# =============================================================================
+# DynamoDB Type Conversion
+# =============================================================================
+def _convert_floats_to_decimal(obj: Any) -> Any:
+    """
+    Recursively convert all float values to Decimal for DynamoDB compatibility.
+
+    DynamoDB doesn't support Python float type - it requires Decimal for numbers.
+    This function walks through nested dictionaries and lists, converting all
+    floats to Decimal while preserving other types.
+
+    Args:
+        obj: Object to convert (can be dict, list, float, or any other type)
+
+    Returns:
+        Converted object with all floats replaced by Decimals
+    """
+    if isinstance(obj, float):
+        # Handle special float values
+        if obj != obj:  # NaN check
+            return None
+        if obj == float("inf") or obj == float("-inf"):
+            return None
+        return Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: _convert_floats_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_floats_to_decimal(item) for item in obj]
+    return obj
 
 
 # =============================================================================
@@ -74,9 +106,13 @@ def search_table_by_fields(
 def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
     """
     Save a generic item to a DynamoDB table.
+
+    Automatically converts all float values to Decimal for DynamoDB compatibility.
     """
     table = get_ddb_table(table_name)
     try:
+        # Convert floats to Decimal before saving
+        item = _convert_floats_to_decimal(item)
         table.put_item(Item=item)
         logger.info(f"[DDB] Saved item to {table_name}")
     except ClientError as e:
