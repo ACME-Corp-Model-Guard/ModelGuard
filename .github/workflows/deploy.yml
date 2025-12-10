@@ -23,12 +23,13 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------
-      # 2. Setup Python for SAM
+      # 2. Setup Python for SAM with caching
       # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       # -----------------------------
       # 3. Configure AWS credentials
@@ -55,12 +56,13 @@ jobs:
       - name: Build SAM application
         run: |
           set -euo pipefail
-          sam build --cached
+          # Use parallel builds and skip unchanged resources
+          sam build --cached --parallel
 
       - name: Deploy SAM application
         run: |
           set -euo pipefail
-          sam deploy --no-confirm-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides DeploymentRegion=${{ env.AWS_REGION }}
 
       # -----------------------------
       # 6. Extract stack outputs
