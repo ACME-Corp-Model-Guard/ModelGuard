@@ -156,7 +156,7 @@ def test_replay_detection_first_request():
     )
 
     # Patch the module-level table reference
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         is_replay = is_request_replayed(
             token="token1",
             http_method="POST",
@@ -178,7 +178,7 @@ def test_replay_detection_immediate_retry():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         # First request
         record_request_fingerprint(
             token="token1",
@@ -209,7 +209,7 @@ def test_replay_detection_different_token():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         # First request with token1
         record_request_fingerprint(
             token="token1",
@@ -240,7 +240,7 @@ def test_replay_detection_different_path():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         # Request to /artifact/model
         record_request_fingerprint(
             token="token1",
@@ -271,7 +271,7 @@ def test_replay_detection_different_method():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         # POST request
         record_request_fingerprint(
             token="token1",
@@ -307,7 +307,7 @@ def test_fingerprint_recording_sets_ttl():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         record_request_fingerprint(
             token="token1",
             http_method="POST",
@@ -337,7 +337,7 @@ def test_fingerprint_recording_preserves_metadata():
     )
 
     token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-    with patch("src.replay_prevention._fingerprints_table", table):
+    with patch("src.replay_prevention.fingerprints_table", table):
         record_request_fingerprint(
             token=token,
             http_method="PUT",

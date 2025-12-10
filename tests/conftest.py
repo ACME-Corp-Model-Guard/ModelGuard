@@ -2,7 +2,6 @@ import os
 
 
 def pytest_configure():
-    os.environ["AWS_DEFAULT_REGION"] = "us-east-2"
     os.environ.setdefault("AWS_REGION", "us-east-2")
     os.environ.setdefault("ARTIFACTS_TABLE", "ArtifactsTestTable")
     os.environ.setdefault("TOKENS_TABLE", "TokensTestTable")
