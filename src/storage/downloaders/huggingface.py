@@ -87,7 +87,7 @@ def download_from_huggingface(
             )
 
         # Create tar.gz archive
-        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz", dir="/tmp").name
 
         with tarfile.open(tar_path, "w:gz") as tar:
             for root, _, files in os.walk(download_dir):
