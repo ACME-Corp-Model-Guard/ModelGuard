@@ -24,6 +24,7 @@ frontend/node_modules
 
 # LLM-related Files
 CLAUDE.md
+.claude
 
 # OpenAPI Specification
 ece461_fall_2025_openapi_spec.yaml
