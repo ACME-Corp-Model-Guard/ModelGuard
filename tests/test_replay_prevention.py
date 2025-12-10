@@ -182,6 +182,7 @@ def test_replay_detection_immediate_retry():
 
     # Reset cached DDB resource inside clients.py
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     with (
@@ -218,6 +219,7 @@ def test_replay_detection_different_token():
 
     # Reset cached DynamoDB so replay_prevention binds to Moto
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     with (
@@ -255,6 +257,7 @@ def test_replay_detection_different_path():
     )
 
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     with (
@@ -292,6 +295,7 @@ def test_replay_detection_different_method():
     )
 
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     with (
@@ -336,6 +340,7 @@ def test_fingerprint_recording_sets_ttl():
 
     # Reset cached resource
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     with (
@@ -371,6 +376,7 @@ def test_fingerprint_recording_preserves_metadata():
 
     # Reset cached resource
     from src.aws import clients
+
     clients._dynamodb_resource = None
 
     token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
