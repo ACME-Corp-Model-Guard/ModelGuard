@@ -74,7 +74,7 @@ def ask_llm(
         raw_text = raw_bytes.decode("utf-8")
 
         parsed = json.loads(raw_text)
-        content = parsed["content"][0]["text"]
+        content = parsed["results"][0]["outputText"]
 
         if return_json:
             try:
