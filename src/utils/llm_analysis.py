@@ -46,6 +46,7 @@ def ask_llm(
     prompt: str,
     max_tokens: int = 200,
     return_json: bool = False,
+    temperature: float = 0.2,
 ) -> Optional[Union[str, Dict[str, Any]]]:
     """Invoke a Bedrock LLM and return text or parsed JSON."""
 
@@ -55,9 +56,11 @@ def ask_llm(
         client: BedrockRuntimeClient = get_bedrock_runtime(region=BEDROCK_REGION)
 
         request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
+            "inputText": prompt,
+            "textGenerationConfig": {
+                "maxTokenCount": max_tokens,
+                "temperature": temperature,
+            },
         }
 
         logger.debug(f"[llm] Invoking Bedrock model '{model_id}'")
