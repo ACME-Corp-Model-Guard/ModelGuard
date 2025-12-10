@@ -50,10 +50,3 @@ jobs:
       - name: Run tests with pytest
         run: |
           AWS_DEFAULT_REGION=us-east-2 pytest tests/
-
-      # --- Upload coverage report ---
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
