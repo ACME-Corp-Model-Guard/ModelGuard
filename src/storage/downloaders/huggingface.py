@@ -68,20 +68,35 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
+        # Configure HuggingFace to use /tmp for all caching and logging
+        # This prevents "Read-only file system" errors in Lambda environment
+        os.environ["HF_HOME"] = "/tmp/.cache/huggingface"
+
         # ------------------------------------------------------------
         # Parse HuggingFace repo ID from URL
         # ------------------------------------------------------------
         # URL examples:
         #   https://huggingface.co/owner/model
-        #   https://huggingface.co/owner/dataset
+        #   https://huggingface.co/datasets/owner/dataset
         #
-        # We want: "owner/model"
+        # We want: "owner/model" or "owner/dataset" (without the datasets/ prefix)
         # ------------------------------------------------------------
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
 
-        repo_path = parts[1].split("/")
+        # Get the path after the domain
+        path_after_domain = parts[1]
+
+        # Remove 'datasets/' or 'models/' prefix if present
+        # This ensures consistent parsing regardless of URL format
+        if path_after_domain.startswith("datasets/"):
+            path_after_domain = path_after_domain[len("datasets/") :]
+        elif path_after_domain.startswith("models/"):
+            path_after_domain = path_after_domain[len("models/") :]
+
+        # Parse owner/repo from the remaining path
+        repo_path = path_after_domain.split("/")
         if len(repo_path) < 2:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
@@ -89,8 +104,8 @@ def download_from_huggingface(
 
         logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
-        # Download HF snapshot into temporary directory
-        cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
+        # Download HF snapshot into temporary directory (explicitly use /tmp for Lambda)
+        cache_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"hf_{artifact_id}_")
 
         snapshot_path = snapshot_download(
             repo_id=repo_id,
@@ -99,10 +114,12 @@ def download_from_huggingface(
             local_dir=cache_dir,
         )
 
-        # Package into tar archive
+        # Package into tar archive (explicitly use /tmp for Lambda)
         import tarfile
 
-        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+        tar_path = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".tar.gz", dir="/tmp"
+        ).name
 
         logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
 

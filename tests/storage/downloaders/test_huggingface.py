@@ -38,6 +38,109 @@ def test_hf_invalid_url_format():
         )
 
 
+def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
+    """
+    Test that dataset URLs with 'datasets/' prefix are parsed correctly.
+    This verifies the fix for the dataset URL parsing bug where URLs like
+    https://huggingface.co/datasets/bookcorpus/bookcorpus were incorrectly
+    parsed as repo_id='datasets/bookcorpus' instead of 'bookcorpus/bookcorpus'.
+    """
+    captured_repo_id = None
+
+    def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
+        nonlocal captured_repo_id
+        captured_repo_id = repo_id
+        snapshot_path = os.path.join(cache_dir, "snapshot")
+        os.makedirs(snapshot_path, exist_ok=True)
+        Path(snapshot_path, "config.json").write_text("{}")
+        return snapshot_path
+
+    class FakeErrors:
+        class RepositoryNotFoundError(Exception):
+            pass
+
+        class RevisionNotFoundError(Exception):
+            pass
+
+    # Mock huggingface_hub
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        type(
+            "FakeHFHub",
+            (),
+            {"snapshot_download": fake_snapshot_download, "errors": FakeErrors},
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "huggingface_hub.errors", FakeErrors)
+
+    # Mock tempfile
+    def fake_mkdtemp(prefix="", dir=None):
+        path = tmp_path / "hf_tmp"
+        path.mkdir(exist_ok=True)
+        return path.as_posix()
+
+    monkeypatch.setattr(tempfile, "mkdtemp", fake_mkdtemp)
+
+    def fake_namedtempfile(**kwargs):
+        file_path = tmp_path / "artifact.tar.gz"
+        file_path.write_text("FAKE TAR")
+        return type("Tmp", (), {"name": file_path.as_posix()})()
+
+    monkeypatch.setattr(
+        tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile()
+    )
+
+    # Mock tarfile
+    class FakeTar:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def add(self, *a, **k):
+            pass
+
+    monkeypatch.setattr(tarfile, "open", lambda *a, **k: FakeTar())
+
+    # Test various URL formats
+    test_cases = [
+        # (input_url, expected_repo_id)
+        (
+            "https://huggingface.co/datasets/bookcorpus/bookcorpus",
+            "bookcorpus/bookcorpus",
+        ),
+        ("https://huggingface.co/datasets/rajpurkar/squad", "rajpurkar/squad"),
+        ("https://huggingface.co/datasets/lerobot/pusht", "lerobot/pusht"),
+        ("https://huggingface.co/datasets/ILSVRC/imagenet-1k", "ILSVRC/imagenet-1k"),
+        (
+            "https://huggingface.co/datasets/HuggingFaceM4/FairFace",
+            "HuggingFaceM4/FairFace",
+        ),
+        (
+            "https://huggingface.co/bert-base-uncased/bert-base-uncased",
+            "bert-base-uncased/bert-base-uncased",
+        ),
+        ("https://huggingface.co/models/facebook/bart-large", "facebook/bart-large"),
+    ]
+
+    for url, expected_repo_id in test_cases:
+        captured_repo_id = None
+        artifact_type = "dataset" if "/datasets/" in url else "model"
+
+        download_from_huggingface(
+            source_url=url, artifact_id="test123", artifact_type=artifact_type
+        )
+
+        assert (
+            captured_repo_id == expected_repo_id
+        ), f"URL {url} parsed to {captured_repo_id}, expected {expected_repo_id}"
+
+
 def test_download_from_huggingface_success(monkeypatch, tmp_path):
     """
     Full pipeline:
@@ -100,7 +203,7 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     # ------------------------------------------------------------------
     # Mock tempfile so we control created paths
     # ------------------------------------------------------------------
-    def fake_mkdtemp(prefix=""):
+    def fake_mkdtemp(prefix="", dir=None):
         path = tmp_path / "hf_tmp"
         path.mkdir(exist_ok=True)
         return path.as_posix()

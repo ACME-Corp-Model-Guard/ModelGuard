@@ -1,6 +1,4 @@
 import os
-import subprocess
-import tarfile
 from pathlib import Path
 
 import pytest
@@ -8,9 +6,7 @@ import requests
 
 from src.storage.downloaders.github import (
     FileDownloadError,
-    _cleanup_temp_dir,
-    _clone_repo,
-    _make_tarball,
+    _download_repo_tarball,
     _parse_github_url,
     download_from_github,
     fetch_github_code_metadata,
@@ -37,71 +33,53 @@ def test_parse_github_url_invalid_format():
         _parse_github_url("https://example.com/user/project")
 
 
-# =============================================================================
-# _clone_repo
-# =============================================================================
-def test_clone_repo_success(monkeypatch, tmp_path):
-    """Simulate successful git clone by mocking subprocess.run()."""
-
-    class FakeCompleted:
-        returncode = 0
-        stderr = ""
-
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompleted())
-
-    _clone_repo("https://github.com/user/repo.git", tmp_path.as_posix())
-
-
-def test_clone_repo_failure(monkeypatch, tmp_path):
-    """Simulate failing git clone."""
-
-    class FakeCompleted:
-        returncode = 1
-        stderr = "fatal: repository not found"
-
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompleted())
-
-    with pytest.raises(FileDownloadError):
-        _clone_repo("https://github.com/bad/repo.git", tmp_path.as_posix())
+def test_parse_github_url_strips_git_suffix():
+    """Test that .git suffix is properly stripped from repository names."""
+    owner, repo = _parse_github_url("https://github.com/user/project.git")
+    assert owner == "user"
+    assert repo == "project"  # .git should be stripped
 
 
 # =============================================================================
-# _make_tarball
+# _download_repo_tarball
 # =============================================================================
-def test_make_tarball(tmp_path):
-    repo_path = tmp_path / "repo"
-    repo_path.mkdir()
+def test_download_repo_tarball_success(monkeypatch, tmp_path):
+    """Test successful repo download via GitHub REST API."""
 
-    # Create some fake files
-    (repo_path / "file1.txt").write_text("hello")
-    subdir = repo_path / "sub"
-    subdir.mkdir()
-    (subdir / "file2.txt").write_text("world")
+    class FakeResponse:
+        status_code = 200
 
-    tar_path = _make_tarball(repo_path.as_posix(), "repo")
+        def raise_for_status(self):
+            pass
 
-    assert os.path.exists(tar_path)
+        def iter_content(self, chunk_size=8192):
+            # Fake tarball content
+            yield b"fake tarball data"
 
-    with tarfile.open(tar_path, "r:gz") as tar:
-        names = tar.getnames()
-        assert "repo/file1.txt" in names
-        assert "repo/sub/file2.txt" in names
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
 
+    result_path = _download_repo_tarball("user", "repo", tmp_path.as_posix())
 
-# =============================================================================
-# _cleanup_temp_dir
-# =============================================================================
-def test_cleanup_temp_dir_existing(tmp_path):
-    temp = tmp_path / "tempdir"
-    temp.mkdir()
-    assert temp.exists()
-
-    _cleanup_temp_dir(temp.as_posix())
-    assert not temp.exists()
+    assert os.path.exists(result_path)
+    assert result_path.endswith(".tar.gz")
+    assert "repo.tar.gz" in result_path
 
 
-def test_cleanup_temp_dir_nonexistent():
-    _cleanup_temp_dir("/path/that/does/not/exist")
+def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
+    """Test handling of 404 (repository not found)."""
+
+    class FakeResponse:
+        status_code = 404
+
+        def raise_for_status(self):
+            raise requests.HTTPError("404 Client Error: Not Found")
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
+
+    with pytest.raises(
+        FileDownloadError, match="Failed to download repository from API"
+    ):
+        _download_repo_tarball("user", "nonexistent", tmp_path.as_posix())
 
 
 # =============================================================================
@@ -114,22 +92,14 @@ def test_download_from_github_success(monkeypatch, tmp_path):
         lambda url: ("user", "repo"),
     )
 
-    def fake_clone(clone_url: str, dest: str):
-        os.makedirs(dest, exist_ok=True)
-        Path(dest, "a.txt").write_text("abc")
-
-    monkeypatch.setattr("src.storage.downloaders.github._clone_repo", fake_clone)
-
-    def fake_make_tar(repo_path: str, repo_name: str):
-        tar_path = tmp_path / "fake.tar.gz"
-        tar_path.write_text("TAR")
-        return tar_path.as_posix()
-
-    monkeypatch.setattr("src.storage.downloaders.github._make_tarball", fake_make_tar)
+    def fake_download_tarball(owner: str, repo: str, dest_dir: str):
+        # Create a fake tarball file
+        tar_path = os.path.join(dest_dir, f"{repo}.tar.gz")
+        Path(tar_path).write_text("fake tarball content")
+        return tar_path
 
     monkeypatch.setattr(
-        "src.storage.downloaders.github._cleanup_temp_dir",
-        lambda d: None,
+        "src.storage.downloaders.github._download_repo_tarball", fake_download_tarball
     )
 
     result = download_from_github(
@@ -160,23 +130,6 @@ def test_download_from_github_parse_failure(monkeypatch):
     with pytest.raises(FileDownloadError):
         download_from_github(
             source_url="https://github.com/user",
-            artifact_id="123",
-            artifact_type="code",
-        )
-
-
-def test_download_from_github_clone_timeout(monkeypatch):
-    def fake_clone(*a, **k):
-        raise subprocess.TimeoutExpired(cmd="git", timeout=300)
-
-    monkeypatch.setattr(
-        "src.storage.downloaders.github._clone_repo",
-        fake_clone,
-    )
-
-    with pytest.raises(FileDownloadError):
-        download_from_github(
-            source_url="https://github.com/user/repo",
             artifact_id="123",
             artifact_type="code",
         )
