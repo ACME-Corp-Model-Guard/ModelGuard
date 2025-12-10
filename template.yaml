@@ -28,6 +28,7 @@ Globals:
         USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
         TOKENS_TABLE: !Ref TokensTable
         FINGERPRINTS_TABLE: !Ref FingerprintsTable
+        HF_HOME: /tmp/.cache/huggingface  # Configure HuggingFace to use /tmp (Lambda writable)
     Tracing: Active
 
 Resources:

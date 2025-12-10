@@ -68,6 +68,10 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
+        # Configure HuggingFace to use /tmp for all caching and logging
+        # This prevents "Read-only file system" errors in Lambda environment
+        os.environ["HF_HOME"] = "/tmp/.cache/huggingface"
+
         # ------------------------------------------------------------
         # Parse HuggingFace repo ID from URL
         # ------------------------------------------------------------
@@ -89,8 +93,8 @@ def download_from_huggingface(
 
         logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
-        # Download HF snapshot into temporary directory
-        cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
+        # Download HF snapshot into temporary directory (explicitly use /tmp for Lambda)
+        cache_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"hf_{artifact_id}_")
 
         snapshot_path = snapshot_download(
             repo_id=repo_id,
@@ -99,10 +103,12 @@ def download_from_huggingface(
             local_dir=cache_dir,
         )
 
-        # Package into tar archive
+        # Package into tar archive (explicitly use /tmp for Lambda)
         import tarfile
 
-        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+        tar_path = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".tar.gz", dir="/tmp"
+        ).name
 
         logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
 

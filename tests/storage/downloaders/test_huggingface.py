@@ -100,7 +100,7 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
     # ------------------------------------------------------------------
     # Mock tempfile so we control created paths
     # ------------------------------------------------------------------
-    def fake_mkdtemp(prefix=""):
+    def fake_mkdtemp(prefix="", dir=None):
         path = tmp_path / "hf_tmp"
         path.mkdir(exist_ok=True)
         return path.as_posix()
