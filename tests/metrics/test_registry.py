@@ -52,12 +52,11 @@ def test_lineage_metrics_list():
 
 
 def test_code_metrics_list():
-    """Test CODE_METRICS contains code quality and availability metrics."""
-    assert len(CODE_METRICS) == 2
+    """Test CODE_METRICS contains code quality, availability, bus factor metrics."""
+    assert len(CODE_METRICS) == 3
 
     metric_types = {type(metric) for metric in CODE_METRICS}
-    expected_types = {CodeQualityMetric, AvailabilityMetric}
-
+    expected_types = {CodeQualityMetric, AvailabilityMetric, BusFactorMetric}
     assert metric_types == expected_types
 
 
