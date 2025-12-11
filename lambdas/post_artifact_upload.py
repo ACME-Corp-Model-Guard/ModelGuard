@@ -13,7 +13,7 @@ from typing import Any, Dict, cast
 from src.artifacts.artifactory import create_artifact, save_artifact_metadata
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.utils.http import (
     LambdaResponse,
@@ -47,15 +47,15 @@ from src.utils.http import (
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler(
+    "POST /artifact/{type}", log_request_body=True, log_response_body=True
+)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[post_artifact] Handling POST /artifact request")
-
     # ---------------------------------------------------------------------
     # Step 1 — Extract artifact_type
     # ---------------------------------------------------------------------
@@ -77,7 +77,13 @@ def lambda_handler(
         )
     artifact_type = cast(ArtifactType, artifact_type_raw)
 
-    logger.info(f"[post_artifact] artifact_type={artifact_type}")
+    clogger.info(
+        "Processing artifact upload",
+        extra={
+            "artifact_type": artifact_type,
+            "user": auth.get("username"),
+        },
+    )
 
     # ---------------------------------------------------------------------
     # Step 2 — Parse request body
@@ -99,8 +105,6 @@ def lambda_handler(
             error_code="MISSING_URL",
         )
 
-    logger.info(f"[post_artifact] ingest_url={url}")
-
     # ---------------------------------------------------------------------
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
@@ -108,8 +112,13 @@ def lambda_handler(
         artifact = create_artifact(artifact_type, source_url=url)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
-        logger.error(
-            f"[post_artifact] Upstream metadata fetch failed: {e}",
+        clogger.error(
+            "Upstream metadata fetch failed",
+            extra={
+                "artifact_type": artifact_type,
+                "source_url": url,
+                "error": str(e),
+            },
         )
         return error_response(
             404,
@@ -117,8 +126,14 @@ def lambda_handler(
             error_code="SOURCE_NOT_FOUND",
         )
     except Exception as e:
-        logger.error(
-            f"[post_artifact] Unexpected metadata ingestion failure: {e}",
+        clogger.error(
+            "Unexpected metadata ingestion failure",
+            extra={
+                "artifact_type": artifact_type,
+                "source_url": url,
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
         )
         return error_response(
             500,
@@ -126,7 +141,14 @@ def lambda_handler(
             error_code="INGESTION_FAILURE",
         )
 
-    logger.info(f"[post_artifact] Created artifact: id={artifact.artifact_id}")
+    clogger.info(
+        "Artifact created successfully",
+        extra={
+            "artifact_id": artifact.artifact_id,
+            "artifact_type": artifact_type,
+            "artifact_name": artifact.name,
+        },
+    )
 
     # ---------------------------------------------------------------------
     # Step 4 — Save metadata to DynamoDB
@@ -134,7 +156,14 @@ def lambda_handler(
     try:
         save_artifact_metadata(artifact)
     except Exception as e:
-        logger.error(f"[post_artifact] Failed to save metadata: {e}")
+        clogger.error(
+            "Failed to save metadata",
+            extra={
+                "artifact_id": artifact.artifact_id,
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
         return error_response(
             500,
             "Failed to save artifact metadata",

@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
@@ -69,7 +69,7 @@ def fetch_github_license(github_url: str) -> Optional[str]:
         return license_info.get("spdx_id")
 
     except Exception as e:
-        logger.error(f"[license_check] GitHub license fetch error: {e}")
+        clogger.error(f"[license_check] GitHub license fetch error: {e}")
         raise
 
 
@@ -94,14 +94,14 @@ def fetch_github_license(github_url: str) -> Optional[str]:
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("POST /artifact/model/{id}/license-check")
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[license_check] Handling POST /artifact/model/{id}/license-check")
+    clogger.info("[license_check] Handling POST /artifact/model/{id}/license-check")
 
     # ---------------------------------------------------------------------
     # Step 1 — Extract and validate artifact ID

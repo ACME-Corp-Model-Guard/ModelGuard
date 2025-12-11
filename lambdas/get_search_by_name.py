@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from src.artifacts.artifactory import load_all_artifacts_by_fields
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -35,15 +35,13 @@ from src.utils.http import (
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("GET /artifact/byName/{name}")
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[get_artifact_by_name] Handling artifact lookup")
-
     # ------------------------------------------------------------------
     # Step 1 - Extract name parameter
     # ------------------------------------------------------------------
@@ -57,8 +55,6 @@ def lambda_handler(
             error_code="INVALID_REQUEST",
         )
 
-    logger.debug(f"[get_artifact_by_name] Searching for artifact with name={name}")
-
     # ------------------------------------------------------------------
     # Step 2 - Scan DynamoDB for all artifacts with this name
     # ------------------------------------------------------------------
@@ -70,10 +66,6 @@ def lambda_handler(
             f"Artifact with name '{name}' does not exist",
             error_code="NOT_FOUND",
         )
-
-    logger.info(
-        f"[get_artifact_by_name] Found {len(artifacts)} artifact(s) with name={name}"
-    )
 
     # ------------------------------------------------------------------
     # Step 3 - Build array of ArtifactMetadata per OpenAPI spec

@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     json_response,
@@ -192,15 +192,13 @@ def _paginate(
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("POST /artifacts", log_request_body=True)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[post_artifacts] Handling artifact enumeration request")
-
     # ---------------------------------------------------------------------
     # Step 1 - Parse offset query parameter
     # ---------------------------------------------------------------------
@@ -218,8 +216,6 @@ def lambda_handler(
             )
     else:
         offset = None
-
-    logger.debug(f"[post_artifacts] offset={offset}")
 
     # ---------------------------------------------------------------------
     # Step 2 - Parse and validate request body
@@ -249,15 +245,17 @@ def lambda_handler(
             error_code="INVALID_REQUEST_BODY",
         )
 
-    logger.debug(f"[post_artifacts] Received {len(artifact_queries)} queries")
-
     # ---------------------------------------------------------------------
     # Step 3 - Load all artifacts from DynamoDB
     # ---------------------------------------------------------------------
     try:
         all_artifacts = load_all_artifacts()
     except Exception as e:
-        logger.error(f"[post_artifacts] Failed to load artifact list: {e}")
+        clogger.error(
+            "Failed to load artifact list",
+            extra={"error_type": type(e).__name__},
+            exc_info=True,
+        )
         return error_response(
             500,
             "Failed to load artifacts",
@@ -286,11 +284,8 @@ def lambda_handler(
 
     headers = {"offset": str(next_offset) if next_offset is not None else "null"}
 
-    response = json_response(
+    return json_response(
         200,
         response_items,
         headers=headers,
     )
-
-    logger.info(f"Returning {response}")
-    return response
