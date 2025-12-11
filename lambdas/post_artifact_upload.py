@@ -15,6 +15,7 @@ from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import logger, with_logging
 from src.storage.downloaders.dispatchers import FileDownloadError
+from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -144,6 +145,9 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
+    # Generate presigned download URL (same as GET /artifacts/{type}/{id})
+    download_url = generate_s3_download_url(artifact.artifact_id, s3_key=artifact.s3_key)
+
     response_body = {
         "metadata": {
             "id": artifact.artifact_id,
@@ -152,11 +156,8 @@ def lambda_handler(
         },
         "data": {
             "url": artifact.source_url,
-            # TODO: Figure out what this URL should be
-            #       Spec requires this field but does not
-            #       explicitly require presigned URLs
-            "download_url": artifact.s3_key,
+            "download_url": download_url,
         },
     }
 
-    return json_response(200, response_body)
+    return json_response(201, response_body)
