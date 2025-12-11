@@ -1,8 +1,7 @@
 # TODO: OpenAPI Compliance Issues
-# - [ ] 401 Unauthorized: Return 401 (not 403) when non-admin user attempts reset
+# - [x] 401 Unauthorized: Return 401 (not 403) when non-admin user attempts reset
 #       Spec says: "You do not have permission to reset the registry"
-# - [ ] Add admin verification: Currently any authenticated user can reset
-#       Should use @admin_only decorator or explicit group check
+# - [x] Add admin verification: Explicit group check added to handler
 """
 DELETE /reset
 Reset the system to default state:
@@ -27,7 +26,12 @@ from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE, USER_POOL_ID
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
 from src.utils.bootstrap import bootstrap_system
-from src.utils.http import LambdaResponse, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
 # =============================================================================
@@ -110,6 +114,20 @@ def lambda_handler(
     auth: AuthContext,
 ) -> LambdaResponse:
     logger.info("[/reset] Handling DELETE /reset")
+
+    # ---------------------------------------------------------------------
+    # Step 0 — Verify admin permission (401 per OpenAPI spec)
+    # ---------------------------------------------------------------------
+    if "Admin" not in auth["groups"]:
+        logger.warning(
+            f"[/reset] Non-admin user attempted reset: {auth['username']}, "
+            f"groups={auth['groups']}"
+        )
+        return error_response(
+            401,
+            "You do not have permission to reset the registry",
+            error_code="ADMIN_REQUIRED",
+        )
 
     # ---------------------------------------------------------------------
     # Step 1 — Clear DynamoDB artifacts table

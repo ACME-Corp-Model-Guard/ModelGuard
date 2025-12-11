@@ -1,5 +1,5 @@
 # TODO: OpenAPI Compliance Issues
-# - [ ] 413 Payload Too Large: Return 413 when too many artifacts match query
+# - [x] 413 Payload Too Large: Return 413 when too many artifacts match query
 #       (implement pagination limit enforcement)
 """
 POST /artifacts
@@ -31,6 +31,9 @@ from src.artifacts.artifactory import (
     load_all_artifacts_by_fields,
 )
 from src.artifacts.base_artifact import BaseArtifact
+
+# Maximum number of artifacts allowed in a single query response
+MAX_QUERY_RESULTS = 500
 
 
 # =============================================================================
@@ -271,6 +274,21 @@ def lambda_handler(
     # Step 4 - Apply ArtifactQuery filters
     # ---------------------------------------------------------------------
     filtered = _filter_artifacts(all_artifacts, artifact_queries)
+
+    # ---------------------------------------------------------------------
+    # Step 4.1 - Check for too many results (413 Payload Too Large)
+    # ---------------------------------------------------------------------
+    if len(filtered) > MAX_QUERY_RESULTS:
+        logger.warning(
+            f"[post_artifacts] Query returned {len(filtered)} artifacts, "
+            f"exceeds maximum of {MAX_QUERY_RESULTS}"
+        )
+        return error_response(
+            413,
+            f"Query returned {len(filtered)} artifacts, "
+            f"exceeds maximum of {MAX_QUERY_RESULTS}. Use more specific filters.",
+            error_code="TOO_MANY_RESULTS",
+        )
 
     # ---------------------------------------------------------------------
     # Step 5 - Apply pagination
