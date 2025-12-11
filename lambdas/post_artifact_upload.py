@@ -1,3 +1,8 @@
+# TODO: OpenAPI Compliance Issues
+# - [ ] 202 Accepted: Implement async ingestion with deferred rating
+#       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
+# - [ ] 409 Conflict: Detect and reject duplicate artifacts (same name + source URL)
+# - [ ] 424 Failed Dependency: Reject artifacts that fail minimum rating threshold
 """
 POST /artifact/{artifact_type}
 Ingest a new artifact from a source URL and store metadata in DynamoDB.
@@ -146,7 +151,9 @@ def lambda_handler(
     # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
     # Generate presigned download URL (same as GET /artifacts/{type}/{id})
-    download_url = generate_s3_download_url(artifact.artifact_id, s3_key=artifact.s3_key)
+    download_url = generate_s3_download_url(
+        artifact.artifact_id, s3_key=artifact.s3_key
+    )
 
     response_body = {
         "metadata": {
