@@ -1,8 +1,6 @@
 # TODO: OpenAPI Compliance Issues
 # - [ ] 202 Accepted: Implement async ingestion with deferred rating
 #       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
-# - [x] 409 Conflict: Detect and reject duplicate artifacts (same source URL)
-# - [x] 424 Failed Dependency: Reject artifacts that fail minimum rating threshold
 """
 POST /artifact/{artifact_type}
 Ingest a new artifact from a source URL and store metadata in DynamoDB.

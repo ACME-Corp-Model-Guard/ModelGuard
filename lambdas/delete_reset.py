@@ -1,7 +1,3 @@
-# TODO: OpenAPI Compliance Issues
-# - [x] 401 Unauthorized: Return 401 (not 403) when non-admin user attempts reset
-#       Spec says: "You do not have permission to reset the registry"
-# - [x] Add admin verification: Explicit group check added to handler
 """
 DELETE /reset
 Reset the system to default state:

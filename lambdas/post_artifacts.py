@@ -1,6 +1,3 @@
-# TODO: OpenAPI Compliance Issues
-# - [x] 413 Payload Too Large: Return 413 when too many artifacts match query
-#       (implement pagination limit enforcement)
 """
 POST /artifacts
 Enumerate artifacts in the registry by applying one or more ArtifactQuery filters.
