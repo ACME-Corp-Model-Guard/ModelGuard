@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Union
 
-from src.logger import logger
+from src.logging import clogger
 from .metric import Metric
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class AvailabilityMetric(Metric):
             {"availability": float} on success
         """
 
-        logger.debug(
+        clogger.debug(
             f"[availability] Scoring model {model.artifact_id} "
             f"(dataset_id={model.dataset_artifact_id}, code_id={model.code_artifact_id})"
         )
@@ -74,14 +74,14 @@ class AvailabilityMetric(Metric):
             if code_available:
                 score += 0.5
 
-            logger.debug(
+            clogger.debug(
                 f"[availability] Model {model.artifact_id} → availability={score}"
             )
 
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            logger.error(
+            clogger.error(
                 f"[availability] Unexpected error scoring availability for "
                 f"model {model.artifact_id}: {e}",
                 exc_info=True,

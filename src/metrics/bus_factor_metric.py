@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.code_artifact import CodeArtifact
-from src.logger import logger
+from src.logging import clogger
 
 from .metric import Metric
 
@@ -37,7 +37,7 @@ class BusFactorMetric(Metric):
         """
         # Load the connected CodeArtifact
         if not model.code_artifact_id:
-            logger.debug(
+            clogger.debug(
                 f"No code artifact_id for model {model.artifact_id}, "
                 f"returning default score"
             )
@@ -45,13 +45,13 @@ class BusFactorMetric(Metric):
 
         code_artifact = load_artifact_metadata(model.code_artifact_id)
         if not isinstance(code_artifact, CodeArtifact):
-            logger.debug(
+            clogger.debug(
                 f"Missing or invalid code artifact for model {model.artifact_id}"
             )
             return {"bus_factor": 0.0}
 
         if not code_artifact.metadata:
-            logger.debug(
+            clogger.debug(
                 f"No metadata available for code artifact {code_artifact.artifact_id}, "
                 f"returning default score"
             )
@@ -60,20 +60,20 @@ class BusFactorMetric(Metric):
         # Get contributors from metadata (stored during artifact creation)
         contributors = code_artifact.metadata.get("contributors", [])
         if not contributors:
-            logger.debug(
+            clogger.debug(
                 f"No contributors data in metadata for code artifact {code_artifact.artifact_id}"
             )
             return {"bus_factor": 0.0}
 
         try:
             bus_factor = self._calculate_bus_factor(contributors)
-            logger.debug(
+            clogger.debug(
                 f"Bus factor score for model {model.artifact_id} "
                 f"(code: {code_artifact.artifact_id}): {bus_factor:.3f}"
             )
             return {"bus_factor": bus_factor}
         except Exception as e:
-            logger.error(
+            clogger.error(
                 f"Failed to calculate bus factor for model {model.artifact_id}: {e}",
                 exc_info=True,
             )
@@ -98,7 +98,7 @@ class BusFactorMetric(Metric):
         )
 
         if total_contributions == 0:
-            logger.warning("Zero total contributions")
+            clogger.warning("Zero total contributions")
             return 0.0
 
         # Sort contributors by contributions (descending)
@@ -130,7 +130,7 @@ class BusFactorMetric(Metric):
             # Add small bonus for projects with many contributors
             bus_factor = min(1.0, bus_factor + 0.1)
 
-        logger.debug(
+        clogger.debug(
             f"Bus factor: {num_contributors_needed} contributors needed for 50% "
             f"(score: {bus_factor:.3f})"
         )

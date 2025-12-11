@@ -4,11 +4,10 @@ Model artifact class with scoring functionality.
 
 import concurrent.futures
 import time
-import traceback
 from typing import Any, Dict, List, Optional, Union
 
 from src.artifacts.base_artifact import BaseArtifact
-from src.logger import logger
+from src.logging import BatchOperationLogger, clogger
 from src.metrics import Metric
 from src.metrics.net_score import calculate_net_score
 
@@ -111,48 +110,82 @@ class ModelArtifact(BaseArtifact):
 
         Uses ThreadPoolExecutor since metrics may involve I/O (HTTP, S3, etc.).
         Falls back gracefully if any metric raises an exception.
+        Logs progress with BatchOperationLogger for observability.
         """
-        logger.info(
-            f"Computing scores (parallel) for model artifact: {self.artifact_id}"
-        )
+        with BatchOperationLogger("compute_scores", total=len(metrics) + 1) as batch:
+            clogger.info(
+                "Computing scores in parallel",
+                extra={
+                    "artifact_id": self.artifact_id,
+                    "artifact_name": self.name,
+                    "num_metrics": len(metrics),
+                },
+            )
 
-        def run_metric(
-            metric: Metric,
-        ) -> tuple[str, float | dict[str, float], float]:
-            metric_name = metric.__class__.__name__.replace("Metric", "")
+            def run_metric(
+                metric: Metric,
+            ) -> tuple[str, float | dict[str, float], float, bool]:
+                metric_name = metric.__class__.__name__.replace("Metric", "")
+                t0 = time.perf_counter()
+                try:
+                    value = metric.score(self)
+                    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                    clogger.debug(
+                        f"Metric computed: {metric_name}",
+                        extra={
+                            "metric": metric_name,
+                            "value": value,
+                            "duration_ms": elapsed_ms,
+                            "artifact_id": self.artifact_id,
+                        },
+                    )
+                    return metric_name, value, elapsed_ms, True
+                except Exception as e:
+                    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                    clogger.error(
+                        f"Metric computation failed: {metric_name}",
+                        extra={
+                            "metric": metric_name,
+                            "artifact_id": self.artifact_id,
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "duration_ms": elapsed_ms,
+                        },
+                        exc_info=True,
+                    )
+                    return metric_name, 0.0, elapsed_ms, False
+
+            # Run all metrics concurrently
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(8, len(metrics))
+            ) as executor:
+                futures = {executor.submit(run_metric, m): m for m in metrics}
+                for future in concurrent.futures.as_completed(futures):
+                    metric_name, value, elapsed_ms, success = future.result()
+                    self.scores[metric_name] = value
+                    self.scores_latency[metric_name] = elapsed_ms
+
+                    # Log to batch tracker
+                    batch.log_item(
+                        metric_name,
+                        status="success" if success else "failure",
+                        value=value,
+                        duration_ms=elapsed_ms,
+                    )
+
+            # Compute NetScore (sequential, depends on other scores)
             t0 = time.perf_counter()
-            try:
-                value = metric.score(self)
-                elapsed_ms = (time.perf_counter() - t0) * 1000.0
-                logger.debug(f"[{metric_name}] scored {value} in {elapsed_ms:.2f}ms")
-                return metric_name, value, elapsed_ms
-            except Exception as e:
-                logger.error(
-                    f"Metric {metric_name} failed for artifact {self.artifact_id}: {e}\n"
-                    f"{traceback.format_exc()}"
-                )
-                return metric_name, 0.0, 0.0
+            net_score = calculate_net_score(self.scores)
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            self.scores["NetScore"] = net_score
+            self.scores_latency["NetScore"] = elapsed_ms
 
-        # Run all metrics concurrently
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(8, len(metrics))
-        ) as executor:
-            futures = {executor.submit(run_metric, m): m for m in metrics}
-            for future in concurrent.futures.as_completed(futures):
-                metric_name, value, elapsed_ms = future.result()
-                self.scores[metric_name] = value
-                self.scores_latency[metric_name] = elapsed_ms
-
-        # Compute NetScore (sequential, depends on other scores)
-        t0 = time.perf_counter()
-        self.scores["NetScore"] = calculate_net_score(self.scores)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
-        self.scores_latency["NetScore"] = elapsed_ms
-
-        logger.info(
-            f"Computed NetScore {self.scores['NetScore']:.3f} for artifact {self.artifact_id} "
-            f"({len(metrics)} metrics in parallel)"
-        )
+            batch.log_item(
+                "NetScore",
+                status="success",
+                value=net_score,
+                duration_ms=elapsed_ms,
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         """

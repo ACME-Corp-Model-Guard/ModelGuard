@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.code_artifact import CodeArtifact
-from src.logger import logger
+from src.logging import clogger
 from src.metrics.metric import Metric
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
@@ -67,14 +67,14 @@ This metric evaluates the overall quality of a code repository, including:
         # Step 0 — Identify code artifact
         # ------------------------------------------------------------------
         if not model.code_artifact_id:
-            logger.warning(
+            clogger.warning(
                 f"[code_quality] No code artifact_id for {model.artifact_id}"
             )
             return {self.SCORE_FIELD: 0.0}
 
         code_artifact = load_artifact_metadata(model.code_artifact_id)
         if not isinstance(code_artifact, CodeArtifact):
-            logger.warning(
+            clogger.warning(
                 f"[code_quality] Missing or invalid code artifact for {model.artifact_id}"
             )
             return {self.SCORE_FIELD: 0.0}
@@ -85,7 +85,7 @@ This metric evaluates the overall quality of a code repository, including:
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         try:
-            logger.debug(
+            clogger.debug(
                 f"[code_quality] Downloading code bundle for {code_artifact.artifact_id}"
             )
 
@@ -107,7 +107,7 @@ This metric evaluates the overall quality of a code repository, including:
             )
 
             if not files:
-                logger.warning(
+                clogger.warning(
                     f"[code_quality] No relevant files extracted for {code_artifact.artifact_id}"
                 )
                 return {self.SCORE_FIELD: 0.0}
@@ -129,7 +129,7 @@ This metric evaluates the overall quality of a code repository, including:
 
             # Ensure JSON dictionary result
             if not isinstance(response, dict) or self.SCORE_FIELD not in response:
-                logger.error(
+                clogger.error(
                     f"[code_quality] Invalid/empty response "
                     f"for {code_artifact.artifact_id}: {response}"
                 )
@@ -141,7 +141,7 @@ This metric evaluates the overall quality of a code repository, including:
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                logger.error(
+                clogger.error(
                     f"[code_quality] Invalid score returned for {code_artifact.artifact_id}: "
                     f"{response}"
                 )
@@ -150,7 +150,7 @@ This metric evaluates the overall quality of a code repository, including:
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            logger.error(
+            clogger.error(
                 f"[code_quality] Evaluation failed for {code_artifact.artifact_id}: {e}",
                 exc_info=True,
             )
@@ -162,4 +162,4 @@ This metric evaluates the overall quality of a code repository, including:
                 if os.path.exists(tmp_tar):
                     os.unlink(tmp_tar)
             except Exception:
-                logger.warning(f"[code_quality] Failed to remove temp file {tmp_tar}")
+                clogger.warning(f"[code_quality] Failed to remove temp file {tmp_tar}")

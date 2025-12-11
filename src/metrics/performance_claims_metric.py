@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Union
 
-from src.logger import logger
+from src.logging import clogger
 
 from .metric import Metric
 
@@ -178,7 +178,7 @@ class PerformanceClaimsMetric(Metric):
             (higher is better - more comprehensive and verifiable performance documentation)
         """
         if not model.metadata:
-            logger.debug(
+            clogger.debug(
                 f"No metadata available for model {model.artifact_id}, returning default score"
             )
             return {"performance_claims": 0.0}
@@ -190,7 +190,7 @@ class PerformanceClaimsMetric(Metric):
             # Calculate score based on various factors
             score = self._calculate_performance_claims_score(claims_info)
 
-            logger.debug(
+            clogger.debug(
                 f"Performance claims score for {model.artifact_id}: {score:.3f} "
                 f"(metrics: {claims_info['has_metrics']}, "
                 f"metric_count: {claims_info.get('metric_count', 0)}, "
@@ -202,7 +202,7 @@ class PerformanceClaimsMetric(Metric):
             return {"performance_claims": score}
 
         except Exception as e:
-            logger.error(
+            clogger.error(
                 f"Failed to calculate performance claims for model {model.artifact_id}: {e}",
                 exc_info=True,
             )
