@@ -46,6 +46,9 @@ def download_from_huggingface(
 
     Raises:
         FileDownloadError: If URL parsing fails, HF download fails, or packaging fails
+
+    Note:
+        The caller is responsible for cleaning up the returned tarball file.
     """
 
     clogger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
@@ -54,6 +57,8 @@ def download_from_huggingface(
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
     cache_dir: Optional[str] = None
+    tar_path: Optional[str] = None
+    success = False
 
     try:
         # Import huggingface_hub lazily
@@ -126,7 +131,10 @@ def download_from_huggingface(
         import tarfile
 
         tar_path = tempfile.NamedTemporaryFile(
-            delete=False, suffix=".tar.gz", dir="/tmp"
+            delete=False,
+            suffix=".tar.gz",
+            prefix=f"hf_{artifact_id}_",
+            dir="/tmp",
         ).name
 
         clogger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
@@ -136,6 +144,7 @@ def download_from_huggingface(
 
         clogger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
 
+        success = True
         return tar_path
 
     except RepositoryNotFoundError:
@@ -149,7 +158,7 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up temporary cache directory
+        # Clean up temporary cache directory (always)
         if cache_dir and os.path.exists(cache_dir):
             try:
                 import shutil
@@ -159,6 +168,16 @@ def download_from_huggingface(
             except Exception as cleanup_err:
                 clogger.warning(
                     f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
+                )
+
+        # Clean up tarball on failure (only caller cleans up on success)
+        if not success and tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                clogger.debug(f"[HF] Cleaned up tarball on failure: {tar_path}")
+            except Exception as cleanup_err:
+                clogger.warning(
+                    f"[HF] Failed to clean up tarball {tar_path}: {cleanup_err}"
                 )
 
 

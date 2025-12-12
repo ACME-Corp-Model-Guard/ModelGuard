@@ -58,11 +58,12 @@ def test_download_repo_tarball_success(monkeypatch, tmp_path):
 
     monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
 
-    result_path = _download_repo_tarball("user", "repo", tmp_path.as_posix())
+    # Third parameter is now artifact_id, not dest_dir
+    result_path = _download_repo_tarball("user", "repo", "test-artifact-id")
 
     assert os.path.exists(result_path)
     assert result_path.endswith(".tar.gz")
-    assert "repo.tar.gz" in result_path
+    assert result_path.startswith("/tmp/gh_test-artifact-id_")
 
 
 def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
@@ -79,7 +80,8 @@ def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
     with pytest.raises(
         FileDownloadError, match="Failed to download repository from API"
     ):
-        _download_repo_tarball("user", "nonexistent", tmp_path.as_posix())
+        # Third parameter is now artifact_id, not dest_dir
+        _download_repo_tarball("user", "nonexistent", "test-artifact-id")
 
 
 # =============================================================================
@@ -92,11 +94,16 @@ def test_download_from_github_success(monkeypatch, tmp_path):
         lambda url: ("user", "repo"),
     )
 
-    def fake_download_tarball(owner: str, repo: str, dest_dir: str):
-        # Create a fake tarball file
-        tar_path = os.path.join(dest_dir, f"{repo}.tar.gz")
-        Path(tar_path).write_text("fake tarball content")
-        return tar_path
+    def fake_download_tarball(owner: str, repo: str, artifact_id: str):
+        # Create a fake tarball file in /tmp
+        import tempfile
+
+        tar_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".tar.gz", prefix=f"gh_{artifact_id}_", dir="/tmp"
+        )
+        tar_file.write(b"fake tarball content")
+        tar_file.close()
+        return tar_file.name
 
     monkeypatch.setattr(
         "src.storage.downloaders.github._download_repo_tarball", fake_download_tarball
@@ -110,6 +117,7 @@ def test_download_from_github_success(monkeypatch, tmp_path):
 
     assert result.endswith(".tar.gz")
     assert Path(result).exists()
+    assert result.startswith("/tmp/gh_123_")
 
 
 def test_download_from_github_wrong_type():

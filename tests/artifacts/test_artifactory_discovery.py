@@ -37,12 +37,14 @@ def test_download_and_extract_files_calls_download(mock_download, mock_extract):
 
     _download_and_extract_files(artifact)
 
-    # Verify download was called with correct params
-    mock_download.assert_called_once_with(
-        artifact_id="test-id",
-        s3_key="models/test-id",
-        local_path="/tmp/model_artifact_files",
-    )
+    # Verify download was called with correct artifact_id and s3_key
+    # The local_path is now a dynamically generated temp file
+    mock_download.assert_called_once()
+    call_kwargs = mock_download.call_args.kwargs
+    assert call_kwargs["artifact_id"] == "test-id"
+    assert call_kwargs["s3_key"] == "models/test-id"
+    assert call_kwargs["local_path"].startswith("/tmp/discovery_test-id_")
+    assert call_kwargs["local_path"].endswith(".tar.gz")
 
 
 @patch("src.artifacts.artifactory.discovery.extract_relevant_files")
@@ -60,19 +62,20 @@ def test_download_and_extract_files_calls_extract(mock_download, mock_extract):
 
     _download_and_extract_files(artifact)
 
-    # Verify extract was called with correct params
-    mock_extract.assert_called_once_with(
-        tar_path="/tmp/model_artifact_files",
-        include_ext={".json", ".md", ".txt"},
-        max_files=10,
-        prioritize_readme=True,
-    )
+    # Verify extract was called with correct params (tar_path is dynamic)
+    mock_extract.assert_called_once()
+    call_kwargs = mock_extract.call_args.kwargs
+    assert call_kwargs["tar_path"].startswith("/tmp/discovery_test-id_")
+    assert call_kwargs["tar_path"].endswith(".tar.gz")
+    assert call_kwargs["include_ext"] == {".json", ".md", ".txt"}
+    assert call_kwargs["max_files"] == 10
+    assert call_kwargs["prioritize_readme"] is True
 
 
 @patch("src.artifacts.artifactory.discovery.extract_relevant_files")
 @patch("src.artifacts.artifactory.discovery.download_artifact_from_s3")
 def test_download_and_extract_files_returns_files_dict(mock_download, mock_extract):
-    """Test that extracted files dictionary is returned."""
+    """Test that extracted files dictionary is returned along with temp path."""
     artifact = ModelArtifact(
         artifact_id="test-id",
         name="test-model",
@@ -86,8 +89,11 @@ def test_download_and_extract_files_returns_files_dict(mock_download, mock_extra
     }
     mock_extract.return_value = expected_files
 
-    result = _download_and_extract_files(artifact)
+    tmp_path, result = _download_and_extract_files(artifact)
 
+    # Function now returns tuple of (tmp_path, files_dict)
+    assert tmp_path.startswith("/tmp/discovery_test-id_")
+    assert tmp_path.endswith(".tar.gz")
     assert result == expected_files
 
 
@@ -436,8 +442,8 @@ def test_find_connected_artifact_names_full_flow(mock_download, mock_llm, mock_u
         artifact_id="test-id", name="test", source_url="https://example.com"
     )
 
-    # Mock successful flow
-    mock_download.return_value = {"README.md": "content"}
+    # Mock successful flow - now returns tuple of (tmp_path, files)
+    mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})
     mock_llm.return_value = {"code_name": "test-code"}
 
     _find_connected_artifact_names(artifact)
@@ -459,7 +465,8 @@ def test_find_connected_artifact_names_skips_update_when_llm_fails(
         artifact_id="test-id", name="test", source_url="https://example.com"
     )
 
-    mock_download.return_value = {"README.md": "content"}
+    # Now returns tuple of (tmp_path, files)
+    mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})
     mock_llm.return_value = None  # LLM failed
 
     _find_connected_artifact_names(artifact)
@@ -503,7 +510,8 @@ def test_find_connected_artifact_names_handles_llm_error(
         artifact_id="test-id", name="test", source_url="https://example.com"
     )
 
-    mock_download.return_value = {"README.md": "content"}
+    # Now returns tuple of (tmp_path, files)
+    mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})
     mock_llm.side_effect = Exception("LLM error")
 
     # Should not raise, but log error
