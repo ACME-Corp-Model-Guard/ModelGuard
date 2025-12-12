@@ -119,7 +119,7 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     existing = load_all_artifacts_by_fields({"source_url": url})
     if existing:
-        logger.info(
+        clogger.info(
             f"[post_artifact] Duplicate artifact detected: {existing[0].artifact_id}"
         )
         return error_response(
@@ -195,7 +195,7 @@ def lambda_handler(
                     failing_metrics.append(f"{metric_name}={score_value:.2f}")
 
         if failing_metrics:
-            logger.warning(
+            clogger.warning(
                 f"[post_artifact] Model {artifact.artifact_id} rejected: "
                 f"metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): {failing_metrics}"
             )
@@ -203,11 +203,11 @@ def lambda_handler(
             if artifact.s3_key and ARTIFACTS_BUCKET:
                 try:
                     delete_objects(ARTIFACTS_BUCKET, [artifact.s3_key])
-                    logger.info(
+                    clogger.info(
                         f"[post_artifact] Cleaned up S3 object: {artifact.s3_key}"
                     )
                 except Exception as cleanup_err:
-                    logger.warning(
+                    clogger.warning(
                         f"[post_artifact] Failed to clean up S3: {cleanup_err}"
                     )
 
