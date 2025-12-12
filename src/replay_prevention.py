@@ -88,9 +88,14 @@ def extract_resource_path(event: Dict[str, Any]) -> str:
     Extract the resource path from API Gateway Lambda event.
 
     Tries in order:
-      1. event["requestContext"]["resourcePath"] (most reliable)
-      2. event["path"]
+      1. event["path"] (actual path with real IDs, e.g., /artifacts/model/abc-123)
+      2. event["requestContext"]["resourcePath"] (template path, e.g., /artifacts/{type}/{id})
       3. Default to "/"
+
+    We prioritize the actual path over the template path because fingerprints
+    must be unique per-request. Using the template path would cause all requests
+    to the same endpoint (e.g., different artifact IDs) to have identical
+    fingerprints, resulting in false "replay attack" detections.
 
     Args:
         event: Lambda event from API Gateway
@@ -99,20 +104,19 @@ def extract_resource_path(event: Dict[str, Any]) -> str:
         Resource path string
 
     Example paths:
-        /artifact/{artifact_type}
-        /artifacts/{artifact_type}/{id}
-        /artifacts
-        /artifact/model/{id}/rate
+        /artifact/model (actual)
+        /artifacts/model/abc-123 (actual)
+        /artifact/model/abc-123/rate (actual)
     """
-    # Method 1: resourcePath from requestContext (includes path parameters)
+    # Method 1: Actual path with real IDs (preferred for unique fingerprints)
+    if "path" in event and event["path"]:
+        return event["path"]
+
+    # Method 2: Template path from requestContext (fallback)
     request_context = event.get("requestContext") or {}
     resource_path = request_context.get("resourcePath")
     if resource_path:
         return resource_path
-
-    # Method 2: Direct path field
-    if "path" in event and event["path"]:
-        return event["path"]
 
     # Method 3: Fallback to "/" if nothing found
     clogger.debug("[replay] Could not extract resource path from event")

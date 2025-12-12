@@ -108,19 +108,19 @@ def test_fingerprint_empty_body_normalization():
 # =============================================================================
 
 
-def test_extract_resource_path_from_request_context():
-    """Prefer resourcePath from requestContext."""
+def test_extract_resource_path_prefers_actual_path():
+    """Prefer actual path over template resourcePath for unique fingerprints."""
     event = {
         "requestContext": {"resourcePath": "/artifact/{artifact_type}"},
-        "path": "/artifact/model",  # Should be ignored
+        "path": "/artifact/model",  # Should be used (actual path with real values)
     }
 
     path = extract_resource_path(event)
-    assert path == "/artifact/{artifact_type}"
+    assert path == "/artifact/model"
 
 
-def test_extract_resource_path_fallback_to_path():
-    """Fall back to path field if resourcePath missing."""
+def test_extract_resource_path_uses_path_when_no_template():
+    """Uses path field when resourcePath is empty."""
     event = {
         "path": "/artifacts",
         "requestContext": {},
@@ -128,6 +128,17 @@ def test_extract_resource_path_fallback_to_path():
 
     path = extract_resource_path(event)
     assert path == "/artifacts"
+
+
+def test_extract_resource_path_fallback_to_template():
+    """Falls back to template resourcePath when path is missing."""
+    event = {
+        "requestContext": {"resourcePath": "/artifacts/{artifact_type}/{id}"},
+        # No "path" field
+    }
+
+    path = extract_resource_path(event)
+    assert path == "/artifacts/{artifact_type}/{id}"
 
 
 def test_extract_resource_path_default():

@@ -194,7 +194,8 @@ def test_auth_required_success(auth_module, mocker):
     assert res["auth"]["username"] == "bob"
 
 
-def test_auth_required_unauthorized(auth_module, mocker):
+def test_auth_required_forbidden(auth_module, mocker):
+    """Auth failures return 403 Forbidden per OpenAPI spec."""
     mocker.patch("src.auth.authorize", side_effect=Exception("bad token"))
 
     @auth_module.auth_required
@@ -202,8 +203,8 @@ def test_auth_required_unauthorized(auth_module, mocker):
         return {"ok": True}
 
     res = handler({"headers": {}}, None)
-    assert res["statusCode"] == 401
-    assert "Unauthorized" in res["body"]
+    assert res["statusCode"] == 403
+    assert "Forbidden" in res["body"]
 
 
 # ====================================================================================
