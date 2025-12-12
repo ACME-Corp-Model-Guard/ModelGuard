@@ -125,9 +125,7 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                clogger.error(
-                    f"[ramp_up] Invalid score for model {model.artifact_id}: {response}"
-                )
+                clogger.error(f"[ramp_up] Invalid score for model {model.artifact_id}: {response}")
                 return {self.SCORE_FIELD: 0.0}
 
             return {self.SCORE_FIELD: score}

@@ -145,9 +145,7 @@ def test_extract_paper_from_citation_field():
 def test_extract_paper_from_arxiv_link_in_text():
     """Test extraction of papers from arxiv.org link in description."""
     metadata = {
-        "cardData": {
-            "description": "See our paper at https://arxiv.org/abs/2301.12345 for details"
-        }
+        "cardData": {"description": "See our paper at https://arxiv.org/abs/2301.12345 for details"}
     }
 
     result = _extract_performance_claims_from_metadata(metadata)
@@ -356,9 +354,7 @@ def test_calculate_score_no_factors(performance_claims_metric):
         "has_structured_metrics": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     assert score == 0.0
     assert breakdown == {
@@ -379,9 +375,7 @@ def test_calculate_score_structured_metrics_only(performance_claims_metric):
         "has_papers": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     assert score == 0.5
     assert breakdown["metrics"] == 0.5
@@ -397,9 +391,7 @@ def test_calculate_score_unstructured_metrics_only(performance_claims_metric):
         "has_papers": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     assert score == 0.3
     assert breakdown["metrics"] == 0.3
@@ -415,9 +407,7 @@ def test_calculate_score_two_metrics_bonus(performance_claims_metric):
         "has_papers": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # 0.5 (structured) + 0.04 (2 metrics bonus)
     assert score == 0.54
@@ -434,9 +424,7 @@ def test_calculate_score_three_metrics_bonus(performance_claims_metric):
         "has_papers": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # 0.5 (structured) + 0.07 (3 metrics bonus)
     assert score == pytest.approx(0.57)
@@ -453,9 +441,7 @@ def test_calculate_score_five_metrics_bonus(performance_claims_metric):
         "has_papers": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # 0.5 (structured) + 0.1 (5+ metrics bonus)
     assert score == 0.6
@@ -472,9 +458,7 @@ def test_calculate_score_benchmarks_only(performance_claims_metric):
         "has_structured_metrics": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     assert score == 0.25
     assert breakdown["benchmarks"] == 0.25
@@ -490,9 +474,7 @@ def test_calculate_score_papers_only(performance_claims_metric):
         "has_structured_metrics": False,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     assert score == 0.15
     assert breakdown["papers"] == 0.15
@@ -508,9 +490,7 @@ def test_calculate_score_clamped_at_one(performance_claims_metric):
         "has_papers": True,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # Should be clamped at 1.0
     assert score <= 1.0
@@ -527,9 +507,7 @@ def test_calculate_score_all_factors_combined(performance_claims_metric):
         "has_papers": True,
     }
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # 0.5 (structured) + 0.1 (5 metrics) + 0.25 (benchmarks) + 0.15 (papers) = 1.0
     assert score == 1.0
@@ -545,9 +523,7 @@ def test_calculate_score_missing_keys_use_defaults(performance_claims_metric):
     """Test that missing keys use default False/0 values."""
     claims_info = {}  # Empty dict
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(
-        claims_info
-    )
+    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
 
     # Should use defaults and return 0.0
     assert score == 0.0

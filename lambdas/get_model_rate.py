@@ -32,9 +32,7 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
     scores_latency = artifact_dict.get("scores_latency", {})
     metadata = artifact_dict.get("metadata", {})
 
-    category = (
-        metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
-    )
+    category = metadata.get("category", "unknown") if isinstance(metadata, dict) else "unknown"
 
     response: Dict[str, Any] = {
         "name": artifact_dict.get("name", "unknown"),

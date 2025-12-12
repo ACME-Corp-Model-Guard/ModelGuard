@@ -60,9 +60,7 @@ def test_upload_file_success(mock_s3, tmp_path):
 def test_upload_file_client_error(mock_s3, tmp_path):
     from botocore.exceptions import ClientError
 
-    mock_s3.upload_file.side_effect = ClientError(
-        {"Error": {"Code": "Fail"}}, "UploadFile"
-    )
+    mock_s3.upload_file.side_effect = ClientError({"Error": {"Code": "Fail"}}, "UploadFile")
 
     local_file = tmp_path / "data.txt"
     local_file.write_text("hello")
@@ -89,9 +87,7 @@ def test_download_file_success(mock_s3, tmp_path):
 def test_download_file_client_error(mock_s3, tmp_path):
     from botocore.exceptions import ClientError
 
-    mock_s3.download_file.side_effect = ClientError(
-        {"Error": {"Code": "Fail"}}, "DownloadFile"
-    )
+    mock_s3.download_file.side_effect = ClientError({"Error": {"Code": "Fail"}}, "DownloadFile")
 
     with pytest.raises(ClientError):
         s3_utils.download_file("path/key.bin", "/tmp/file")
@@ -128,9 +124,7 @@ def test_upload_artifact_to_s3_missing_bucket(monkeypatch):
     monkeypatch.setattr(s3_utils, "ARTIFACTS_BUCKET", "")
 
     with pytest.raises(ValueError):
-        s3_utils.upload_artifact_to_s3(
-            "A1", "model", "models/A1.tar.gz", "http://example.com"
-        )
+        s3_utils.upload_artifact_to_s3("A1", "model", "models/A1.tar.gz", "http://example.com")
 
 
 def test_upload_artifact_to_s3_download_error(monkeypatch):
@@ -143,9 +137,7 @@ def test_upload_artifact_to_s3_download_error(monkeypatch):
     )
 
     with pytest.raises(FileDownloadError):
-        s3_utils.upload_artifact_to_s3(
-            "A1", "model", "models/A1.tar.gz", "http://bad.example.com"
-        )
+        s3_utils.upload_artifact_to_s3("A1", "model", "models/A1.tar.gz", "http://bad.example.com")
 
 
 # ---------------------------------------------------------------------

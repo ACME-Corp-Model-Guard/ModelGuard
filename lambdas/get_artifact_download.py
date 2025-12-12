@@ -100,9 +100,7 @@ def lambda_handler(
                 "error_type": type(e).__name__,
             },
         )
-        return error_response(
-            500, "Failed to generate download URL", error_code="S3_ERROR"
-        )
+        return error_response(500, "Failed to generate download URL", error_code="S3_ERROR")
 
     # ---------------------------------------------------------------------
     # Step 5 - Build the returned Artifact object per OpenAPI spec

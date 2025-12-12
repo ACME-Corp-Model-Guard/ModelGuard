@@ -53,9 +53,7 @@ def test_get_artifact_class_invalid_type():
 
 def test_get_artifact_class_error_message_contains_valid_types():
     """Test that error message lists valid types."""
-    with pytest.raises(
-        ValueError, match=r"Must be one of \['model', 'dataset', 'code'\]"
-    ):
+    with pytest.raises(ValueError, match=r"Must be one of \['model', 'dataset', 'code'\]"):
         _get_artifact_class("wrong")  # type: ignore
 
 
@@ -98,9 +96,7 @@ def test_enrich_kwargs_skips_fetch_when_name_provided():
         "source_url": "https://huggingface.co/test/model",
     }
 
-    with patch(
-        "src.artifacts.artifactory.factory.fetch_artifact_metadata"
-    ) as mock_fetch:
+    with patch("src.artifacts.artifactory.factory.fetch_artifact_metadata") as mock_fetch:
         result = _enrich_kwargs_with_metadata("model", kwargs)
 
         # Verify fetch NOT called
@@ -117,9 +113,7 @@ def test_enrich_kwargs_skips_fetch_when_no_source_url():
         # No source_url
     }
 
-    with patch(
-        "src.artifacts.artifactory.factory.fetch_artifact_metadata"
-    ) as mock_fetch:
+    with patch("src.artifacts.artifactory.factory.fetch_artifact_metadata") as mock_fetch:
         _enrich_kwargs_with_metadata("model", kwargs)
 
         # Verify fetch NOT called
@@ -276,9 +270,7 @@ def test_initialize_new_artifact_computes_scores_for_model(mock_upload, mock_con
     """Test that model artifacts get score computation."""
     artifact = ModelArtifact(name="test-model", source_url="https://example.com")
 
-    with patch(
-        "src.artifacts.artifactory.factory._compute_initial_scores"
-    ) as mock_compute:
+    with patch("src.artifacts.artifactory.factory._compute_initial_scores") as mock_compute:
         _initialize_new_artifact(artifact)
 
         # Should call score computation for model
@@ -291,9 +283,7 @@ def test_initialize_new_artifact_skips_scores_for_code(mock_upload, mock_connect
     """Test that code artifacts skip score computation."""
     artifact = CodeArtifact(name="test-code", source_url="https://github.com/test/repo")
 
-    with patch(
-        "src.artifacts.artifactory.factory._compute_initial_scores"
-    ) as mock_compute:
+    with patch("src.artifacts.artifactory.factory._compute_initial_scores") as mock_compute:
         _initialize_new_artifact(artifact)
 
         # Should NOT call score computation for code
@@ -308,9 +298,7 @@ def test_initialize_new_artifact_skips_scores_for_dataset(mock_upload, mock_conn
         name="test-dataset", source_url="https://huggingface.co/datasets/test"
     )
 
-    with patch(
-        "src.artifacts.artifactory.factory._compute_initial_scores"
-    ) as mock_compute:
+    with patch("src.artifacts.artifactory.factory._compute_initial_scores") as mock_compute:
         _initialize_new_artifact(artifact)
 
         # Should NOT call score computation for dataset

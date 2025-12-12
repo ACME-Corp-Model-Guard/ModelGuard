@@ -40,9 +40,7 @@ def test_ask_llm_returns_string(mock_bedrock):
     # Fake Titan Text Lite response structure
     response_json = {
         "inputTextTokenCount": 10,
-        "results": [
-            {"tokenCount": 5, "outputText": "Hello world", "completionReason": "FINISH"}
-        ],
+        "results": [{"tokenCount": 5, "outputText": "Hello world", "completionReason": "FINISH"}],
     }
 
     mock_bedrock.invoke_model.return_value = {
@@ -87,9 +85,7 @@ def test_ask_llm_malformed_body(mock_bedrock):
     """
     ask_llm should handle json.JSONDecodeError on the outer response.
     """
-    mock_bedrock.invoke_model.return_value = {
-        "body": MagicMock(read=lambda: b"{not json")
-    }
+    mock_bedrock.invoke_model.return_value = {"body": MagicMock(read=lambda: b"{not json")}
 
     result = llm.ask_llm("prompt")
     assert result is None
@@ -100,9 +96,7 @@ def test_ask_llm_missing_keys(mock_bedrock):
     ask_llm should handle KeyError if the Bedrock response is missing expected fields.
     """
     mock_bedrock.invoke_model.return_value = {
-        "body": MagicMock(
-            read=lambda: json.dumps({"inputTextTokenCount": 10}).encode("utf-8")
-        )
+        "body": MagicMock(read=lambda: json.dumps({"inputTextTokenCount": 10}).encode("utf-8"))
     }
 
     result = llm.ask_llm("prompt")
@@ -115,9 +109,7 @@ def test_ask_llm_client_error(mock_bedrock):
     """
     from botocore.exceptions import ClientError
 
-    mock_bedrock.invoke_model.side_effect = ClientError(
-        {"Error": {"Code": "Boom"}}, "InvokeModel"
-    )
+    mock_bedrock.invoke_model.side_effect = ClientError({"Error": {"Code": "Boom"}}, "InvokeModel")
 
     result = llm.ask_llm("prompt")
     assert result is None

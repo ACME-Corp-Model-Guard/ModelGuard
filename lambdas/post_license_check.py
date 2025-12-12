@@ -58,9 +58,7 @@ def fetch_github_license(github_url: str) -> Optional[str]:
             raise ValueError(f"GitHub Repository Not Found: {github_url}")
 
         if resp.status_code != 200:
-            raise ValueError(
-                f"GitHub API Error ({resp.status_code}) for repository {github_url}"
-            )
+            raise ValueError(f"GitHub API Error ({resp.status_code}) for repository {github_url}")
 
         license_info = resp.json().get("license")
         if not license_info:

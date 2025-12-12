@@ -35,9 +35,7 @@ from src.settings import (
 # =====================================================================================
 
 
-def _ensure_cognito_group_exists(
-    cognito: CognitoIdentityProviderClient, group_name: str
-) -> None:
+def _ensure_cognito_group_exists(cognito: CognitoIdentityProviderClient, group_name: str) -> None:
     """
     Ensure a Cognito group exists. Creates it if missing.
     """
@@ -111,9 +109,7 @@ def _ensure_user_exists(
         clogger.info(f"[bootstrap] Added user {username} → group {admin_group}")
     except ClientError as e:
         if "UserAlreadyInGroupException" in str(e):
-            clogger.debug(
-                f"[bootstrap] User {username} already in {admin_group}, ignoring"
-            )
+            clogger.debug(f"[bootstrap] User {username} already in {admin_group}, ignoring")
         else:
             raise
 

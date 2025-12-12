@@ -171,6 +171,4 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
                 if os.path.exists(tmp_tar):
                     os.unlink(tmp_tar)
             except Exception:
-                clogger.warning(
-                    f"[dataset_quality] Failed to remove temp file {tmp_tar}"
-                )
+                clogger.warning(f"[dataset_quality] Failed to remove temp file {tmp_tar}")

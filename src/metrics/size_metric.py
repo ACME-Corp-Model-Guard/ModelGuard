@@ -62,13 +62,9 @@ class SizeMetric(Metric):
         try:
             scores = {
                 "size_pi": self._calculate_device_score(size_bytes, self.PI_CAPACITY),
-                "size_nano": self._calculate_device_score(
-                    size_bytes, self.NANO_CAPACITY
-                ),
+                "size_nano": self._calculate_device_score(size_bytes, self.NANO_CAPACITY),
                 "size_pc": self._calculate_device_score(size_bytes, self.PC_CAPACITY),
-                "size_server": self._calculate_device_score(
-                    size_bytes, self.SERVER_CAPACITY
-                ),
+                "size_server": self._calculate_device_score(size_bytes, self.SERVER_CAPACITY),
             }
 
             # Convert to human-readable format for logging
@@ -93,9 +89,7 @@ class SizeMetric(Metric):
                 "size_server": 0.5,
             }
 
-    def _calculate_device_score(
-        self, size_bytes: float, capacity_bytes: float
-    ) -> float:
+    def _calculate_device_score(self, size_bytes: float, capacity_bytes: float) -> float:
         """
         Calculate size score for a specific device capacity.
 

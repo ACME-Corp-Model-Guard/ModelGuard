@@ -117,9 +117,7 @@ def _calculate_costs_with_dependencies(
 @log_lambda_handler("GET /artifact/{type}/{id}/cost")
 @translate_exceptions
 @auth_required
-def lambda_handler(
-    event: Dict[str, Any], context: Any, auth: AuthContext
-) -> LambdaResponse:
+def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> LambdaResponse:
     clogger.info("[artifact_cost] Handling artifact cost request")
 
     # ----------------------------------------------------------------------
