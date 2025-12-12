@@ -31,3 +31,6 @@ ece461_fall_2025_openapi_spec.yaml
 
 # Test Shell
 shell.py
+
+# Downloaded Logs
+logs/
