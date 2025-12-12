@@ -117,7 +117,7 @@ def test_translate_exceptions_logs(monkeypatch):
     Ensure that translate_exceptions logs errors.
     """
     mock_log = MagicMock()
-    monkeypatch.setattr(http, "logger", mock_log)
+    monkeypatch.setattr(http, "clogger", mock_log)
 
     @http.translate_exceptions
     def handler(event, context):

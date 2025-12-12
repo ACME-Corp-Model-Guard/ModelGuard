@@ -9,7 +9,7 @@ import json
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, TypedDict, TypeVar, Union, List
 
-from src.logger import logger
+from src.logutil import clogger
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -105,7 +105,7 @@ def translate_exceptions(func: F) -> Callable[[Dict[str, Any], Any], LambdaRespo
             return func(event, context)
 
         except Exception as e:
-            logger.error(f"Error in {func.__name__}: {e}")
+            clogger.error(f"Error in {func.__name__}: {e}")
             return error_response(
                 500,
                 f"Internal Server Error: {e}",

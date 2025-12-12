@@ -18,7 +18,7 @@ from botocore.exceptions import ClientError
 
 from src.artifacts.types import ArtifactType
 from src.aws.clients import get_s3
-from src.logger import logger
+from src.logutil import clogger
 from src.settings import ARTIFACTS_BUCKET
 from src.storage.downloaders.dispatchers import (
     FileDownloadError as SourceDownloadError,
@@ -36,11 +36,11 @@ def upload_file(s3_key: str, local_path: str) -> None:
     s3: S3Client = get_s3()
 
     try:
-        logger.debug(f"Uploading file to s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        clogger.debug(f"Uploading file to s3://{ARTIFACTS_BUCKET}/{s3_key}")
         s3.upload_file(local_path, ARTIFACTS_BUCKET, s3_key)
-        logger.info(f"Upload successful: s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        clogger.info(f"Upload successful: s3://{ARTIFACTS_BUCKET}/{s3_key}")
     except ClientError as e:
-        logger.error(f"Failed to upload file to S3: {e}")
+        clogger.error(f"Failed to upload file to S3: {e}")
         raise
 
 
@@ -50,13 +50,13 @@ def download_file(s3_key: str, local_path: str) -> None:
     """
     s3: S3Client = get_s3()
 
-    logger.debug(f"Downloading s3://{ARTIFACTS_BUCKET}/{s3_key} -> {local_path}")
+    clogger.debug(f"Downloading s3://{ARTIFACTS_BUCKET}/{s3_key} -> {local_path}")
 
     try:
         s3.download_file(ARTIFACTS_BUCKET, s3_key, local_path)
-        logger.info(f"Downloaded: s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        clogger.info(f"Downloaded: s3://{ARTIFACTS_BUCKET}/{s3_key}")
     except ClientError as e:
-        logger.error(f"Failed to download s3://{ARTIFACTS_BUCKET}/{s3_key}: {e}")
+        clogger.error(f"Failed to download s3://{ARTIFACTS_BUCKET}/{s3_key}: {e}")
         raise
 
 
@@ -66,7 +66,7 @@ def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
     """
     s3: S3Client = get_s3()
 
-    logger.debug(
+    clogger.debug(
         f"Generating presigned URL for s3://{ARTIFACTS_BUCKET}/{s3_key} "
         f"(expires in {expiration}s)"
     )
@@ -77,10 +77,10 @@ def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
             Params={"Bucket": ARTIFACTS_BUCKET, "Key": s3_key},
             ExpiresIn=expiration,
         )
-        logger.info(f"Presigned URL generated for {s3_key}, expires={expiration}s")
+        clogger.info(f"Presigned URL generated for {s3_key}, expires={expiration}s")
         return url
     except ClientError as e:
-        logger.error(f"Failed to generate presigned URL for {s3_key}: {e}")
+        clogger.error(f"Failed to generate presigned URL for {s3_key}: {e}")
         raise
 
 
@@ -100,7 +100,7 @@ def upload_artifact_to_s3(
     if not ARTIFACTS_BUCKET:
         raise ValueError("ARTIFACTS_BUCKET environment variable not set")
 
-    logger.info(
+    clogger.info(
         f"[s3_utils] Fetching upstream artifact {artifact_id} "
         f"from {source_url} → s3://{ARTIFACTS_BUCKET}/{s3_key}"
     )
@@ -120,7 +120,7 @@ def upload_artifact_to_s3(
 
         # 2. Upload to S3
         upload_file(s3_key, tmp_path)
-        logger.info(
+        clogger.info(
             f"[s3_utils] Uploaded artifact {artifact_id} "
             f"to s3://{ARTIFACTS_BUCKET}/{s3_key}"
         )
@@ -128,18 +128,18 @@ def upload_artifact_to_s3(
     except SourceDownloadError:
         raise
     except ClientError:
-        logger.error(f"[s3_utils] Failed to upload {artifact_id} to S3")
+        clogger.error(f"[s3_utils] Failed to upload {artifact_id} to S3")
         raise
     except Exception:
-        logger.error(f"[s3_utils] Unexpected error uploading artifact {artifact_id}")
+        clogger.error(f"[s3_utils] Unexpected error uploading artifact {artifact_id}")
         raise
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.unlink(tmp_path)
-                logger.debug(f"[s3_utils] Removed temp file: {tmp_path}")
+                clogger.debug(f"[s3_utils] Removed temp file: {tmp_path}")
             except Exception:
-                logger.warning(f"[s3_utils] Failed to remove temp file: {tmp_path}")
+                clogger.warning(f"[s3_utils] Failed to remove temp file: {tmp_path}")
 
 
 # =====================================================================================
@@ -156,7 +156,7 @@ def download_artifact_from_s3(
     if not ARTIFACTS_BUCKET:
         raise ValueError("ARTIFACTS_BUCKET environment variable not set")
 
-    logger.debug(
+    clogger.debug(
         f"[s3_utils] Downloading artifact {artifact_id}: "
         f"s3://{ARTIFACTS_BUCKET}/{s3_key} → {local_path}"
     )
@@ -178,7 +178,7 @@ def generate_s3_download_url(
     if not ARTIFACTS_BUCKET:
         raise ValueError("ARTIFACTS_BUCKET environment variable not set")
 
-    logger.debug(
+    clogger.debug(
         f"[s3_utils] Generating presigned URL for {artifact_id}: "
         f"s3://{ARTIFACTS_BUCKET}/{s3_key}"
     )

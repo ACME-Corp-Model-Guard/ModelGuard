@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 from botocore.exceptions import ClientError
 
 from src.aws.clients import get_ddb_table
-from src.logger import logger
+from src.logutil import clogger
 from src.settings import FINGERPRINTS_TABLE
 
 # ==============================================================================
@@ -74,7 +74,7 @@ def calculate_request_fingerprint(
     # SHA-256 hash
     fingerprint = hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
-    logger.debug(f"[replay] Calculated fingerprint: {fingerprint[:16]}...")
+    clogger.debug(f"[replay] Calculated fingerprint: {fingerprint[:16]}...")
     return fingerprint
 
 
@@ -115,7 +115,7 @@ def extract_resource_path(event: Dict[str, Any]) -> str:
         return event["path"]
 
     # Method 3: Fallback to "/" if nothing found
-    logger.debug("[replay] Could not extract resource path from event")
+    clogger.debug("[replay] Could not extract resource path from event")
     return "/"
 
 
@@ -158,7 +158,7 @@ def is_request_replayed(
         response = table.get_item(Key={"fingerprint": fingerprint})
 
         if "Item" in response:
-            logger.warning(
+            clogger.warning(
                 f"[replay] REPLAY DETECTED: fingerprint={fingerprint[:16]}... "
                 f"token={token[:20]}... method={http_method} path={resource_path}"
             )
@@ -167,7 +167,7 @@ def is_request_replayed(
         return False
 
     except ClientError as e:
-        logger.error(f"[replay] DynamoDB check failed: {e}")
+        clogger.error(f"[replay] DynamoDB check failed: {e}")
         raise
 
 
@@ -221,10 +221,10 @@ def record_request_fingerprint(
                 "path": resource_path,
             }
         )
-        logger.debug(
+        clogger.debug(
             f"[replay] Recorded fingerprint: {fingerprint[:16]}... "
             f"expires_at={ttl_expiry}"
         )
     except Exception as e:
-        logger.error(f"[replay] Failed to record fingerprint: {e}")
+        clogger.error(f"[replay] Failed to record fingerprint: {e}")
         # Do NOT raise: recording is defensive, not required for request success

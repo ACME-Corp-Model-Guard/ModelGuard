@@ -17,7 +17,7 @@ from botocore.exceptions import ClientError
 from mypy_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from src.aws.clients import get_bedrock_runtime
-from src.logger import logger
+from src.logutil import clogger
 from src.settings import BEDROCK_MODEL_ID, BEDROCK_REGION
 
 
@@ -63,7 +63,7 @@ def ask_llm(
             },
         }
 
-        logger.debug(f"[llm] Invoking Bedrock model '{model_id}'")
+        clogger.debug(f"[llm] Invoking Bedrock model '{model_id}'")
 
         response = client.invoke_model(
             modelId=model_id,
@@ -80,14 +80,14 @@ def ask_llm(
             try:
                 return json.loads(content)
             except json.JSONDecodeError:
-                logger.error("[llm] Failed to decode JSON from LLM output")
-                logger.debug(f"[llm] Raw output:\n{content}")
+                clogger.error("[llm] Failed to decode JSON from LLM output")
+                clogger.debug(f"[llm] Raw output:\n{content}")
                 return None
 
         return content
 
     except (ClientError, KeyError, json.JSONDecodeError) as e:
-        logger.error(f"[llm] Bedrock request failed: {e}")
+        clogger.error(f"[llm] Bedrock request failed: {e}")
         return None
 
 
@@ -136,7 +136,7 @@ def build_llm_prompt(
 
     prompt = "\n".join(parts)
 
-    logger.debug(
+    clogger.debug(
         f"[llm_prompt_builder] Built prompt with "
         f"{1 + (len(sections) if sections else 0) + (1 if metric_description else 0)} block(s)"
     )

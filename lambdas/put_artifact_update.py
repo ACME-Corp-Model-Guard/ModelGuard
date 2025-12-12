@@ -33,7 +33,7 @@ from src.artifacts.artifactory import (
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.settings import ARTIFACTS_BUCKET
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.storage.s3_utils import delete_objects

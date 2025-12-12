@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     json_response,

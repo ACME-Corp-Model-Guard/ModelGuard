@@ -5,7 +5,7 @@ Return the lineage graph for a model artifact.
 
 from typing import Any, Dict
 from src.auth import AuthContext, auth_required
-from src.logger import log_lambda_handler
+from src.logutil import log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,

@@ -17,7 +17,7 @@ from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.model_artifact import ModelArtifact
 from src.artifacts.code_artifact import CodeArtifact
 from src.artifacts.dataset_artifact import DatasetArtifact
-from src.logger import logger
+from src.logutil import clogger
 from .discovery import _find_connected_artifact_names
 from .persistence import (
     load_all_artifacts,
@@ -147,7 +147,9 @@ def _(artifact: ModelArtifact) -> None:
                 child_model_artifact.artifact_id
             )  # update this model for lineage
 
-    logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+    clogger.info(
+        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
+    )
 
 
 @connect_artifact.register
@@ -189,7 +191,9 @@ def _(artifact: CodeArtifact) -> None:
 
         save_artifact_metadata(model_artifact)
 
-    logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+    clogger.info(
+        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
+    )
 
 
 @connect_artifact.register
@@ -231,4 +235,6 @@ def _(artifact: DatasetArtifact) -> None:
 
         save_artifact_metadata(model_artifact)
 
-    logger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+    clogger.info(
+        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
+    )

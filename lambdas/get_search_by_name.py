@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from src.artifacts.artifactory import load_all_artifacts_by_fields
 from src.auth import AuthContext, auth_required
-from src.logger import log_lambda_handler
+from src.logutil import log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     error_response,

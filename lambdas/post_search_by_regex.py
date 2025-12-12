@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Pattern
 from src.artifacts.artifactory import load_all_artifacts
 from src.artifacts.base_artifact import BaseArtifact
 from src.auth import AuthContext, auth_required
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.http import (
