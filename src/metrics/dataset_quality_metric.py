@@ -5,7 +5,7 @@ import tempfile
 from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.dataset_artifact import DatasetArtifact
-from src.logging import clogger
+from src.logutil import clogger
 from src.metrics.metric import Metric
 from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files

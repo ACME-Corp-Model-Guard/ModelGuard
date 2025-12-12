@@ -8,7 +8,7 @@ New code should use @log_lambda_handler instead.
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from src.logging.config import logger
+from src.logutil.config import logger
 
 F = TypeVar("F", bound=Callable[..., Any])
 

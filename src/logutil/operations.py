@@ -9,7 +9,7 @@ import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
-from src.logging.context import clogger
+from src.logutil.context import clogger
 
 __all__ = ["log_operation", "BatchOperationLogger"]
 

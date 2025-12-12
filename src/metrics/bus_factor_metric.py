@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.code_artifact import CodeArtifact
-from src.logging import clogger
+from src.logutil import clogger
 
 from .metric import Metric
 

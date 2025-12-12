@@ -9,7 +9,7 @@ Provides comprehensive logging utilities for AWS Lambda handlers including:
 - Operation timing and batch processing tracking
 
 Usage:
-    from src.logging import clogger, log_lambda_handler
+    from src.logutil import clogger, log_lambda_handler
 
     @log_lambda_handler("POST /artifact/{type}")
     def lambda_handler(event, context):
@@ -18,12 +18,12 @@ Usage:
 """
 
 # Import and re-export all public components
-from src.logging.config import logger, setup_logging
-from src.logging.context import clogger, correlation_id, request_start_time
-from src.logging.decorators import log_lambda_handler
-from src.logging.legacy import with_logging
-from src.logging.masking import mask_sensitive_data
-from src.logging.operations import BatchOperationLogger, log_operation
+from src.logutil.config import logger, setup_logging
+from src.logutil.context import clogger, correlation_id, request_start_time
+from src.logutil.decorators import log_lambda_handler
+from src.logutil.legacy import with_logging
+from src.logutil.masking import mask_sensitive_data
+from src.logutil.operations import BatchOperationLogger, log_operation
 
 # Initialize logging when package is imported (same as original behavior)
 setup_logging()

@@ -30,7 +30,7 @@ import time
 from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
-from src.logging.config import logger
+from src.logutil.config import logger
 
 # Thread-safe context variables for Lambda execution tracking
 correlation_id: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)

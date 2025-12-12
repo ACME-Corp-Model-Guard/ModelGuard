@@ -14,9 +14,9 @@ import uuid
 from functools import wraps
 from typing import Any, Callable, Dict, TypeVar
 
-from src.logging.config import logger
-from src.logging.context import clogger, correlation_id, request_start_time
-from src.logging.masking import mask_sensitive_data
+from src.logutil.config import logger
+from src.logutil.context import clogger, correlation_id, request_start_time
+from src.logutil.masking import mask_sensitive_data
 
 F = TypeVar("F", bound=Callable[..., Any])
 
