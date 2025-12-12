@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Pattern
 from src.artifacts.artifactory import load_all_artifacts
 from src.artifacts.base_artifact import BaseArtifact
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.http import (
@@ -101,7 +101,7 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
     """
     # Skip if no S3 key
     if not artifact.s3_key:
-        logger.debug(
+        clogger.debug(
             f"[post_search_by_regex] Artifact {artifact.artifact_id} has no s3_key, "
             "skipping README fetch"
         )
@@ -113,7 +113,7 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         # Download artifact from S3
-        logger.debug(
+        clogger.debug(
             f"[post_search_by_regex] Downloading artifact {artifact.artifact_id} from S3"
         )
         download_artifact_from_s3(
@@ -132,21 +132,21 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
         )
 
         if not files:
-            logger.debug(
+            clogger.debug(
                 f"[post_search_by_regex] No README found for artifact {artifact.artifact_id}"
             )
             return ""
 
         # Get first (and only) file content
         readme_text = list(files.values())[0]
-        logger.debug(
+        clogger.debug(
             f"[post_search_by_regex] Extracted README ({len(readme_text)} chars) "
             f"for artifact {artifact.artifact_id}"
         )
         return readme_text
 
     except Exception as e:
-        logger.warning(
+        clogger.warning(
             f"[post_search_by_regex] Failed to extract README for artifact "
             f"{artifact.artifact_id}: {e}"
         )
@@ -158,7 +158,7 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
             try:
                 os.unlink(tmp_tar)
             except Exception as e:
-                logger.warning(
+                clogger.warning(
                     f"[post_search_by_regex] Failed to remove temp file {tmp_tar}: {e}"
                 )
 
@@ -206,7 +206,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     Searches artifact name, metadata, and README content (fetched from S3).
     """
     artifacts = load_all_artifacts()
-    logger.info(
+    clogger.info(
         f"[post_search_by_regex] Loaded {len(artifacts)} artifacts for regex search"
     )
 
@@ -234,7 +234,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
                 }
             )
 
-    logger.info(f"[post_search_by_regex] Found {len(matches)} matching artifacts")
+    clogger.info(f"[post_search_by_regex] Found {len(matches)} matching artifacts")
     return matches
 
 
@@ -244,7 +244,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("POST /artifact/byRegEx", log_request_body=True)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any], context: Any, auth: AuthContext
@@ -263,14 +263,14 @@ def lambda_handler(
     - 404 if no artifacts match.
     - 403 / 500 handled by decorators and error_response.
     """
-    logger.info("[post_search_by_regex] Handling regex search request")
+    clogger.info("[post_search_by_regex] Handling regex search request")
     # ------------------------------------------------------------------
     # Step 1 - Parse and validate regex from body
     # ------------------------------------------------------------------
     try:
         pattern = _parse_regex(event)
     except ValueError as exc:
-        logger.warning(f"[post_search_by_regex] Invalid request: {exc}")
+        clogger.warning(f"[post_search_by_regex] Invalid request: {exc}")
         return error_response(400, str(exc), error_code="INVALID_ARTIFACT_REGEX")
 
     # ------------------------------------------------------------------

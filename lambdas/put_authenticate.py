@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     json_response,
@@ -35,13 +35,11 @@ from src.auth import authenticate_user
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("PUT /authenticate", log_request_body=True)
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
 ) -> LambdaResponse:
-    logger.info("[/authenticate] Handling PUT /authenticate")
-
     # ---------------------------------------------------------------------
     # Step 1 — Parse JSON body
     # ---------------------------------------------------------------------
@@ -85,14 +83,18 @@ def lambda_handler(
     try:
         tokens = authenticate_user(username, password)
     except Exception as e:
-        logger.error(
-            [f"[/authenticate] Exception encountered during authentication: {e}"]
+        clogger.exception(
+            "Authentication failed",
+            extra={"username": username, "error_type": type(e).__name__},
         )
         return error_response(401, "Invalid username or password")
 
     access_token = tokens.get("access_token")
     if not access_token:
-        logger.error("[/authenticate] Missing 'access_token' from Cognito response")
+        clogger.error(
+            "Missing access_token from Cognito response",
+            extra={"username": username},
+        )
         return error_response(
             500,
             "Internal Server Error",

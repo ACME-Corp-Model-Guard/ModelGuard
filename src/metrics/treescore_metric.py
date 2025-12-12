@@ -4,7 +4,7 @@ from typing import Dict, Union
 
 from src.artifacts.artifactory import load_artifact_metadata
 from src.artifacts.model_artifact import ModelArtifact
-from src.logger import logger
+from src.logging import clogger
 from src.metrics.metric import Metric
 
 
@@ -42,9 +42,9 @@ class TreescoreMetric(Metric):
                     break
         score = score / parent_count if parent_count > 0 else 0.5
         if score < 0.0 or score > 1.0:
-            logger.warning(
+            clogger.warning(
                 f"Computed treescore {score} out of bounds for model {model.artifact_id}"
             )
             score = 0.5  # Clamp to neutral if out of bounds
-        logger.info(f"Computed treescore {score} for model {model.artifact_id}")
+        clogger.info(f"Computed treescore {score} for model {model.artifact_id}")
         return {"treescore": score}

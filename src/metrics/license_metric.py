@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict
 
-from src.logger import logger
+from src.logging import clogger
 from src.metrics.metric import Metric
 
 if TYPE_CHECKING:
@@ -70,17 +70,17 @@ class LicenseMetric(Metric):
                 self.DEFAULT_SCORE,
             )
 
-            logger.debug(
+            clogger.debug(
                 f"[license] artifact_id={model.artifact_id} "
                 f"raw={raw!r} normalized={normalized!r} score={score}"
             )
 
             return {self.SCORE_FIELD: float(score)}
 
-        except Exception as exc:
-            logger.error(
-                f"[license] Failed scoring artifact_id={model.artifact_id}: {exc}",
-                exc_info=True,
+        except Exception as e:
+            clogger.exception(
+                f"[license] Failed scoring artifact_id={model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: float(self.DEFAULT_SCORE)}
 
