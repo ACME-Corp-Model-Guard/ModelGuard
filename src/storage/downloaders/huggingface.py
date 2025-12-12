@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 
 
 class FileDownloadError(Exception):
@@ -48,7 +48,7 @@ def download_from_huggingface(
         FileDownloadError: If URL parsing fails, HF download fails, or packaging fails
     """
 
-    logger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
+    clogger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
 
     if artifact_type == "code":
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
@@ -110,7 +110,7 @@ def download_from_huggingface(
         else:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
-        logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
+        clogger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
         # Download HF snapshot into temporary directory (explicitly use /tmp for Lambda)
         cache_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"hf_{artifact_id}_")
@@ -129,12 +129,12 @@ def download_from_huggingface(
             delete=False, suffix=".tar.gz", dir="/tmp"
         ).name
 
-        logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
+        clogger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
 
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(snapshot_path, arcname=os.path.basename(snapshot_path))
 
-        logger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
+        clogger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
 
         return tar_path
 
@@ -145,7 +145,7 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
 
     except Exception as e:
-        logger.error(f"[HF] Download failed: {e}")
+        clogger.error(f"[HF] Download failed: {e}")
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
@@ -155,9 +155,9 @@ def download_from_huggingface(
                 import shutil
 
                 shutil.rmtree(cache_dir)
-                logger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
+                clogger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
             except Exception as cleanup_err:
-                logger.warning(
+                clogger.warning(
                     f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
                 )
 
@@ -169,7 +169,7 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
     """
     Fetch model metadata from HuggingFace Hub API.
     """
-    logger.info(f"[HF] Fetching model metadata: {url}")
+    clogger.info(f"[HF] Fetching model metadata: {url}")
 
     try:
         parts = url.rstrip("/").split("huggingface.co/")
@@ -196,7 +196,7 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch model metadata: {e}")
+        clogger.error(f"[HF] Failed to fetch model metadata: {e}")
         raise
 
 
@@ -207,7 +207,7 @@ def fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:
     """
     Fetch dataset metadata from HuggingFace Hub API.
     """
-    logger.info(f"[HF] Fetching dataset metadata: {url}")
+    clogger.info(f"[HF] Fetching dataset metadata: {url}")
 
     try:
         parts = url.rstrip("/").split("huggingface.co/datasets/")
@@ -233,5 +233,5 @@ def fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch dataset metadata: {e}")
+        clogger.error(f"[HF] Failed to fetch dataset metadata: {e}")
         raise

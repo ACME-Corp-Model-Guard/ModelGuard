@@ -4,7 +4,7 @@ import os
 import tempfile
 from typing import TYPE_CHECKING, Dict
 
-from src.logutil import clogger
+from src.logutil import clogger, log_operation
 from src.metrics.metric import Metric
 from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
@@ -66,24 +66,32 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             # ------------------------------------------------------------------
             # Step 1 — Download model tarball from S3
             # ------------------------------------------------------------------
-            clogger.debug(f"[ramp_up] Downloading bundle for model {model.artifact_id}")
-
-            download_artifact_from_s3(
+            with log_operation(
+                "s3_download",
                 artifact_id=model.artifact_id,
                 s3_key=model.s3_key,
-                local_path=tmp_tar,
-            )
+            ):
+                download_artifact_from_s3(
+                    artifact_id=model.artifact_id,
+                    s3_key=model.s3_key,
+                    local_path=tmp_tar,
+                )
 
             # ------------------------------------------------------------------
             # Step 2 — Extract relevant documentation files
             # ------------------------------------------------------------------
-            files = extract_relevant_files(
-                tar_path=tmp_tar,
-                include_ext=self.INCLUDE_EXT,
+            with log_operation(
+                "extract_files",
+                artifact_id=model.artifact_id,
                 max_files=self.MAX_FILES,
-                max_chars=self.MAX_CHARS_PER_FILE,
-                prioritize_readme=True,
-            )
+            ):
+                files = extract_relevant_files(
+                    tar_path=tmp_tar,
+                    include_ext=self.INCLUDE_EXT,
+                    max_files=self.MAX_FILES,
+                    max_chars=self.MAX_CHARS_PER_FILE,
+                    prioritize_readme=True,
+                )
 
             if not files:
                 clogger.warning(
@@ -104,7 +112,12 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             # ------------------------------------------------------------------
             # Step 4 — Query LLM (JSON mode)
             # ------------------------------------------------------------------
-            response = ask_llm(prompt, return_json=True)
+            with log_operation(
+                "llm_analysis",
+                artifact_id=model.artifact_id,
+                file_count=len(files),
+            ):
+                response = ask_llm(prompt, return_json=True)
 
             # ------------------------------------------------------------------
             # Step 5 — Extract score

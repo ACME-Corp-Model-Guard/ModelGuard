@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
 from src.aws.clients import get_s3
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.settings import ARTIFACTS_BUCKET
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (

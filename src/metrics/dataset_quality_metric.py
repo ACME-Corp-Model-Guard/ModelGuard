@@ -5,7 +5,7 @@ import tempfile
 from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.dataset_artifact import DatasetArtifact
-from src.logutil import clogger
+from src.logutil import clogger, log_operation
 from src.metrics.metric import Metric
 from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files
@@ -86,26 +86,32 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         try:
-            clogger.debug(
-                f"[dataset_quality] Downloading dataset bundle for {dataset_artifact.artifact_id}"
-            )
-
-            download_artifact_from_s3(
+            with log_operation(
+                "s3_download",
                 artifact_id=dataset_artifact.artifact_id,
                 s3_key=dataset_artifact.s3_key,
-                local_path=tmp_tar,
-            )
+            ):
+                download_artifact_from_s3(
+                    artifact_id=dataset_artifact.artifact_id,
+                    s3_key=dataset_artifact.s3_key,
+                    local_path=tmp_tar,
+                )
 
             # ------------------------------------------------------------------
             # Step 2 — Extract relevant dataset files
             # ------------------------------------------------------------------
-            files = extract_relevant_files(
-                tar_path=tmp_tar,
-                include_ext=self.INCLUDE_EXT,
+            with log_operation(
+                "extract_files",
+                artifact_id=dataset_artifact.artifact_id,
                 max_files=self.MAX_FILES,
-                max_chars=self.MAX_CHARS_PER_FILE,
-                prioritize_readme=True,
-            )
+            ):
+                files = extract_relevant_files(
+                    tar_path=tmp_tar,
+                    include_ext=self.INCLUDE_EXT,
+                    max_files=self.MAX_FILES,
+                    max_chars=self.MAX_CHARS_PER_FILE,
+                    prioritize_readme=True,
+                )
 
             if not files:
                 clogger.warning(
@@ -127,7 +133,12 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             # ------------------------------------------------------------------
             # Step 4 — Ask LLM
             # ------------------------------------------------------------------
-            response = ask_llm(prompt, return_json=True)
+            with log_operation(
+                "llm_analysis",
+                artifact_id=dataset_artifact.artifact_id,
+                file_count=len(files),
+            ):
+                response = ask_llm(prompt, return_json=True)
 
             # ------------------------------------------------------------------
             # Step 5 — Extract score

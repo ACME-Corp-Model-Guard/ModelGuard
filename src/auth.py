@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError
 from jose import jwk, jwt
 from jose.utils import base64url_decode
 
-from src.logger import logger
+from src.logutil import clogger
 from src.replay_prevention import (
     extract_resource_path,
     is_request_replayed,
@@ -50,7 +50,7 @@ JWKS_URL = (
     f"{USER_POOL_ID}/.well-known/jwks.json"
 )
 
-logger.info(f"[auth] Loading JWKS keys from {JWKS_URL}")
+clogger.info(f"[auth] Loading JWKS keys from {JWKS_URL}")
 jwks = http.request("GET", JWKS_URL).json()["keys"]
 
 
@@ -74,7 +74,7 @@ class TokenRecord(TypedDict):
 def authenticate_user(username: str, password: str) -> dict:
     """Authenticate via Cognito USER_PASSWORD_AUTH and store token with TTL."""
     try:
-        logger.info(f"[auth] Authenticating user {username} via Cognito")
+        clogger.info(f"[auth] Authenticating user {username} via Cognito")
 
         resp = cognito.initiate_auth(
             AuthFlow="USER_PASSWORD_AUTH",
@@ -106,7 +106,7 @@ def authenticate_user(username: str, password: str) -> dict:
         }
 
     except ClientError as e:
-        logger.error(f"[auth] Cognito authentication failed: {e}")
+        clogger.error(f"[auth] Cognito authentication failed: {e}")
         raise
 
 
@@ -274,7 +274,7 @@ def auth_required(
             auth: AuthContext = authorize(event)
             return func(event, context, auth=auth)
         except Exception as e:
-            logger.error(f"[auth_required] Unauthorized: {e}")
+            clogger.error(f"[auth_required] Unauthorized: {e}")
             return error_response(
                 401,
                 f"Unauthorized: {e}",
@@ -319,7 +319,7 @@ def roles_required(
                 auth: AuthContext = authorize(event, allowed_roles=allowed_roles)
                 return func(event, context, auth=auth)
             except Exception as e:
-                logger.error(f"[roles_required] Forbidden: {e}")
+                clogger.error(f"[roles_required] Forbidden: {e}")
                 return error_response(
                     403,
                     f"Forbidden: {e}",

@@ -16,7 +16,7 @@ from typing import Any, Dict, Tuple
 import requests
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 
 
 class FileDownloadError(Exception):
@@ -57,7 +57,7 @@ def _download_repo_tarball(owner: str, repo: str, dest_dir: str) -> str:
     """
     tarball_url = f"https://api.github.com/repos/{owner}/{repo}/tarball"
 
-    logger.debug(f"[GitHub] Downloading from API: {tarball_url}")
+    clogger.debug(f"[GitHub] Downloading from API: {tarball_url}")
 
     try:
         response = requests.get(tarball_url, timeout=300, stream=True)
@@ -70,7 +70,7 @@ def _download_repo_tarball(owner: str, repo: str, dest_dir: str) -> str:
                 if chunk:
                     f.write(chunk)
 
-        logger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
+        clogger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
         return tarball_path
 
     except requests.RequestException as e:
@@ -92,7 +92,7 @@ def download_from_github(
     This approach doesn't require the git binary, making it suitable for
     Lambda environments.
     """
-    logger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
+    clogger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
 
     if artifact_type != "code":
         raise FileDownloadError("Only 'code' artifacts may be downloaded from GitHub")
@@ -104,14 +104,14 @@ def download_from_github(
         # Step 2 — Download tarball directly to /tmp (use /tmp for Lambda)
         temp_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"gh_{artifact_id}_")
 
-        logger.debug(f"[GitHub] Downloading {owner}/{repo} as tarball")
+        clogger.debug(f"[GitHub] Downloading {owner}/{repo} as tarball")
         tar_path = _download_repo_tarball(owner, repo, temp_dir)
 
-        logger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
+        clogger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
         return tar_path
 
     except Exception as e:
-        logger.error(f"[GitHub] Download failed: {e}")
+        clogger.error(f"[GitHub] Download failed: {e}")
         raise FileDownloadError(f"GitHub download failed: {e}")
 
 
@@ -122,7 +122,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
     """
     Fetch code repository metadata from the GitHub REST API.
     """
-    logger.info(f"[GitHub] Fetching code metadata: {url}")
+    clogger.info(f"[GitHub] Fetching code metadata: {url}")
 
     try:
         parts = url.rstrip("/").split("github.com/")
@@ -147,7 +147,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
             )
             # Handle rate limiting gracefully
             if contributors_response.status_code == 403:
-                logger.warning(
+                clogger.warning(
                     f"[GitHub] Rate limit exceeded when fetching contributors for {owner}/{repo}"
                 )
             else:
@@ -157,11 +157,11 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
                 for contrib in contributors_data:
                     if isinstance(contrib, dict) and "contributions" in contrib:
                         contributors.append({"contributions": contrib["contributions"]})
-                logger.debug(
+                clogger.debug(
                     f"[GitHub] Fetched {len(contributors)} contributors for {owner}/{repo}"
                 )
         except Exception as e:
-            logger.warning(
+            clogger.warning(
                 f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}"
             )
 
@@ -184,5 +184,5 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[GitHub] Failed to fetch repo metadata: {e}")
+        clogger.error(f"[GitHub] Failed to fetch repo metadata: {e}")
         raise

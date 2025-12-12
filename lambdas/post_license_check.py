@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from src.auth import AuthContext, auth_required
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,

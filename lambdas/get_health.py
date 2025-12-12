@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from src.logger import log_lambda_handler
+from src.logutil import log_lambda_handler
 from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 

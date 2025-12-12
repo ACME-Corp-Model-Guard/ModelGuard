@@ -10,7 +10,7 @@ from __future__ import annotations
 import tarfile
 from typing import Dict, Iterable, List, Tuple
 
-from src.logger import logger
+from src.logutil import clogger
 
 
 # ====================================================================================
@@ -48,10 +48,12 @@ def extract_files_from_tar(
                     files[m.name] = text[:max_chars]
 
                 except Exception as e:
-                    logger.warning(f"[file_extraction] Failed to extract {m.name}: {e}")
+                    clogger.warning(
+                        f"[file_extraction] Failed to extract {m.name}: {e}"
+                    )
 
     except Exception as e:
-        logger.error(f"[file_extraction] Failed to open tar: {e}")
+        clogger.error(f"[file_extraction] Failed to open tar: {e}")
 
     return files
 

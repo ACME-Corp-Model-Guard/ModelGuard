@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 from src.auth import AuthContext, auth_required
-from src.logger import clogger, log_lambda_handler
+from src.logutil import clogger, log_lambda_handler
 from src.utils.http import (
     LambdaResponse,
     json_response,

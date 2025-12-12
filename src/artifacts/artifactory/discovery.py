@@ -12,7 +12,7 @@ configuration files, and other metadata to discover relationships like:
 from typing import Any, Dict, Optional, Union
 
 from src.artifacts.model_artifact import ModelArtifact
-from src.logger import logger
+from src.logutil import clogger
 from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
 from src.utils.llm_analysis import (
@@ -58,13 +58,13 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
         # Step 3: Update artifact fields with extracted data
         _update_connection_fields(artifact, extracted_data)
 
-        logger.info(
+        clogger.info(
             f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', "
             f"parent_model_name='{artifact.parent_model_name}' "
             f"for model artifact: {artifact.artifact_id}"
         )
     except Exception as e:
-        logger.error(
+        clogger.error(
             f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}"
         )
 
@@ -141,7 +141,7 @@ def _llm_extract_fields(
 
     # Validate response
     if not response or not isinstance(response, dict):
-        logger.warning(
+        clogger.warning(
             f"LLM failed to extract connected artifact names for {artifact.artifact_id}"
         )
         return None
