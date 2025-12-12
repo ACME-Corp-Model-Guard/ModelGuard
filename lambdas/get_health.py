@@ -8,12 +8,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from src.logger import with_logging
+from src.logger import log_lambda_handler
 from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 
-@with_logging
 @translate_exceptions
+@log_lambda_handler("GET /health")
 def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
     """
     Returns a standardized health/liveness response.

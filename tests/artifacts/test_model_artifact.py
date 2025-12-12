@@ -89,9 +89,11 @@ def test_compute_scores_handles_exceptions(model_artifact):
     assert "Good" in model_artifact.scores
     assert isinstance(model_artifact.scores["Good"], (float, int))
 
-    # Bad metric should have defaulted to 0.0
+    # Bad metric should have defaulted to 0.0 (but still track latency)
     assert model_artifact.scores["Bad"] == 0.0
-    assert model_artifact.scores_latency["Bad"] == 0.0
+    assert (
+        model_artifact.scores_latency["Bad"] >= 0.0
+    )  # Now tracks time even for failures
     print("Handled exception in BadMetric as expected.")
 
 

@@ -5,7 +5,7 @@ import tempfile
 from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.dataset_artifact import DatasetArtifact
-from src.logger import logger
+from src.logging import clogger
 from src.metrics.metric import Metric
 from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files
@@ -66,7 +66,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         # ------------------------------------------------------------------
         dataset_id = model.dataset_artifact_id
         if dataset_id is None:
-            logger.warning(
+            clogger.warning(
                 f"[dataset_quality] No dataset artifact_id for model {model.artifact_id}"
             )
             return {self.SCORE_FIELD: 0.0}
@@ -74,7 +74,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         dataset_artifact = load_artifact_metadata(dataset_id)
 
         if not isinstance(dataset_artifact, DatasetArtifact):
-            logger.warning(
+            clogger.warning(
                 f"[dataset_quality] Missing or invalid dataset artifact for model "
                 f"{model.artifact_id}"
             )
@@ -86,7 +86,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         try:
-            logger.debug(
+            clogger.debug(
                 f"[dataset_quality] Downloading dataset bundle for {dataset_artifact.artifact_id}"
             )
 
@@ -108,7 +108,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             )
 
             if not files:
-                logger.warning(
+                clogger.warning(
                     f"[dataset_quality] No relevant dataset files extracted for "
                     f"{dataset_artifact.artifact_id}"
                 )
@@ -135,7 +135,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                logger.error(
+                clogger.error(
                     f"[dataset_quality] Invalid score returned for {dataset_artifact.artifact_id}: "
                     f"{response}"
                 )
@@ -146,9 +146,9 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            logger.error(
-                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}
 
@@ -160,6 +160,6 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
                 if os.path.exists(tmp_tar):
                     os.unlink(tmp_tar)
             except Exception:
-                logger.warning(
+                clogger.warning(
                     f"[dataset_quality] Failed to remove temp file {tmp_tar}"
                 )

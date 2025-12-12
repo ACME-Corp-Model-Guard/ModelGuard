@@ -30,7 +30,7 @@ from src.artifacts.artifactory import (
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.settings import ARTIFACTS_BUCKET
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.storage.s3_utils import delete_objects
@@ -157,7 +157,7 @@ def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("PUT /artifacts/{type}/{id}", log_request_body=True)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
@@ -165,7 +165,7 @@ def lambda_handler(
     auth: AuthContext,  # Use for auth side effects
     # ) -> Dict[str, Any]:
 ) -> LambdaResponse:
-    logger.info("[put_artifact_update] Handling artifact upodate request")
+    clogger.info("[put_artifact_update] Handling artifact upodate request")
 
     # ------------------------------------------------------------------
     # Step 1 - Extract & validate path parameters
@@ -188,7 +188,7 @@ def lambda_handler(
         )
 
     artifact_type = cast(ArtifactType, artifact_type_raw)
-    logger.debug(
+    clogger.debug(
         f"[put_artifact_update] artifact_type = {artifact_type}, artifact_id = {artifact_id}"
     )
 
@@ -198,7 +198,7 @@ def lambda_handler(
     try:
         body = _parse_body(event)
     except ValueError as exc:
-        logger.warning(f"[put_artifact_update] Invalid request body: {exc}")
+        clogger.warning(f"[put_artifact_update] Invalid request body: {exc}")
         return error_response(400, str(exc), error_code="INVALID_REQUEST")
 
     request_metadata = body["metadata"]
@@ -209,20 +209,22 @@ def lambda_handler(
         return error_response(
             400, "Request data.url must be a non-empty string", error_code="MISSING_URL"
         )
-    logger.info(f"[put_artifact_update] update_url = {url}")
+    clogger.info(f"[put_artifact_update] update_url = {url}")
 
     # ------------------------------------------------------------------
     # Step 3 - Load existing artifact metadata (previous version)
     # ------------------------------------------------------------------
     old_artifact = load_artifact_metadata(artifact_id)
     if old_artifact is None:
-        logger.warning(f"[put_artifact_update] Artifact '{artifact_id}' does not exist")
+        clogger.warning(
+            f"[put_artifact_update] Artifact '{artifact_id}' does not exist"
+        )
         return error_response(
             404, f"Artifact '{artifact_id}' does not exist", error_code="NOT_FOUND"
         )
 
     old_s3_key = getattr(old_artifact, "s3_key", None)
-    logger.debug(
+    clogger.debug(
         f"[put_artifact_update] Loaded old artifact"
         f"id = {old_artifact.artifact_id}, s3_key = {old_s3_key}"
     )
@@ -233,7 +235,7 @@ def lambda_handler(
     try:
         _validate_name_id_match(request_metadata, artifact_id, old_artifact)
     except ValueError as exc:
-        logger.warning(f"[put_artifact_update] Name/ID validation failed: {exc}")
+        clogger.warning(f"[put_artifact_update] Name/ID validation failed: {exc}")
         return error_response(400, str(exc), error_code="NAME_ID_MISMATCH")
 
     # ------------------------------------------------------------------
@@ -247,18 +249,20 @@ def lambda_handler(
     """
     try:
         new_artifact = create_artifact(artifact_type, source_url=url)
-    except FileDownloadError as exc:
-        logger.error(
-            f"[put_artifact_update] Upstream artifact download/metadata failed: {exc}"
+    except FileDownloadError as e:
+        clogger.error(
+            "[put_artifact_update] Upstream artifact download/metadata failed",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             404,
             "Artifact metadata could not be fetched from the source URL",
             error_code="SOURCE_NOT_FOUND",
         )
-    except Exception as exc:  # pragma: no cover - safety net
-        logger.error(
-            f"[put_artifact_update] Unexpected error during artifact creation: {exc}"
+    except Exception as e:  # pragma: no cover - safety net
+        clogger.exception(
+            "[put_artifact_update] Unexpected error during artifact creation",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             500,
@@ -266,7 +270,7 @@ def lambda_handler(
             error_code="INGESTION_FAILURE",
         )
 
-    logger.info(
+    clogger.info(
         f"[put_artifact_update] Created candidate artifact: "
         f"id={new_artifact.artifact_id}, type={new_artifact.artifact_type}, "
         f"s3_key={getattr(new_artifact, 's3_key', None)}"
@@ -282,7 +286,7 @@ def lambda_handler(
         old_score = _get_net_score(old_artifact)
 
         if new_score is None:
-            logger.warning(
+            clogger.warning(
                 "[put_artifact_update] NetScore missing for new model; "
                 "treating as 0.0 for comparison"
             )
@@ -294,7 +298,7 @@ def lambda_handler(
         """
         threshold = 0.0 if old_score is None else old_score
 
-        logger.info(
+        clogger.info(
             "[put_artifact_update] NetScore comparison: "
             f"old={threshold:.4f}, new={new_score:.4f}"
         )
@@ -309,16 +313,17 @@ def lambda_handler(
     if not accept_update:
         new_s3_key = getattr(new_artifact, "s3_key", None)
         if ARTIFACTS_BUCKET and new_s3_key:
-            logger.info(
+            clogger.info(
                 f"[put_artifact_update] Update rejected; deleting new S3 object "
                 f"s3://{ARTIFACTS_BUCKET}/{new_s3_key}"
             )
             try:
                 delete_objects(ARTIFACTS_BUCKET, [new_s3_key])
-            except Exception as exc:  # pragma: no cover - best effort cleanup
-                logger.error(
+            except Exception as e:  # pragma: no cover - best effort cleanup
+                clogger.exception(
                     f"[put_artifact_update] Failed to delete new artifact S3 key "
-                    f"{new_s3_key}: {exc}"
+                    f"{new_s3_key}",
+                    extra={"error_type": type(e).__name__},
                 )
 
         return error_response(
@@ -334,16 +339,17 @@ def lambda_handler(
     #   - Overwrite old metadata with new artifact metadata
     # ------------------------------------------------------------------
     if ARTIFACTS_BUCKET and old_s3_key:
-        logger.info(
+        clogger.info(
             f"[put_artifact_update] Update accepted; deleting old S3 object "
             f"s3://{ARTIFACTS_BUCKET}/{old_s3_key}"
         )
         try:
             delete_objects(ARTIFACTS_BUCKET, [old_s3_key])
-        except Exception as exc:  # pragma: no cover - best effort cleanup
-            logger.error(
+        except Exception as e:  # pragma: no cover - best effort cleanup
+            clogger.exception(
                 f"[put_artifact_update] Failed to delete old artifact S3 key "
-                f"{old_s3_key}: {exc}"
+                f"{old_s3_key}",
+                extra={"error_type": type(e).__name__},
             )
 
     # Align IDs so we overwrite the existing artifact row in DynamoDB.
@@ -352,9 +358,10 @@ def lambda_handler(
 
     try:
         save_artifact_metadata(new_artifact)
-    except Exception as exc:
-        logger.error(
-            f"[put_artifact_update] Failed to save updated artifact metadata: {exc}"
+    except Exception as e:
+        clogger.exception(
+            "[put_artifact_update] Failed to save updated artifact metadata",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             500,
@@ -365,7 +372,7 @@ def lambda_handler(
     # ------------------------------------------------------------------
     # Step 6 - Return success response (per OpenAPI spec: just a message)
     # ------------------------------------------------------------------
-    logger.info(
+    clogger.info(
         f"[put_artifact_update] Artifact update succeeded for id={new_artifact.artifact_id}"
     )
     return json_response(200, {"message": "Artifact is updated"})

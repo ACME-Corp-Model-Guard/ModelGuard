@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
@@ -111,7 +111,7 @@ def _format_rate_response(artifact_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("GET /artifact/model/{id}/rate")
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
@@ -123,8 +123,6 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     path_params = event.get("pathParameters") or {}
     model_id = path_params.get("id")
-
-    logger.info(f"[get_model_rate] Handling GET /artifact/model/{model_id}/rate")
 
     if not model_id:
         return error_response(
@@ -161,12 +159,14 @@ def lambda_handler(
         artifact_dict = artifact.to_dict()
         rate_data = _format_rate_response(artifact_dict)
     except Exception as e:
-        logger.error(f"[get_model_rate] Failed to format rate data: {e}")
+        clogger.exception(
+            "Failed to format rate data",
+            extra={"model_id": model_id, "error_type": type(e).__name__},
+        )
         return error_response(
             500,
             f"Failed to format rate data: {str(e)}",
             error_code="INTERNAL_ERROR",
         )
 
-    logger.info(f"[get_model_rate] Successfully retrieved rating for model {model_id}")
     return json_response(200, rate_data)

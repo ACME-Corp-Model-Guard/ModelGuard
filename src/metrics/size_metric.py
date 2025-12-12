@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Union
 
-from src.logger import logger
+from src.logging import clogger
 
 from .metric import Metric
 
@@ -48,7 +48,7 @@ class SizeMetric(Metric):
 
         # Handle missing or invalid size
         if not size_bytes or size_bytes <= 0:
-            logger.debug(
+            clogger.debug(
                 f"No valid size information for model {model.artifact_id}, "
                 f"returning neutral scores"
             )
@@ -73,7 +73,7 @@ class SizeMetric(Metric):
 
             # Convert to human-readable format for logging
             size_gb = size_bytes / (1024 * 1024 * 1024)
-            logger.debug(
+            clogger.debug(
                 f"Size scores for {model.artifact_id} (size: {size_gb:.2f} GB): "
                 f"Pi={scores['size_pi']:.3f}, Nano={scores['size_nano']:.3f}, "
                 f"Pc={scores['size_pc']:.3f}, Server={scores['size_server']:.3f}"
@@ -82,9 +82,9 @@ class SizeMetric(Metric):
             return scores
 
         except Exception as e:
-            logger.error(
-                f"Failed to calculate size scores for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"Failed to calculate size scores for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {
                 "size_pi": 0.5,

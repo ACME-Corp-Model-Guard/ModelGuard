@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.logger import logger, with_logging
+from src.logger import log_lambda_handler
 from src.utils.http import LambdaResponse, json_response, translate_exceptions
 
 # Supported track(s) for this system.
@@ -30,21 +30,11 @@ SUPPORTED_TRACKS = ["Access control track"]
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("GET /tracks")
 def lambda_handler(event: Dict[str, Any], context: Any) -> LambdaResponse:
-    logger.info("[tracks] Handling tracks listing request")
-
     # ---------------------------------------------------------------------
-    # Step 1 - Log incoming request (useful for debugging)
-    # ---------------------------------------------------------------------
-    logger.debug(f"[tracks] Incoming event: {event}")
-
-    # ---------------------------------------------------------------------
-    # Step 2 - Build response body (OpenAPI spec requires "plannedTracks" key)
+    # Step 1 - Build response body (OpenAPI spec requires "plannedTracks" key)
     # ---------------------------------------------------------------------
     response_body = {"plannedTracks": SUPPORTED_TRACKS}
 
-    # ---------------------------------------------------------------------
-    # Step 3 - Return 200 with supported tracks list
-    # ---------------------------------------------------------------------
     return json_response(200, response_body)

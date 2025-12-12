@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
 from src.aws.clients import get_s3
-from src.logger import logger, with_logging
+from src.logger import clogger, log_lambda_handler
 from src.settings import ARTIFACTS_BUCKET
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
@@ -35,13 +35,13 @@ def _get_artifact_size_mb(artifact_id: str, s3_key: str) -> float:
     """
     s3 = get_s3()
     try:
-        logger.debug(f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        clogger.debug(f"[artifact_cost] HEAD s3://{ARTIFACTS_BUCKET}/{s3_key}")
         head = s3.head_object(Bucket=ARTIFACTS_BUCKET, Key=s3_key)
         size_bytes = int(head.get("ContentLength", 0))
         size_mb = size_bytes / (1024 * 1024)  # Convert bytes to MB
         return round(size_mb, 2)
     except Exception as e:
-        logger.warning(f"[artifact_cost] Failed HEAD for artifact {artifact_id}: {e}")
+        clogger.warning(f"[artifact_cost] Failed HEAD for artifact {artifact_id}: {e}")
         return 0.0
 
 
@@ -114,13 +114,13 @@ def _calculate_costs_with_dependencies(
 # =============================================================================
 
 
-@with_logging
+@log_lambda_handler("GET /artifact/{type}/{id}/cost")
 @translate_exceptions
 @auth_required
 def lambda_handler(
     event: Dict[str, Any], context: Any, auth: AuthContext
 ) -> LambdaResponse:
-    logger.info("[artifact_cost] Handling artifact cost request")
+    clogger.info("[artifact_cost] Handling artifact cost request")
 
     # ----------------------------------------------------------------------
     # Step 1 - Extract path parameters
@@ -153,7 +153,7 @@ def lambda_handler(
     dependency_param = query_params.get("dependency", "false").lower()
     include_dependencies = dependency_param in ("true", "1", "yes")
 
-    logger.debug(
+    clogger.debug(
         f"[artifact_cost] artifact_type={artifact_type}, artifact_id={artifact_id}, "
         f"include_dependencies={include_dependencies}"
     )
