@@ -105,6 +105,7 @@ def lambda_handler(
         )
 
     url = body.get("url")
+    name = body.get("name")  # Optional: autograder may provide this
     if not url:
         return error_response(
             400,
@@ -128,7 +129,7 @@ def lambda_handler(
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = create_artifact(artifact_type, source_url=url)
+        artifact = create_artifact(artifact_type, source_url=url, name=name)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         clogger.error(
