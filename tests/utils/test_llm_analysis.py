@@ -164,7 +164,6 @@ def test_build_file_analysis_prompt_basic():
 
     assert "Code Quality" in prompt
     assert "code_quality" in prompt
-    assert '"code_quality": <float [0.0, 1.0]>' in prompt
 
     assert "=== FILE: a.py ===" in prompt
     assert "print('a')" in prompt

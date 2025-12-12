@@ -119,7 +119,7 @@ def ask_llm(
             clogger.debug(f"[llm] Raw parsed keys: {list(parsed.keys())}")
             clogger.debug(f"[llm] Raw text (first 500 chars):\n{raw_text[:500]}")
             return None
-        
+
         # Log if content is unexpectedly empty or short
         if not content or len(content.strip()) < 10:
             clogger.warning(
@@ -172,13 +172,12 @@ def ask_llm(
 def build_llm_prompt(
     instructions: str,
     sections: Optional[Dict[str, str]] = None,
-    metric_description: Optional[str] = None,
     important_terms: Optional[List[str]] = None,
 ) -> str:
     """Construct a structured prompt with smart token budgeting.
 
     Strategy:
-    - Preserve instructions and metric description intact
+    - Preserve instructions intact
     - Allocate per-section budgets proportional to size (with min floor)
     - Trim from END of each section to preserve headers
     - Prefer lines matching important_terms before adding tail lines
@@ -189,11 +188,7 @@ def build_llm_prompt(
     important = important_terms or []
 
     # Assemble header (always preserved)
-    header_parts: List[str] = [instructions.strip() + "\n\n"]
-    if metric_description:
-        header_parts.append("=== Metric Description ===\n")
-        header_parts.append(metric_description.strip() + "\n\n")
-    header_text = "\n".join(header_parts)
+    header_text = instructions.strip() + "\n\n"
 
     section_items = list(sections.items()) if sections else []
 
@@ -272,27 +267,35 @@ def build_file_analysis_prompt(
     """Construct a structured prompt for LLM-based multi-file analysis with an
     optional detailed metric description."""
 
+    metric_details = ""
+    if metric_description:
+        metric_details = f"""
+
+Metric Details:
+{metric_description.strip()}
+"""
+
     instructions = f"""
-You are an expert evaluator for the metric: "{metric_name}".
+You are an expert evaluator for the metric: "{metric_name}".{metric_details}
 
-You will be provided with repository files below. Your task is to analyze them and 
-produce a quality score.
+Your task: Analyze repository files and produce a quality score in range {score_range}.
 
-Scoring criteria:
-- Evaluate based on the metric: "{metric_name}"
-- Score range: {score_range}
-- Consider all provided files in your assessment
+IMPORTANT: Repository files are provided below. You MUST read ALL files before responding.
+Do NOT generate output until you have examined every file.
 
 Instructions:
-- Read through ALL the provided files carefully
-- Analyze the code quality, structure, and characteristics
-- After reviewing all files, assign a single numeric score
-- Return your score as a JSON object
+1. Read each file completely
+2. Analyze code quality, structure, documentation, and characteristics
+3. Evaluate against the "{metric_name}" metric criteria
+4. After reading ALL files, calculate a single numeric score
+5. Generate JSON response with your score
 
-Expected output format:
-{{ "{score_name}": <float {score_range}> }}
+Output requirements:
+- Format: {{ "{score_name}": <float value> }}
+- Score must be in range {score_range}
+- Use actual analysis (not placeholder values)
 
-Now examine the files:
+Begin reading the files now:
     """.strip()
 
     sections = {f"FILE: {fname}": content for fname, content in files.items()}
@@ -300,7 +303,6 @@ Now examine the files:
     return build_llm_prompt(
         instructions=instructions,
         sections=sections,
-        metric_description=metric_description,
     )
 
 
@@ -323,32 +325,37 @@ Now examine the files:
 
 
 def build_extract_fields_from_files_prompt(
-    fields: List[str],
+    fields: Dict[str, str],
     files: Dict[str, str],
 ) -> str:
     """Construct a structured prompt for extracting fields from files."""
 
-    # Convert list to json, with value = PUT VALUE HERE
-    fields_json: Dict[str, Optional[str]] = {}
-    for item in fields:
-        fields_json[item] = "PUT VALUE HERE"
+    # Use fields dict directly or convert to placeholder format
+    fields_json: Dict[str, str] = {
+        field_name: value or "PUT VALUE HERE"
+        for field_name, value in fields.items()
+    }
 
     instructions = f"""
-You will be provided with repository files below. Your task is to examine them and 
-extract specific information.
+Your task: Extract specific field values from repository files.
 
-Fields to extract: {json.dumps(fields_json)}
+Fields needed: {json.dumps(fields_json)}
+
+IMPORTANT: Repository files are provided below. You MUST read ALL files before responding.
+Do NOT generate output until you have examined every file.
 
 Instructions:
-- Read through ALL the provided files carefully
-- For each field, find the most relevant value from the files
-- Include only one value per field, even if it appears in multiple files
-- After reviewing all files, return your answer as a JSON object
+1. Read each file completely
+2. Identify relevant values for each field
+3. Select one value per field (if multiple candidates exist, choose the most relevant)
+4. After reading ALL files, generate a JSON response
 
-Expected output format:
-{{ "FIELD": "VALUE" }}
+Output requirements:
+- Format: {{ "field_name": "extracted_value" }}
+- Include all requested fields that you can find. If you are not confident in a value, use null.
+- Use actual values found in the files (not placeholders)
 
-Now examine the files:
+Begin reading the files now:
     """
 
     sections = {f"FILE: {fname}": content for fname, content in files.items()}
@@ -501,7 +508,7 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
             f"Value: {repr(content)[:200]}"
         )
         return None
-    
+
     if not content or not content.strip():
         clogger.error("[llm] Response content is empty or whitespace-only")
         return None

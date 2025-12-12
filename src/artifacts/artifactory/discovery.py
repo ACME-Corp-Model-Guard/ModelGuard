@@ -154,13 +154,13 @@ def _llm_extract_fields(
     """
     # Build LLM prompt to extract connection fields
     prompt: str = build_extract_fields_from_files_prompt(
-        fields=[
-            "code_name",
-            "dataset_name",
-            "parent_model_name",
-            "parent_model_source",
-            "parent_model_relationship",
-        ],
+        fields={
+            "code_name": "Name of the code artifact",
+            "dataset_name": "Name of the dataset artifact",
+            "parent_model_name": "Name of the parent model",
+            "parent_model_source": "File name where you learned parent model name (if any)",
+            "parent_model_relationship": "Relationship to the parent model (if any)",
+        },
         files=files,
     )
 

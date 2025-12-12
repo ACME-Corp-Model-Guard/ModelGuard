@@ -67,40 +67,41 @@ def extract_files_from_tar(
 
 # Patterns to exclude from file content (case-insensitive)
 JUNK_LINE_PATTERNS = [
-    r'^\[unused\d+\]$',  # [unused0], [unused123], etc.
-    r'^unused\d+$',       # unused0, unused123, etc.
+    r"^\[unused\d+\]$",  # [unused0], [unused123], etc.
+    r"^unused\d+$",  # unused0, unused123, etc.
 ]
 
 
 def filter_junk_lines(content: str) -> str:
     """
     Remove lines matching junk patterns that waste token budget.
-    
+
     Filters out enumeration patterns like:
     - [unused0], [unused1], ..., [unused999]
     - Other repetitive non-informative patterns
-    
+
     Args:
         content: Raw file content
-        
+
     Returns:
         Filtered content with junk lines removed
     """
     if not content:
         return content
-    
+
     lines = content.splitlines()
-    
+
     # Compile patterns once
     compiled_patterns = [re.compile(p, re.IGNORECASE) for p in JUNK_LINE_PATTERNS]
-    
+
     # Filter out matching lines
     filtered_lines = [
-        line for line in lines
+        line
+        for line in lines
         if not any(pattern.match(line.strip()) for pattern in compiled_patterns)
     ]
-    
-    return '\n'.join(filtered_lines)
+
+    return "\n".join(filtered_lines)
 
 
 # ====================================================================================
@@ -112,12 +113,12 @@ def filter_junk_lines(content: str) -> str:
 
 # Files to exclude entirely (waste token budget, provide no useful metadata)
 EXCLUDE_FILENAMES = {
-    'vocab.txt',
-    'vocab.json',
-    'tokenizer.json',
-    'merges.txt',
-    'added_tokens.json',
-    'special_tokens_map.json',
+    "vocab.txt",
+    "vocab.json",
+    "tokenizer.json",
+    "merges.txt",
+    "added_tokens.json",
+    "special_tokens_map.json",
 }
 
 
@@ -143,17 +144,17 @@ def select_relevant_files(
     def is_readme(name: str) -> bool:
         n = name.lower()
         return "readme" in n or n.endswith("readme.md") or n.endswith("readme")
-    
+
     def is_excluded(name: str) -> bool:
         """Check if filename should be excluded entirely."""
-        basename = name.split('/')[-1].lower()  # Get just the filename
+        basename = name.split("/")[-1].lower()  # Get just the filename
         return basename in EXCLUDE_FILENAMES
 
     # Filter by extension OR README special-case, excluding vocab/tokenizer files
     candidates: List[Tuple[str, str]] = []
     for name, content in all_files.items():
         lower = name.lower()
-        
+
         # Skip excluded files entirely
         if is_excluded(name):
             clogger.debug(f"[file_extraction] Excluding {name} (vocab/tokenizer file)")

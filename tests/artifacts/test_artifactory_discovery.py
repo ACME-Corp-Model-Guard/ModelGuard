@@ -183,13 +183,13 @@ def test_llm_extract_fields_builds_prompt(mock_build_prompt, mock_ask_llm):
 
     # Verify prompt builder was called with correct fields and files
     mock_build_prompt.assert_called_once_with(
-        fields=[
-            "code_name",
-            "dataset_name",
-            "parent_model_name",
-            "parent_model_source",
-            "parent_model_relationship",
-        ],
+        fields={
+            "code_name": "Name of the code artifact",
+            "dataset_name": "Name of the dataset artifact",
+            "parent_model_name": "Name of the parent model",
+            "parent_model_source": "File name where parent model was found",
+            "parent_model_relationship": "Relationship to the parent model",
+        },
         files=files,
     )
 
