@@ -29,6 +29,9 @@ from src.artifacts.artifactory import (
 )
 from src.artifacts.base_artifact import BaseArtifact
 
+# Maximum number of artifacts allowed in a single query response
+MAX_QUERY_RESULTS = 500
+
 
 # =============================================================================
 # Helper: Validate request body
@@ -265,6 +268,21 @@ def lambda_handler(
     # Step 4 - Apply ArtifactQuery filters
     # ---------------------------------------------------------------------
     filtered = _filter_artifacts(all_artifacts, artifact_queries)
+
+    # ---------------------------------------------------------------------
+    # Step 4.1 - Check for too many results (413 Payload Too Large)
+    # ---------------------------------------------------------------------
+    if len(filtered) > MAX_QUERY_RESULTS:
+        clogger.warning(
+            f"[post_artifacts] Query returned {len(filtered)} artifacts, "
+            f"exceeds maximum of {MAX_QUERY_RESULTS}"
+        )
+        return error_response(
+            413,
+            f"Query returned {len(filtered)} artifacts, "
+            f"exceeds maximum of {MAX_QUERY_RESULTS}. Use more specific filters.",
+            error_code="TOO_MANY_RESULTS",
+        )
 
     # ---------------------------------------------------------------------
     # Step 5 - Apply pagination

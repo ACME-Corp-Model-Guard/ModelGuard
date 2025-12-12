@@ -1,3 +1,6 @@
+# TODO: OpenAPI Compliance Issues
+# - [ ] 202 Accepted: Implement async update with deferred rating
+#       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
 """
 PUT /artifacts/{artifact_type}/{id}
 Update an existing artifact with a new upstream URL.
@@ -165,7 +168,7 @@ def lambda_handler(
     auth: AuthContext,  # Use for auth side effects
     # ) -> Dict[str, Any]:
 ) -> LambdaResponse:
-    clogger.info("[put_artifact_update] Handling artifact upodate request")
+    clogger.info("[put_artifact_update] Handling artifact update request")
 
     # ------------------------------------------------------------------
     # Step 1 - Extract & validate path parameters
@@ -177,7 +180,7 @@ def lambda_handler(
     if not artifact_type_raw or not artifact_id:
         return error_response(
             400,
-            "Missing requiured path parameters: artifact_type or id",
+            "Missing required path parameters: artifact_type or id",
             error_code="INVALID_REQUEST",
         )
     if artifact_type_raw not in ("model", "dataset", "code"):

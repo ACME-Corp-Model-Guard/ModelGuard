@@ -1,3 +1,6 @@
+# TODO: OpenAPI Compliance Issues
+# - [ ] 202 Accepted: Implement async ingestion with deferred rating
+#       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
 """
 POST /artifact/{artifact_type}
 Ingest a new artifact from a source URL and store metadata in DynamoDB.
@@ -10,11 +13,17 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, cast
 
-from src.artifacts.artifactory import create_artifact, save_artifact_metadata
+from src.artifacts.artifactory import (
+    create_artifact,
+    load_all_artifacts_by_fields,
+    save_artifact_metadata,
+)
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logger import clogger, log_lambda_handler
+from src.settings import ARTIFACTS_BUCKET, MINIMUM_METRIC_THRESHOLD
 from src.storage.downloaders.dispatchers import FileDownloadError
+from src.storage.s3_utils import delete_objects, generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -106,6 +115,20 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
+    # Step 2.1 — Check for duplicate artifact (409 Conflict)
+    # ---------------------------------------------------------------------
+    existing = load_all_artifacts_by_fields({"source_url": url})
+    if existing:
+        clogger.info(
+            f"[post_artifact] Duplicate artifact detected: {existing[0].artifact_id}"
+        )
+        return error_response(
+            409,
+            f"Artifact already exists with this source URL (id: {existing[0].artifact_id})",
+            error_code="ARTIFACT_EXISTS",
+        )
+
+    # ---------------------------------------------------------------------
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
@@ -150,6 +173,52 @@ def lambda_handler(
     )
 
     # ---------------------------------------------------------------------
+    # Step 3.1 — Check quality threshold for models (424 Failed Dependency)
+    # ---------------------------------------------------------------------
+    if artifact.artifact_type == "model":
+        scores = getattr(artifact, "scores", {})
+        failing_metrics = []
+
+        # Check each non-latency metric against threshold
+        for metric_name, score_value in scores.items():
+            # Skip special cases and handle Size dict
+            if isinstance(score_value, dict):
+                # Size metric has per-platform scores - check each one
+                for platform, platform_score in score_value.items():
+                    if isinstance(platform_score, (int, float)):
+                        if platform_score < MINIMUM_METRIC_THRESHOLD:
+                            failing_metrics.append(
+                                f"Size.{platform}={platform_score:.2f}"
+                            )
+            elif isinstance(score_value, (int, float)):
+                if score_value < MINIMUM_METRIC_THRESHOLD:
+                    failing_metrics.append(f"{metric_name}={score_value:.2f}")
+
+        if failing_metrics:
+            clogger.warning(
+                f"[post_artifact] Model {artifact.artifact_id} rejected: "
+                f"metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): {failing_metrics}"
+            )
+            # Clean up S3 object since we're rejecting
+            if artifact.s3_key and ARTIFACTS_BUCKET:
+                try:
+                    delete_objects(ARTIFACTS_BUCKET, [artifact.s3_key])
+                    clogger.info(
+                        f"[post_artifact] Cleaned up S3 object: {artifact.s3_key}"
+                    )
+                except Exception as cleanup_err:
+                    clogger.warning(
+                        f"[post_artifact] Failed to clean up S3: {cleanup_err}"
+                    )
+
+            return error_response(
+                424,
+                f"Model rejected: metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): "
+                f"{', '.join(failing_metrics)}",
+                error_code="QUALITY_THRESHOLD_NOT_MET",
+            )
+
+    # ---------------------------------------------------------------------
     # Step 4 — Save metadata to DynamoDB
     # ---------------------------------------------------------------------
     try:
@@ -171,6 +240,11 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
+    # Generate presigned download URL (same as GET /artifacts/{type}/{id})
+    download_url = generate_s3_download_url(
+        artifact.artifact_id, s3_key=artifact.s3_key
+    )
+
     response_body = {
         "metadata": {
             "id": artifact.artifact_id,
@@ -179,11 +253,8 @@ def lambda_handler(
         },
         "data": {
             "url": artifact.source_url,
-            # TODO: Figure out what this URL should be
-            #       Spec requires this field but does not
-            #       explicitly require presigned URLs
-            "download_url": artifact.s3_key,
+            "download_url": download_url,
         },
     }
 
-    return json_response(200, response_body)
+    return json_response(201, response_body)

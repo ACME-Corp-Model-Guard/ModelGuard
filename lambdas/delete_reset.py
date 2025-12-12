@@ -19,7 +19,12 @@ from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
 from src.utils.bootstrap import bootstrap_system
-from src.utils.http import LambdaResponse, json_response, translate_exceptions
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
 # =============================================================================
@@ -50,6 +55,20 @@ def lambda_handler(
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
+    # ---------------------------------------------------------------------
+    # Step 0 — Verify admin permission (401 per OpenAPI spec)
+    # ---------------------------------------------------------------------
+    if "Admin" not in auth["groups"]:
+        clogger.warning(
+            f"[/reset] Non-admin user attempted reset: {auth['username']}, "
+            f"groups={auth['groups']}"
+        )
+        return error_response(
+            401,
+            "You do not have permission to reset the registry",
+            error_code="ADMIN_REQUIRED",
+        )
+
     # ---------------------------------------------------------------------
     # Step 1 — Clear DynamoDB artifacts table
     # ---------------------------------------------------------------------
