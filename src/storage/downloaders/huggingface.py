@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -23,6 +23,56 @@ class FileDownloadError(Exception):
     """Raised when a HuggingFace download fails."""
 
     pass
+
+
+# =============================================================================
+# Selective Download Configuration
+# =============================================================================
+# Skip large binary weight files to avoid disk space exhaustion in Lambda.
+# Only download metadata files needed for metric computation.
+
+# Glob patterns to ignore (large binary files)
+IGNORE_PATTERNS: List[str] = [
+    # PyTorch weights
+    "*.bin",
+    "pytorch_model*.bin",
+    # Safetensors weights
+    "*.safetensors",
+    "model*.safetensors",
+    # Other model formats
+    "*.pt",
+    "*.pth",
+    "*.onnx",
+    "*.gguf",
+    "*.ggml",
+    # TensorFlow/Keras
+    "*.h5",
+    "tf_model.h5",
+    # Flax/JAX
+    "*.msgpack",
+    "flax_model.msgpack",
+    # Large dataset files
+    "*.arrow",
+    "*.parquet",
+]
+
+# Glob patterns to allow (metadata and documentation files)
+ALLOW_PATTERNS: List[str] = [
+    # Config files
+    "*.json",
+    "*.yaml",
+    "*.yml",
+    "*.cfg",
+    "*.ini",
+    # Documentation
+    "*.md",
+    "*.txt",
+    "*.rst",
+    "README*",
+    "LICENSE*",
+    # Code samples
+    "*.py",
+]
 
 
 # =====================================================================================
@@ -46,6 +96,9 @@ def download_from_huggingface(
 
     Raises:
         FileDownloadError: If URL parsing fails, HF download fails, or packaging fails
+
+    Note:
+        The caller is responsible for cleaning up the returned tarball file.
     """
 
     clogger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
@@ -54,6 +107,8 @@ def download_from_huggingface(
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
     cache_dir: Optional[str] = None
+    tar_path: Optional[str] = None
+    success = False
 
     try:
         # Import huggingface_hub lazily
@@ -115,18 +170,28 @@ def download_from_huggingface(
         # Download HF snapshot into temporary directory (explicitly use /tmp for Lambda)
         cache_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"hf_{artifact_id}_")
 
+        clogger.debug(
+            f"[HF] Using selective download patterns "
+            f"(ignoring: {len(IGNORE_PATTERNS)} patterns, allowing: {len(ALLOW_PATTERNS)} patterns)"
+        )
+
         snapshot_path = snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,  # "model" or "dataset"
             cache_dir=cache_dir,
             local_dir=cache_dir,
+            ignore_patterns=IGNORE_PATTERNS,
+            allow_patterns=ALLOW_PATTERNS,
         )
 
         # Package into tar archive (explicitly use /tmp for Lambda)
         import tarfile
 
         tar_path = tempfile.NamedTemporaryFile(
-            delete=False, suffix=".tar.gz", dir="/tmp"
+            delete=False,
+            suffix=".tar.gz",
+            prefix=f"hf_{artifact_id}_",
+            dir="/tmp",
         ).name
 
         clogger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
@@ -136,6 +201,7 @@ def download_from_huggingface(
 
         clogger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
 
+        success = True
         return tar_path
 
     except RepositoryNotFoundError:
@@ -149,7 +215,7 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up temporary cache directory
+        # Clean up temporary cache directory (always)
         if cache_dir and os.path.exists(cache_dir):
             try:
                 import shutil
@@ -159,6 +225,16 @@ def download_from_huggingface(
             except Exception as cleanup_err:
                 clogger.warning(
                     f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
+                )
+
+        # Clean up tarball on failure (only caller cleans up on success)
+        if not success and tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                clogger.debug(f"[HF] Cleaned up tarball on failure: {tar_path}")
+            except Exception as cleanup_err:
+                clogger.warning(
+                    f"[HF] Failed to clean up tarball {tar_path}: {cleanup_err}"
                 )
 
 

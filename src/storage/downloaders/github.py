@@ -9,7 +9,6 @@ Used during artifact ingestion before uploading artifacts to S3.
 
 from __future__ import annotations
 
-import os
 import tempfile
 from typing import Any, Dict, Tuple
 
@@ -47,13 +46,15 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
     return owner, repo
 
 
-def _download_repo_tarball(owner: str, repo: str, dest_dir: str) -> str:
+def _download_repo_tarball(owner: str, repo: str, artifact_id: str) -> str:
     """
     Download repository as tarball from GitHub API.
 
     Uses GitHub's official REST API which doesn't require git binary.
     Automatically uses the repository's default branch.
     Returns the path to the downloaded tarball file.
+
+    The caller is responsible for cleaning up the returned file.
     """
     tarball_url = f"https://api.github.com/repos/{owner}/{repo}/tarball"
 
@@ -63,12 +64,20 @@ def _download_repo_tarball(owner: str, repo: str, dest_dir: str) -> str:
         response = requests.get(tarball_url, timeout=300, stream=True)
         response.raise_for_status()
 
-        # Download tarball directly to /tmp
-        tarball_path = os.path.join(dest_dir, f"{repo}.tar.gz")
-        with open(tarball_path, "wb") as f:
+        # Create temp file directly in /tmp (no subdirectory needed)
+        # Using NamedTemporaryFile with delete=False so caller can clean it up
+        tar_file = tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".tar.gz",
+            prefix=f"gh_{artifact_id}_",
+            dir="/tmp",
+        )
+        tarball_path = tar_file.name
+
+        with tar_file:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
-                    f.write(chunk)
+                    tar_file.write(chunk)
 
         clogger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
         return tarball_path
@@ -91,6 +100,8 @@ def download_from_github(
     Downloads the repository as a tarball directly using GitHub's archive API.
     This approach doesn't require the git binary, making it suitable for
     Lambda environments.
+
+    The caller is responsible for cleaning up the returned tarball file.
     """
     clogger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
 
@@ -101,11 +112,9 @@ def download_from_github(
         # Step 1 — Parse repo identifier
         owner, repo = _parse_github_url(source_url)
 
-        # Step 2 — Download tarball directly to /tmp (use /tmp for Lambda)
-        temp_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"gh_{artifact_id}_")
-
+        # Step 2 — Download tarball directly to /tmp (no subdirectory needed)
         clogger.debug(f"[GitHub] Downloading {owner}/{repo} as tarball")
-        tar_path = _download_repo_tarball(owner, repo, temp_dir)
+        tar_path = _download_repo_tarball(owner, repo, artifact_id)
 
         clogger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
         return tar_path

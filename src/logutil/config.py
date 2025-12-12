@@ -39,6 +39,9 @@ def setup_logging() -> None:
     elif log_level == "2":
         log_level = "DEBUG"
 
+    # Temporarily Force Log Level to DEBUG for Debugging
+    log_level = "DEBUG"
+
     # Check if running in AWS Lambda
     is_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
