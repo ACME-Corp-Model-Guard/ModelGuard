@@ -2,7 +2,7 @@ name: "Deploy ModelGuard API + Frontend"
 
 on:
   push:
-    branches: [ main, llm-token-limit ]
+    branches: [ main ]
 
 env:
   AWS_REGION: "us-east-2"

@@ -157,7 +157,6 @@ def build_llm_prompt(
     sections: Optional[Dict[str, str]] = None,
     metric_description: Optional[str] = None,
     important_terms: Optional[List[str]] = None,
-    max_input_tokens: Optional[int] = None,
 ) -> str:
     """Construct a structured prompt with smart token budgeting.
 
@@ -169,7 +168,7 @@ def build_llm_prompt(
     - Respect max_input_tokens override or use MAX_INPUT_TOKENS
     """
 
-    token_budget = max_input_tokens or MAX_INPUT_TOKENS
+    token_budget = MAX_INPUT_TOKENS
     important = important_terms or []
 
     # Assemble header (always preserved)
@@ -406,11 +405,20 @@ def _trim_section_to_budget(
     # Collect important line indices
     important_indices = {i for i, ln in enumerate(lines) if is_important(ln)}
 
-    # Start with important lines and track tokens incrementally
-    selected_indices = set(important_indices)
-    running_tokens = _estimate_token_count(
-        "\n".join(lines[i] for i in sorted(selected_indices))
-    )
+    # Add important lines up to budget (prioritize by original order)
+    selected_indices = set()
+    running_tokens = 0
+
+    for i in sorted(important_indices):
+        line_tokens = _estimate_token_count(lines[i])
+        if running_tokens + line_tokens + 1 > token_budget:  # +1 for newline
+            clogger.debug(
+                f"[llm] Important lines exceed budget ({running_tokens}/{token_budget} tokens). "
+                f"Truncating at line {i}."
+            )
+            break
+        selected_indices.add(i)
+        running_tokens += line_tokens + 1
 
     # Add tail lines from the end until budget would be exceeded
     for i in range(len(lines) - 1, -1, -1):
