@@ -59,7 +59,7 @@ def ask_llm(
     prompt: str,
     max_tokens: int = 200,
     return_json: bool = False,
-    temperature: float = 0.2,
+    temperature: float = 0.7,
 ) -> Optional[Union[str, Dict[str, Any]]]:
     """Invoke a Bedrock LLM and return text or parsed JSON."""
 
@@ -81,6 +81,7 @@ def ask_llm(
             "textGenerationConfig": {
                 "maxTokenCount": max_tokens,
                 "temperature": temperature,
+                "stopSequences": [],
             },
         }
 
@@ -274,10 +275,24 @@ def build_file_analysis_prompt(
     instructions = f"""
 You are an expert evaluator for the metric: "{metric_name}".
 
-Examine the provided repository files and produce a single score in the range {score_range}.
+You will be provided with repository files below. Your task is to analyze them and 
+produce a quality score.
 
-Return ONLY a JSON object of the exact form:
+Scoring criteria:
+- Evaluate based on the metric: "{metric_name}"
+- Score range: {score_range}
+- Consider all provided files in your assessment
+
+Instructions:
+- Read through ALL the provided files carefully
+- Analyze the code quality, structure, and characteristics
+- After reviewing all files, assign a single numeric score
+- Return your score as a JSON object
+
+Expected output format:
 {{ "{score_name}": <float {score_range}> }}
+
+Now examine the files:
     """.strip()
 
     sections = {f"FILE: {fname}": content for fname, content in files.items()}
@@ -319,12 +334,21 @@ def build_extract_fields_from_files_prompt(
         fields_json[item] = "PUT VALUE HERE"
 
     instructions = f"""
-Examine the provided repository files and fill in the value for the
-following fields: {json.dumps(fields_json)}.
-Include only one value per field, even if it appears in multiple files.
+You will be provided with repository files below. Your task is to examine them and 
+extract specific information.
 
-Return ONLY a JSON object of the exact form:
+Fields to extract: {json.dumps(fields_json)}
+
+Instructions:
+- Read through ALL the provided files carefully
+- For each field, find the most relevant value from the files
+- Include only one value per field, even if it appears in multiple files
+- After reviewing all files, return your answer as a JSON object
+
+Expected output format:
 {{ "FIELD": "VALUE" }}
+
+Now examine the files:
     """
 
     sections = {f"FILE: {fname}": content for fname, content in files.items()}
