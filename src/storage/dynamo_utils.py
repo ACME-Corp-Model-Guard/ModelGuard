@@ -17,7 +17,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from botocore.exceptions import ClientError
 from src.aws.clients import get_ddb_table
-from src.logger import logger
+from src.logutil import clogger
 
 
 # =============================================================================
@@ -114,9 +114,9 @@ def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
         # Convert floats to Decimal before saving
         item = _convert_floats_to_decimal(item)
         table.put_item(Item=item)
-        logger.info(f"[DDB] Saved item to {table_name}")
+        clogger.info(f"[DDB] Saved item to {table_name}")
     except ClientError as e:
-        logger.error(f"[DDB] Failed to save item to {table_name}: {e}")
+        clogger.error(f"[DDB] Failed to save item to {table_name}: {e}")
         raise
 
 
@@ -131,12 +131,14 @@ def load_item_from_key(
         response = table.get_item(Key=key)
         item = response.get("Item")
         if item:
-            logger.info(f"[DDB] Loaded item from {table_name} with key={key}")
+            clogger.info(f"[DDB] Loaded item from {table_name} with key={key}")
         else:
-            logger.warning(f"[DDB] No item found in {table_name} with key={key}")
+            clogger.warning(f"[DDB] No item found in {table_name} with key={key}")
         return item
     except ClientError as e:
-        logger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
+        clogger.error(
+            f"[DDB] Failed to load item from {table_name} with key={key}: {e}"
+        )
         raise
 
 

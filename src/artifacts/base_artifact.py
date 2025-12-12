@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 
 
 class BaseArtifact(ABC):
@@ -44,7 +44,7 @@ class BaseArtifact(ABC):
             metadata: Optional dict for additional artifact-specific data
         """
         if artifact_type not in self.VALID_TYPES:
-            logger.error(f"Invalid artifact_type: {artifact_type}")
+            clogger.error(f"Invalid artifact_type: {artifact_type}")
             raise ValueError(
                 f"Invalid artifact_type: {artifact_type}. Must be one of {self.VALID_TYPES}"
             )
@@ -56,7 +56,7 @@ class BaseArtifact(ABC):
         self.s3_key = s3_key or f"{artifact_type}s/{self.artifact_id}"
         self.metadata = metadata or {}
 
-        logger.debug(
+        clogger.debug(
             f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}"
         )
 

@@ -17,7 +17,7 @@ from src.artifacts.model_artifact import ModelArtifact
 from src.artifacts.code_artifact import CodeArtifact
 from src.artifacts.dataset_artifact import DatasetArtifact
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 from src.storage.downloaders.dispatchers import (
     fetch_artifact_metadata,
     FileDownloadError,
@@ -69,7 +69,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
             license="apache-2.0"
         )
     """
-    logger.debug(f"Creating artifact of type: {artifact_type}")
+    clogger.debug(f"Creating artifact of type: {artifact_type}")
 
     # Step 1: Get artifact class (factory pattern)
     artifact_class = _get_artifact_class(artifact_type)
@@ -84,7 +84,7 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
     if _is_new_artifact(kwargs):
         _initialize_new_artifact(artifact)
 
-    logger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
+    clogger.info(f"Created {artifact_type} artifact: {artifact.artifact_id}")
     return artifact
 
 
@@ -119,7 +119,7 @@ def _get_artifact_class(artifact_type: ArtifactType) -> type[BaseArtifact]:
     }
 
     if artifact_type not in artifact_map:
-        logger.error(f"Invalid artifact_type in factory: {artifact_type}")
+        clogger.error(f"Invalid artifact_type in factory: {artifact_type}")
         raise ValueError(
             f"Invalid artifact_type: {artifact_type}. Must be one of {list(artifact_map.keys())}"
         )
@@ -157,15 +157,15 @@ def _enrich_kwargs_with_metadata(
     url = kwargs.get("source_url")
     if not kwargs.get("name") and isinstance(url, str):
         try:
-            logger.debug(f"Fetching metadata for {artifact_type} from {url}")
+            clogger.debug(f"Fetching metadata for {artifact_type} from {url}")
             metadata = fetch_artifact_metadata(url=url, artifact_type=artifact_type)
             kwargs.update(metadata)
-            logger.debug(f"Enriched kwargs with metadata: {list(metadata.keys())}")
+            clogger.debug(f"Enriched kwargs with metadata: {list(metadata.keys())}")
         except FileDownloadError as e:
-            logger.error(f"Failed to fetch metadata for artifact creation: {e}")
+            clogger.error(f"Failed to fetch metadata for artifact creation: {e}")
             raise
         except KeyError as e:
-            logger.error(
+            clogger.error(
                 f"Missing expected metadata field during artifact creation: {e}"
             )
             raise
@@ -207,7 +207,7 @@ def _initialize_new_artifact(artifact: BaseArtifact) -> None:
         - Computes and stores metric scores (models only)
         - May modify related artifacts (updates parent/child relationships)
     """
-    logger.debug(f"Initializing new artifact: {artifact.artifact_id}")
+    clogger.debug(f"Initializing new artifact: {artifact.artifact_id}")
 
     # Step 1: Upload to S3
     upload_artifact_to_s3(
@@ -245,7 +245,7 @@ def _compute_initial_scores(artifact: ModelArtifact) -> None:
     # Lazy import to avoid circular dependency (metrics imports artifactory)
     from src.metrics.registry import METRICS
 
-    logger.debug(f"Computing initial scores for model: {artifact.artifact_id}")
+    clogger.debug(f"Computing initial scores for model: {artifact.artifact_id}")
     artifact.compute_scores(METRICS)
 
     # Initialize security fields

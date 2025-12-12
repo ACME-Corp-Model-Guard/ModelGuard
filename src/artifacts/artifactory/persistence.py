@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 from src.settings import ARTIFACTS_TABLE
 from src.storage.dynamo_utils import save_item_to_table, load_item_from_key, scan_table
 
@@ -55,7 +55,7 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
 
     item = load_item_from_key(ARTIFACTS_TABLE, {"artifact_id": artifact_id})
     if not item:
-        logger.warning(f"Artifact {artifact_id} not found")
+        clogger.warning(f"Artifact {artifact_id} not found")
         return None
 
     artifact_type = item.get("artifact_type")
@@ -67,7 +67,7 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
     kwargs.pop("artifact_type", None)
 
     artifact = create_artifact(artifact_type, **kwargs)
-    logger.info(f"Loaded {artifact_type} artifact {artifact_id}")
+    clogger.info(f"Loaded {artifact_type} artifact {artifact_id}")
     return artifact
 
 
@@ -96,7 +96,7 @@ def load_all_artifacts() -> List[BaseArtifact]:
             artifact_id = item.get("artifact_id")
             artifact_type = item.get("artifact_type")
             if not artifact_type:
-                logger.warning(f"Artifact {artifact_id} missing artifact_type field")
+                clogger.warning(f"Artifact {artifact_id} missing artifact_type field")
                 continue
 
             # Don't pass artifact_type twice
@@ -106,11 +106,11 @@ def load_all_artifacts() -> List[BaseArtifact]:
             artifact = create_artifact(artifact_type, **kwargs)
             artifacts.append(artifact)
 
-        logger.info(f"Loaded {len(artifacts)} artifacts from {ARTIFACTS_TABLE}")
+        clogger.info(f"Loaded {len(artifacts)} artifacts from {ARTIFACTS_TABLE}")
         return artifacts
 
     except Exception as e:
-        logger.error(f"Failed to load all artifacts: {e}")
+        clogger.error(f"Failed to load all artifacts: {e}")
         raise
 
 

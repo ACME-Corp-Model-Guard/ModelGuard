@@ -21,7 +21,7 @@ import boto3
 from botocore.exceptions import ClientError
 from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 
-from src.logger import logger
+from src.logutil import clogger
 from src.settings import (
     DEFAULT_ADMIN_GROUP,
     DEFAULT_ADMIN_PASSWORD,
@@ -43,9 +43,9 @@ def _ensure_cognito_group_exists(
     """
     try:
         cognito.get_group(GroupName=group_name, UserPoolId=USER_POOL_ID)
-        logger.debug(f"[bootstrap] Cognito group already exists: {group_name}")
+        clogger.debug(f"[bootstrap] Cognito group already exists: {group_name}")
     except ClientError:
-        logger.info(f"[bootstrap] Creating Cognito group: {group_name}")
+        clogger.info(f"[bootstrap] Creating Cognito group: {group_name}")
         cognito.create_group(
             GroupName=group_name,
             UserPoolId=USER_POOL_ID,
@@ -65,10 +65,10 @@ def _ensure_user_exists(
     """
     try:
         cognito.admin_get_user(UserPoolId=USER_POOL_ID, Username=username)
-        logger.info(f"[bootstrap] User already exists: {username}")
+        clogger.info(f"[bootstrap] User already exists: {username}")
 
     except ClientError:
-        logger.info(f"[bootstrap] Creating default admin user: {username}")
+        clogger.info(f"[bootstrap] Creating default admin user: {username}")
 
         cognito.admin_create_user(
             UserPoolId=USER_POOL_ID,
@@ -88,12 +88,12 @@ def _ensure_user_exists(
             Password=password,
             Permanent=True,
         )
-        logger.info(f"[bootstrap] Set permanent password for user: {username}")
+        clogger.info(f"[bootstrap] Set permanent password for user: {username}")
 
     # Confirm the user
     try:
         cognito.admin_confirm_sign_up(UserPoolId=USER_POOL_ID, Username=username)
-        logger.debug(f"[bootstrap] User confirmed: {username}")
+        clogger.debug(f"[bootstrap] User confirmed: {username}")
     except ClientError as e:
         # If already confirmed, ignore
         if "NotAuthorizedException" in str(e):
@@ -108,10 +108,10 @@ def _ensure_user_exists(
             Username=username,
             GroupName=admin_group,
         )
-        logger.info(f"[bootstrap] Added user {username} → group {admin_group}")
+        clogger.info(f"[bootstrap] Added user {username} → group {admin_group}")
     except ClientError as e:
         if "UserAlreadyInGroupException" in str(e):
-            logger.debug(
+            clogger.debug(
                 f"[bootstrap] User {username} already in {admin_group}, ignoring"
             )
         else:
@@ -136,7 +136,7 @@ def bootstrap_system() -> None:
         - Seed default artifacts
         - Initialize other required metadata
     """
-    logger.info("[bootstrap] Running system bootstrap initialization...")
+    clogger.info("[bootstrap] Running system bootstrap initialization...")
 
     cognito = boto3.client("cognito-idp")
 
@@ -151,4 +151,4 @@ def bootstrap_system() -> None:
         admin_group=DEFAULT_ADMIN_GROUP,
     )
 
-    logger.info("[bootstrap] System bootstrap completed")
+    clogger.info("[bootstrap] System bootstrap completed")
