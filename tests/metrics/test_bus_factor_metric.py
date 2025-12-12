@@ -55,9 +55,7 @@ def test_invalid_code_artifact_returns_zero(bus_factor_metric, model, monkeypatc
             s3_key="models/wrong",
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -70,9 +68,7 @@ def test_missing_code_artifact_returns_zero(bus_factor_metric, model, monkeypatc
     def fake_load(artifact_id):
         return None
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -94,9 +90,7 @@ def test_no_metadata_returns_zero(bus_factor_metric, model, monkeypatch):
             metadata=None,  # No metadata
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -115,9 +109,7 @@ def test_empty_contributors_returns_zero(bus_factor_metric, model, monkeypatch):
             metadata={"contributors": []},  # Empty contributors
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -136,9 +128,7 @@ def test_missing_contributors_field_returns_zero(bus_factor_metric, model, monke
             metadata={"some_other_field": "value"},  # No contributors field
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -164,9 +154,7 @@ def test_single_contributor_low_score(bus_factor_metric, model, monkeypatch):
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -194,9 +182,7 @@ def test_five_contributors_medium_score(bus_factor_metric, model, monkeypatch):
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -220,9 +206,7 @@ def test_ten_contributors_high_score(bus_factor_metric, model, monkeypatch):
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -246,9 +230,7 @@ def test_many_contributors_with_bonus(bus_factor_metric, model, monkeypatch):
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -279,9 +261,7 @@ def test_unequal_distribution_low_bus_factor(bus_factor_metric, model, monkeypat
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -308,9 +288,7 @@ def test_equal_distribution_higher_bus_factor(bus_factor_metric, model, monkeypa
             },
         )
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
 
     score = bus_factor_metric.score(model)
 
@@ -367,9 +345,7 @@ def test_score_capped_at_one(bus_factor_metric):
 # =============================================================================
 # Exception Handling Tests
 # =============================================================================
-def test_exception_during_calculation_returns_zero(
-    bus_factor_metric, model, monkeypatch
-):
+def test_exception_during_calculation_returns_zero(bus_factor_metric, model, monkeypatch):
     """Test that exceptions during calculation return 0.0 score."""
 
     def fake_load(artifact_id):
@@ -385,9 +361,7 @@ def test_exception_during_calculation_returns_zero(
     def fake_calculate(*args, **kwargs):
         raise ValueError("Test error")
 
-    monkeypatch.setattr(
-        "src.metrics.bus_factor_metric.load_artifact_metadata", fake_load
-    )
+    monkeypatch.setattr("src.metrics.bus_factor_metric.load_artifact_metadata", fake_load)
     monkeypatch.setattr(bus_factor_metric, "_calculate_bus_factor", fake_calculate)
 
     score = bus_factor_metric.score(model)

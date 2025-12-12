@@ -59,9 +59,7 @@ BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", "us-east-1")
 # Default Admin User Settings for /reset Endpoint
 # -----------------------------------------------------------------------------
 DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
-DEFAULT_ADMIN_PASSWORD: str = (
-    "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;"
-)
+DEFAULT_ADMIN_PASSWORD: str = "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;"
 DEFAULT_ADMIN_GROUP: str = "Admin"
 
 
@@ -70,6 +68,4 @@ DEFAULT_ADMIN_GROUP: str = "Admin"
 # -----------------------------------------------------------------------------
 # Minimum score threshold for each non-latency metric (0.0 to 1.0)
 # Model artifacts must score at least this value on ALL metrics to be ingestible
-MINIMUM_METRIC_THRESHOLD: float = float(
-    os.environ.get("MINIMUM_METRIC_THRESHOLD", "0.5")
-)
+MINIMUM_METRIC_THRESHOLD: float = float(os.environ.get("MINIMUM_METRIC_THRESHOLD", "0.5"))

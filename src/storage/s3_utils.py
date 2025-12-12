@@ -121,8 +121,7 @@ def upload_artifact_to_s3(
         # 2. Upload to S3
         upload_file(s3_key, tmp_path)
         clogger.info(
-            f"[s3_utils] Uploaded artifact {artifact_id} "
-            f"to s3://{ARTIFACTS_BUCKET}/{s3_key}"
+            f"[s3_utils] Uploaded artifact {artifact_id} " f"to s3://{ARTIFACTS_BUCKET}/{s3_key}"
         )
 
     except SourceDownloadError:
@@ -247,9 +246,7 @@ def delete_objects(bucket_name: str, keys: Iterable[str]) -> int:
     """
     s3: S3Client = get_s3()
 
-    key_list: list[ObjectIdentifierTypeDef] = [
-        ObjectIdentifierTypeDef(Key=key) for key in keys
-    ]
+    key_list: list[ObjectIdentifierTypeDef] = [ObjectIdentifierTypeDef(Key=key) for key in keys]
 
     if not key_list:
         return 0

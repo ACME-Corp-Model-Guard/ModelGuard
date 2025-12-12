@@ -272,12 +272,8 @@ def test_create_new_artifact_triggers_upload_and_connect(mock_upload, mock_conne
 
 def test_create_existing_artifact_skips_upload():
     """Test that loading existing artifact (with s3_key) skips S3 upload and connection."""
-    with patch(
-        "src.artifacts.artifactory.factory.upload_artifact_to_s3"
-    ) as mock_upload:
-        with patch(
-            "src.artifacts.artifactory.connections.connect_artifact"
-        ) as mock_connect:
+    with patch("src.artifacts.artifactory.factory.upload_artifact_to_s3") as mock_upload:
+        with patch("src.artifacts.artifactory.connections.connect_artifact") as mock_connect:
             create_artifact(
                 artifact_type="model",
                 name="existing-model",

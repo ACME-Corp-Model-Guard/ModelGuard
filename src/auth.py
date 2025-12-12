@@ -45,10 +45,7 @@ API_TOKEN_CALL_LIMIT = 1000  # 1000 API calls per token
 # JWKS LOADING (COLD START)
 # ====================================================================================
 
-JWKS_URL = (
-    f"https://cognito-idp.{REGION}.amazonaws.com/"
-    f"{USER_POOL_ID}/.well-known/jwks.json"
-)
+JWKS_URL = f"https://cognito-idp.{REGION}.amazonaws.com/" f"{USER_POOL_ID}/.well-known/jwks.json"
 
 clogger.info(f"[auth] Loading JWKS keys from {JWKS_URL}")
 jwks = http.request("GET", JWKS_URL).json()["keys"]
@@ -149,9 +146,7 @@ def verify_token(token: str) -> dict:
             Key={"token": token},
             UpdateExpression="ADD uses :inc",
             ConditionExpression=(
-                "attribute_exists(#token) AND "
-                "uses < :limit AND "
-                "ttl_expiry > :current_time"
+                "attribute_exists(#token) AND " "uses < :limit AND " "ttl_expiry > :current_time"
             ),
             ExpressionAttributeNames={"#token": "token"},
             ExpressionAttributeValues={
@@ -183,9 +178,7 @@ def require_roles(claims: dict, allowed_roles: list) -> None:
     if any(role in groups for role in allowed_roles):
         return
 
-    raise Exception(
-        f"Permission denied — required={allowed_roles}, user_groups={groups}"
-    )
+    raise Exception(f"Permission denied — required={allowed_roles}, user_groups={groups}")
 
 
 def get_username(claims: dict) -> str | None:
@@ -204,9 +197,7 @@ class AuthContext(TypedDict):
     token: str
 
 
-def authorize(
-    event: Dict[str, Any], allowed_roles: Optional[List[str]] = None
-) -> AuthContext:
+def authorize(event: Dict[str, Any], allowed_roles: Optional[List[str]] = None) -> AuthContext:
     """Authenticate + authorize request via headers and custom rules."""
     headers = event.get("headers", {}) or {}
     token_header = headers.get("X-Authorization")

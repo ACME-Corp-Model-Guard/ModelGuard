@@ -98,9 +98,7 @@ def test_code_quality_metric_no_code_artifact(metric, model_artifact, code_artif
 # =====================================================================================
 # FAILURE: invalid CodeArtifact → expect fallback score 0.0
 # =====================================================================================
-def test_code_quality_metric_invalid_code_artifact(
-    metric, model_artifact, code_artifact
-):
+def test_code_quality_metric_invalid_code_artifact(metric, model_artifact, code_artifact):
 
     with (
         patch(
@@ -188,9 +186,7 @@ def test_code_quality_metric_no_files(metric, model_artifact, code_artifact):
             return_value=code_artifact,
         ),
         patch("src.metrics.code_quality_metric.download_artifact_from_s3"),
-        patch(
-            "src.metrics.code_quality_metric.extract_relevant_files", return_value={}
-        ),
+        patch("src.metrics.code_quality_metric.extract_relevant_files", return_value={}),
     ):
         result = metric.score(model_artifact)
 

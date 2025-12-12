@@ -74,9 +74,7 @@ class AvailabilityMetric(Metric):
             if code_available:
                 score += 0.5
 
-            clogger.debug(
-                f"[availability] Model {model.artifact_id} → availability={score}"
-            )
+            clogger.debug(f"[availability] Model {model.artifact_id} → availability={score}")
 
             return {self.SCORE_FIELD: score}
 

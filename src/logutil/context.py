@@ -34,9 +34,7 @@ from src.logutil.config import logger
 
 # Thread-safe context variables for Lambda execution tracking
 correlation_id: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
-request_start_time: ContextVar[Optional[float]] = ContextVar(
-    "request_start_time", default=None
-)
+request_start_time: ContextVar[Optional[float]] = ContextVar("request_start_time", default=None)
 
 __all__ = ["correlation_id", "request_start_time", "ContextualLogger", "clogger"]
 
@@ -70,40 +68,20 @@ class ContextualLogger:
 
         return ctx
 
-    def info(
-        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
-    ) -> None:
-        logger.bind(**self._add_context(extra)).info(
-            self._enrich_message(msg), **kwargs
-        )
+    def info(self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        logger.bind(**self._add_context(extra)).info(self._enrich_message(msg), **kwargs)
 
-    def debug(
-        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
-    ) -> None:
-        logger.bind(**self._add_context(extra)).debug(
-            self._enrich_message(msg), **kwargs
-        )
+    def debug(self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        logger.bind(**self._add_context(extra)).debug(self._enrich_message(msg), **kwargs)
 
-    def warning(
-        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
-    ) -> None:
-        logger.bind(**self._add_context(extra)).warning(
-            self._enrich_message(msg), **kwargs
-        )
+    def warning(self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        logger.bind(**self._add_context(extra)).warning(self._enrich_message(msg), **kwargs)
 
-    def error(
-        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
-    ) -> None:
-        logger.bind(**self._add_context(extra)).error(
-            self._enrich_message(msg), **kwargs
-        )
+    def error(self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        logger.bind(**self._add_context(extra)).error(self._enrich_message(msg), **kwargs)
 
-    def exception(
-        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
-    ) -> None:
-        logger.bind(**self._add_context(extra)).exception(
-            self._enrich_message(msg), **kwargs
-        )
+    def exception(self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+        logger.bind(**self._add_context(extra)).exception(self._enrich_message(msg), **kwargs)
 
 
 # Create singleton instance

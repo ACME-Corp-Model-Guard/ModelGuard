@@ -77,9 +77,7 @@ def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
 
     monkeypatch.setattr(requests, "get", lambda *a, **k: FakeResponse())
 
-    with pytest.raises(
-        FileDownloadError, match="Failed to download repository from API"
-    ):
+    with pytest.raises(FileDownloadError, match="Failed to download repository from API"):
         # Third parameter is now artifact_id, not dest_dir
         _download_repo_tarball("user", "nonexistent", "test-artifact-id")
 

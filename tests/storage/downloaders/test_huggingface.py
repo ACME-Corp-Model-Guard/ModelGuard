@@ -87,9 +87,7 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
         file_path.write_text("FAKE TAR")
         return type("Tmp", (), {"name": file_path.as_posix()})()
 
-    monkeypatch.setattr(
-        tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile()
-    )
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile())
 
     # Mock tarfile
     class FakeTar:
@@ -222,9 +220,7 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
         file_path.write_text("FAKE TAR")
         return type("Tmp", (), {"name": file_path.as_posix()})()
 
-    monkeypatch.setattr(
-        tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile()
-    )
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", lambda **k: fake_namedtempfile())
 
     # ------------------------------------------------------------------
     # Run downloader
@@ -364,9 +360,7 @@ def test_fetch_hf_dataset_metadata_success(monkeypatch):
 
     monkeypatch.setattr(requests, "get", lambda url, timeout=10: FakeResponse())
 
-    metadata = fetch_huggingface_dataset_metadata(
-        "https://huggingface.co/datasets/owner/dataset"
-    )
+    metadata = fetch_huggingface_dataset_metadata("https://huggingface.co/datasets/owner/dataset")
 
     assert metadata["name"] == "dataset"
     assert metadata["metadata"]["downloads"] == 42
@@ -386,6 +380,4 @@ def test_fetch_hf_dataset_metadata_http_error(monkeypatch):
     monkeypatch.setattr(requests, "get", lambda url, timeout=10: BadResponse())
 
     with pytest.raises(Exception):
-        fetch_huggingface_dataset_metadata(
-            "https://huggingface.co/datasets/owner/dataset"
-        )
+        fetch_huggingface_dataset_metadata("https://huggingface.co/datasets/owner/dataset")

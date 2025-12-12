@@ -105,11 +105,7 @@ def _get_card_data(metadata: Dict[str, Any], artifact_id: str = "") -> Dict[str,
     Returns:
         cardData dictionary, or empty dict if not found
     """
-    log_prefix = (
-        f"[performance_claims] [{artifact_id}]"
-        if artifact_id
-        else "[performance_claims]"
-    )
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
 
     if not metadata:
         clogger.debug(f"{log_prefix} metadata is empty or None")
@@ -119,9 +115,7 @@ def _get_card_data(metadata: Dict[str, Any], artifact_id: str = "") -> Dict[str,
 
     # Get cardData from various possible locations
     card_data = (
-        metadata.get("metadata", {}).get("cardData", {})
-        or metadata.get("cardData", {})
-        or {}
+        metadata.get("metadata", {}).get("cardData", {}) or metadata.get("cardData", {}) or {}
     )
 
     if not card_data:
@@ -145,11 +139,7 @@ def _extract_model_index_metrics(
     Returns:
         Tuple of (metrics_list, has_structured_metrics, has_benchmarks)
     """
-    log_prefix = (
-        f"[performance_claims] [{artifact_id}]"
-        if artifact_id
-        else "[performance_claims]"
-    )
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
     metrics_list: List[str] = []
     has_structured = False
     has_benchmarks = False
@@ -206,11 +196,7 @@ def _extract_performance_field_metrics(
     Returns:
         Tuple of (metrics_list, has_benchmarks)
     """
-    log_prefix = (
-        f"[performance_claims] [{artifact_id}]"
-        if artifact_id
-        else "[performance_claims]"
-    )
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
     metrics_list: List[str] = []
     has_benchmarks = False
 
@@ -238,9 +224,7 @@ def _extract_performance_field_metrics(
     if found_perf_fields:
         clogger.debug(f"{log_prefix} found performance fields: {found_perf_fields}")
     else:
-        clogger.debug(
-            f"{log_prefix} no performance fields found (checked: {_PERFORMANCE_FIELDS})"
-        )
+        clogger.debug(f"{log_prefix} no performance fields found (checked: {_PERFORMANCE_FIELDS})")
 
     return metrics_list, has_benchmarks
 
@@ -258,11 +242,7 @@ def _extract_paper_citations(
     Returns:
         Tuple of (has_papers, source_field) where source_field indicates where citation was found
     """
-    log_prefix = (
-        f"[performance_claims] [{artifact_id}]"
-        if artifact_id
-        else "[performance_claims]"
-    )
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
 
     if not isinstance(card_data, dict):
         return False, None
@@ -346,11 +326,7 @@ def _extract_performance_claims_from_metadata(
         - has_structured_metrics: bool - whether metrics are in structured format
         - card_data: dict - raw cardData if available
     """
-    log_prefix = (
-        f"[performance_claims] [{artifact_id}]"
-        if artifact_id
-        else "[performance_claims]"
-    )
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
 
     # Initialize result with defaults
     result: Dict[str, Any] = {

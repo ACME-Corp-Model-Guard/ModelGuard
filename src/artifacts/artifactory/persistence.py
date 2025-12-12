@@ -178,9 +178,7 @@ def _filter_by_type(
     return [a for a in artifacts if a.artifact_type == artifact_type]
 
 
-def _filter_by_fields(
-    artifacts: List[BaseArtifact], fields: Dict[str, Any]
-) -> List[BaseArtifact]:
+def _filter_by_fields(artifacts: List[BaseArtifact], fields: Dict[str, Any]) -> List[BaseArtifact]:
     """
     Filter artifacts to only those matching all specified field criteria.
 

@@ -64,15 +64,9 @@ def log_lambda_handler(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(
-            event: Dict[str, Any], context: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+        def wrapper(event: Dict[str, Any], context: Any, **kwargs: Any) -> Dict[str, Any]:
             # Initialize correlation context
-            cid = (
-                context.request_id
-                if hasattr(context, "request_id")
-                else str(uuid.uuid4())
-            )
+            cid = context.request_id if hasattr(context, "request_id") else str(uuid.uuid4())
             correlation_id.set(cid)
             request_start_time.set(time.time())
 
@@ -99,9 +93,7 @@ def log_lambda_handler(
                 detailed_request = {
                     "event_type": "request_details",
                     "endpoint": endpoint_name,
-                    "headers": (
-                        mask_sensitive_data(headers) if mask_request else headers
-                    ),
+                    "headers": (mask_sensitive_data(headers) if mask_request else headers),
                     "query_params": query_params,
                     "path_params": path_params,
                 }
@@ -111,16 +103,12 @@ def log_lambda_handler(
                     try:
                         body_dict = json.loads(raw_body) if raw_body else {}
                         detailed_request["body"] = (
-                            mask_sensitive_data(body_dict)
-                            if mask_request
-                            else body_dict
+                            mask_sensitive_data(body_dict) if mask_request else body_dict
                         )
                     except json.JSONDecodeError:
                         detailed_request["body"] = "[NON_JSON_BODY]"
 
-                clogger.debug(
-                    f"Request details: {http_method} {path}", extra=detailed_request
-                )
+                clogger.debug(f"Request details: {http_method} {path}", extra=detailed_request)
 
             # Execute handler
             try:
@@ -153,14 +141,10 @@ def log_lambda_handler(
                         detailed_response = {
                             "event_type": "response_details",
                             "body": (
-                                mask_sensitive_data(body_dict)
-                                if mask_response
-                                else body_dict
+                                mask_sensitive_data(body_dict) if mask_response else body_dict
                             ),
                         }
-                        clogger.debug(
-                            f"Response details: {status_code}", extra=detailed_response
-                        )
+                        clogger.debug(f"Response details: {status_code}", extra=detailed_response)
                     except json.JSONDecodeError:
                         pass
 

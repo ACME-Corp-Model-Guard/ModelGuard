@@ -219,9 +219,7 @@ def lambda_handler(
     # ------------------------------------------------------------------
     old_artifact = load_artifact_metadata(artifact_id)
     if old_artifact is None:
-        clogger.warning(
-            f"[put_artifact_update] Artifact '{artifact_id}' does not exist"
-        )
+        clogger.warning(f"[put_artifact_update] Artifact '{artifact_id}' does not exist")
         return error_response(
             404, f"Artifact '{artifact_id}' does not exist", error_code="NOT_FOUND"
         )
@@ -324,8 +322,7 @@ def lambda_handler(
                 delete_objects(ARTIFACTS_BUCKET, [new_s3_key])
             except Exception as e:  # pragma: no cover - best effort cleanup
                 clogger.exception(
-                    f"[put_artifact_update] Failed to delete new artifact S3 key "
-                    f"{new_s3_key}",
+                    f"[put_artifact_update] Failed to delete new artifact S3 key " f"{new_s3_key}",
                     extra={"error_type": type(e).__name__},
                 )
 
@@ -350,8 +347,7 @@ def lambda_handler(
             delete_objects(ARTIFACTS_BUCKET, [old_s3_key])
         except Exception as e:  # pragma: no cover - best effort cleanup
             clogger.exception(
-                f"[put_artifact_update] Failed to delete old artifact S3 key "
-                f"{old_s3_key}",
+                f"[put_artifact_update] Failed to delete old artifact S3 key " f"{old_s3_key}",
                 extra={"error_type": type(e).__name__},
             )
 

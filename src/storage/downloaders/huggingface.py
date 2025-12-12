@@ -223,9 +223,7 @@ def download_from_huggingface(
                 shutil.rmtree(cache_dir)
                 clogger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
             except Exception as cleanup_err:
-                clogger.warning(
-                    f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
-                )
+                clogger.warning(f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}")
 
         # Clean up tarball on failure (only caller cleans up on success)
         if not success and tar_path and os.path.exists(tar_path):
@@ -233,9 +231,7 @@ def download_from_huggingface(
                 os.unlink(tar_path)
                 clogger.debug(f"[HF] Cleaned up tarball on failure: {tar_path}")
             except Exception as cleanup_err:
-                clogger.warning(
-                    f"[HF] Failed to clean up tarball {tar_path}: {cleanup_err}"
-                )
+                clogger.warning(f"[HF] Failed to clean up tarball {tar_path}: {cleanup_err}")
 
 
 # =====================================================================================
