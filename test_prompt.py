@@ -17,15 +17,10 @@ def build_extract_fields_from_files_prompt(
 ) -> str:
     """Construct a structured prompt for extracting fields from files."""
 
-    # Convert list to json, with value = PUT VALUE HERE
-    fields_json: Dict[str, Optional[str]] = {}
-    for item in fields:
-        fields_json[item] = "PUT VALUE HERE"
-
     instructions = f"""
 Your task: Extract specific field values from repository files.
 
-Fields needed: {json.dumps(fields_json)}
+Fields needed: {json.dumps(fields)}
 
 IMPORTANT: Repository files are provided below. You MUST read ALL files before responding.
 Do NOT generate output until you have examined every file.
@@ -39,6 +34,11 @@ Instructions:
 Output requirements:
 - Format: {{ "field_name": "extracted_value" }}
 - Include all requested fields that you can find. If you are not confident in a value, use null.
+- Do NOT include any fields not listed in the "Fields needed" section
+- Do NOT fabricate values or make assumptions
+- Include only one answer per field, no lists
+- Use exact values from the files (do not paraphrase)
+- Ensure valid JSON format
 - Use actual values found in the files (not placeholders)
 
 Begin reading the files now:
@@ -78,9 +78,9 @@ This model is uncased: it does not make a difference between english and English
 
 # Fields to extract (same as production)
 FIELDS = {
-    "code_name": "Name of the code artifact",
-    "dataset_name": "Name of the dataset artifact",
-    "parent_model_name": "Name of the parent model",
+    "code_name": "Name of the code artifact (only one)",
+    "dataset_name": "Name of the dataset artifact (only one)",
+    "parent_model_name": "Name of the parent model (only one)",
     "parent_model_source": "File name where you learned parent model name (if any)",
     "parent_model_relationship": "Relationship to the parent model (if any)",
 }

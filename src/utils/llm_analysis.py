@@ -26,9 +26,9 @@ from src.settings import BEDROCK_MODEL_ID, BEDROCK_REGION
 # CONSTANTS
 # ====================================================================================
 
-# Bedrock Titan Text Lite model: 4096 input tokens max
-# Conservative limit to stay under hard limit and observed errors (4519)
-MAX_INPUT_TOKENS = 3500
+# Amazon Nova Lite model: 300K context window
+# Conservative limit for prompt size - Nova models handle much larger contexts
+MAX_INPUT_TOKENS = 10000  # Increased from 3500 - Nova Lite has 300K context
 CHARS_PER_TOKEN = 3  # Rough estimate for token counting
 
 
