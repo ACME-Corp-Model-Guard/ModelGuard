@@ -265,11 +265,11 @@ def auth_required(
             auth: AuthContext = authorize(event)
             return func(event, context, auth=auth)
         except Exception as e:
-            clogger.error(f"[auth_required] Unauthorized: {e}")
+            clogger.error(f"[auth_required] Forbidden: {e}")
             return error_response(
-                401,
-                f"Unauthorized: {e}",
-                error_code="UNAUTHORIZED",
+                403,
+                f"Forbidden: {e}",
+                error_code="FORBIDDEN",
             )
 
     return wrapper
