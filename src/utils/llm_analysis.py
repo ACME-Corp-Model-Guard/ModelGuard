@@ -118,7 +118,11 @@ def ask_llm(
             return None
 
         if return_json:
-            return _extract_json_from_response(content)
+            result = _extract_json_from_response(content)
+            if result is None:
+                # Log what the LLM actually output when JSON extraction fails
+                clogger.debug(f"[llm] Raw output (first 500 chars):\n{content[:500]}")
+            return result
 
         return content
 
@@ -226,6 +230,7 @@ def build_llm_prompt(
     prompt = _truncate_to_token_limit(prompt, max_tokens=token_budget)
     clogger.debug(
         f"[llm_prompt_builder] Built prompt with {1 + len(trimmed_sections)} block(s), "
+        f"{list(sections.keys())}, "
         f"estimated {_estimate_token_count(prompt)} tokens"
     )
     return prompt
@@ -455,11 +460,15 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     Returns parsed JSON dict on success, None on failure.
     """
 
-    if not content or not isinstance(content, str):
+    if not isinstance(content, str):
         clogger.error(
             f"[llm] Invalid response content: expected str, got {type(content).__name__}. "
             f"Value: {repr(content)[:200]}"
         )
+        return None
+    
+    if not content or not content.strip():
+        clogger.error("[llm] Response content is empty or whitespace-only")
         return None
 
     # Strategy 1: Direct parse
@@ -486,7 +495,6 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
 
     # All strategies failed
     clogger.error("[llm] Failed to extract JSON from LLM output")
-    clogger.debug(f"[llm] Raw output (first 500 chars):\n{content[:500]}")
     return None
 
 
