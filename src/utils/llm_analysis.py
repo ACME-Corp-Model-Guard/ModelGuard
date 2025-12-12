@@ -108,7 +108,9 @@ def ask_llm(
         parsed = json.loads(raw_text)
         # Defensive parsing with visibility
         try:
-            content = parsed["results"][0]["outputText"]
+            result = parsed["results"][0]
+            content = result["outputText"]
+            stop_reason = result.get("completionReason", "unknown")
         except (KeyError, IndexError, TypeError):
             clogger.error(
                 "[llm] Unexpected response schema; 'results[0].outputText' not found"
@@ -116,6 +118,15 @@ def ask_llm(
             clogger.debug(f"[llm] Raw parsed keys: {list(parsed.keys())}")
             clogger.debug(f"[llm] Raw text (first 500 chars):\n{raw_text[:500]}")
             return None
+        
+        # Log if content is unexpectedly empty or short
+        if not content or len(content.strip()) < 10:
+            clogger.warning(
+                f"[llm] Received suspiciously short output: {len(content)} chars, "
+                f"stripped={len(content.strip() if content else '')} chars, "
+                f"stopReason={stop_reason}"
+            )
+            clogger.debug(f"[llm] Full Bedrock response:\n{raw_text}")
 
         if return_json:
             result = _extract_json_from_response(content)
