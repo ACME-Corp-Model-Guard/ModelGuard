@@ -513,7 +513,7 @@ def _truncate_to_token_limit(text: str, max_tokens: int = MAX_INPUT_TOKENS) -> s
         return text
 
     # Calculate approximate character limit
-    char_limit = max_tokens * 3
+    char_limit = max_tokens * CHARS_PER_TOKEN
     truncated = text[:char_limit].rstrip()
 
     clogger.warning(
