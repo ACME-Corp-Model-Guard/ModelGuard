@@ -257,7 +257,7 @@ def test_create_new_artifact_triggers_upload_and_connect(mock_upload, mock_conne
     create_artifact(
         artifact_type="model",
         name="new-model",
-        source_url="https://example.com",
+        source_url="https://huggingface.co/new/model",
         size=1000,
         license="MIT",
         # No s3_key = new artifact

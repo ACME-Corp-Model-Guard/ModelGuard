@@ -92,7 +92,7 @@ def test_enrich_kwargs_fetches_metadata_when_name_missing(mock_fetch):
 def test_enrich_kwargs_skips_fetch_when_name_provided():
     """Test metadata fetch is skipped when name already provided."""
     kwargs = {
-        "name": "existing-name",
+        "s3_key": "existing-key",
         "source_url": "https://huggingface.co/test/model",
     }
 
@@ -405,6 +405,7 @@ def test_create_artifact_with_all_kwargs():
     with patch("src.artifacts.artifactory.factory._initialize_new_artifact"):
         artifact = create_artifact(
             artifact_type="model",
+            s3_key="models/test-123",
             name="test-model",
             source_url="https://example.com",
             size=5000,
