@@ -29,6 +29,7 @@ from src.settings import BEDROCK_MODEL_ID, BEDROCK_REGION
 # Bedrock Titan Text Lite model: 4096 input tokens max
 # Conservative limit to stay under hard limit and observed errors (4519)
 MAX_INPUT_TOKENS = 3500
+CHARS_PER_TOKEN = 3  # Rough estimate for token counting
 
 
 # ====================================================================================
@@ -455,7 +456,10 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     """
 
     if not content or not isinstance(content, str):
-        clogger.error("[llm] Invalid response content (not a string)")
+        clogger.error(
+            f"[llm] Invalid response content: expected str, got {type(content).__name__}. "
+            f"Value: {repr(content)[:200]}"
+        )
         return None
 
     # Strategy 1: Direct parse
@@ -492,8 +496,8 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
 
 
 def _estimate_token_count(text: str) -> int:
-    """Rough estimate of token count (1 token ≈ 4 characters for English)."""
-    return max(1, len(text) // 4)
+    """Token estimate (1 token ≈ CHARS_PER_TOKEN characters to account for tokenizer variance)."""
+    return max(1, len(text) // CHARS_PER_TOKEN)
 
 
 def _truncate_to_token_limit(text: str, max_tokens: int = MAX_INPUT_TOKENS) -> str:
@@ -509,7 +513,7 @@ def _truncate_to_token_limit(text: str, max_tokens: int = MAX_INPUT_TOKENS) -> s
         return text
 
     # Calculate approximate character limit
-    char_limit = max_tokens * 4
+    char_limit = max_tokens * 3
     truncated = text[:char_limit].rstrip()
 
     clogger.warning(
