@@ -9,10 +9,12 @@ configuration files, and other metadata to discover relationships like:
 - Parent models (if this is a fine-tuned model)
 """
 
+import os
+import tempfile
 from typing import Any, Dict, Optional, Union
 
 from src.artifacts.model_artifact import ModelArtifact
-from src.logger import logger
+from src.logutil import clogger
 from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
 from src.utils.llm_analysis import (
@@ -46,9 +48,11 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
     Args:
         artifact: The model artifact to analyze
     """
+    tmp_path: Optional[str] = None
+
     try:
         # Step 1: Download artifact and extract relevant files
-        files = _download_and_extract_files(artifact)
+        tmp_path, files = _download_and_extract_files(artifact)
 
         # Step 2: Use LLM to extract connection fields from files
         extracted_data = _llm_extract_fields(artifact, files)
@@ -58,15 +62,25 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
         # Step 3: Update artifact fields with extracted data
         _update_connection_fields(artifact, extracted_data)
 
-        logger.info(
+        clogger.info(
             f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', "
             f"parent_model_name='{artifact.parent_model_name}' "
             f"for model artifact: {artifact.artifact_id}"
         )
     except Exception as e:
-        logger.error(
+        clogger.error(
             f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}"
         )
+    finally:
+        # Clean up temp file
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+                clogger.debug(f"[discovery] Cleaned up temp file: {tmp_path}")
+            except Exception as cleanup_err:
+                clogger.warning(
+                    f"[discovery] Failed to clean up temp file {tmp_path}: {cleanup_err}"
+                )
 
 
 # =============================================================================
@@ -74,7 +88,9 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
 # =============================================================================
 
 
-def _download_and_extract_files(artifact: ModelArtifact) -> Dict[str, str]:
+def _download_and_extract_files(
+    artifact: ModelArtifact,
+) -> tuple[str, Dict[str, str]]:
     """
     Download artifact from S3 and extract relevant files for analysis.
 
@@ -85,27 +101,39 @@ def _download_and_extract_files(artifact: ModelArtifact) -> Dict[str, str]:
         artifact: The model artifact to download
 
     Returns:
-        Dictionary mapping filenames to their contents (limited to 10 files)
+        Tuple of (temp_file_path, files_dict) where:
+        - temp_file_path: Path to the downloaded temp file (caller must clean up)
+        - files_dict: Dictionary mapping filenames to their contents (limited to 10 files)
 
     Raises:
         Exception: If download or extraction fails
     """
+    # Create a unique temp file for this artifact
+    tmp_file = tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".tar.gz",
+        prefix=f"discovery_{artifact.artifact_id}_",
+        dir="/tmp",
+    )
+    tmp_path = tmp_file.name
+    tmp_file.close()  # Close so download_artifact_from_s3 can write to it
+
     # Download artifact from S3 to temp location
     download_artifact_from_s3(
         artifact_id=artifact.artifact_id,
         s3_key=artifact.s3_key,
-        local_path="/tmp/model_artifact_files",
+        local_path=tmp_path,
     )
 
     # Extract relevant files for analysis
     files: Dict[str, str] = extract_relevant_files(
-        tar_path="/tmp/model_artifact_files",
+        tar_path=tmp_path,
         include_ext={".json", ".md", ".txt"},
         max_files=10,
         prioritize_readme=True,
     )
 
-    return files
+    return tmp_path, files
 
 
 def _llm_extract_fields(
@@ -141,7 +169,7 @@ def _llm_extract_fields(
 
     # Validate response
     if not response or not isinstance(response, dict):
-        logger.warning(
+        clogger.warning(
             f"LLM failed to extract connected artifact names for {artifact.artifact_id}"
         )
         return None
