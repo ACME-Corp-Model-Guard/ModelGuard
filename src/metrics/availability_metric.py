@@ -81,9 +81,9 @@ class AvailabilityMetric(Metric):
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            clogger.error(
+            clogger.exception(
                 f"[availability] Unexpected error scoring availability for "
-                f"model {model.artifact_id}: {e}",
-                exc_info=True,
+                f"model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}

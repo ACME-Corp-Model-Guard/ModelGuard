@@ -77,10 +77,10 @@ class LicenseMetric(Metric):
 
             return {self.SCORE_FIELD: float(score)}
 
-        except Exception as exc:
-            clogger.error(
-                f"[license] Failed scoring artifact_id={model.artifact_id}: {exc}",
-                exc_info=True,
+        except Exception as e:
+            clogger.exception(
+                f"[license] Failed scoring artifact_id={model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: float(self.DEFAULT_SCORE)}
 

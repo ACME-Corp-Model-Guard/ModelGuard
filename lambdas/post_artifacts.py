@@ -251,10 +251,9 @@ def lambda_handler(
     try:
         all_artifacts = load_all_artifacts()
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Failed to load artifact list",
             extra={"error_type": type(e).__name__},
-            exc_info=True,
         )
         return error_response(
             500,

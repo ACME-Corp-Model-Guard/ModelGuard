@@ -28,6 +28,12 @@ class FileDownloadError(Exception):
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
+def _get_temp_dir() -> str:
+    """Get appropriate temp directory for current environment."""
+    # Lambda only has /tmp writable, local dev can use system temp
+    if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return "/tmp"
+    return None  # Let tempfile.mkdtemp use system default
 def _parse_github_url(source_url: str) -> Tuple[str, str]:
     """Extract (owner, repo) from a GitHub URL."""
     parts = source_url.rstrip("/").split("github.com/")
@@ -101,8 +107,8 @@ def download_from_github(
         # Step 1 — Parse repo identifier
         owner, repo = _parse_github_url(source_url)
 
-        # Step 2 — Download tarball directly to /tmp (use /tmp for Lambda)
-        temp_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"gh_{artifact_id}_")
+        # Step 2 — Download tarball (Lambda: /tmp, local: system temp)
+        temp_dir = tempfile.mkdtemp(dir=_get_temp_dir(), prefix=f"gh_{artifact_id}_")
 
         logger.debug(f"[GitHub] Downloading {owner}/{repo} as tarball")
         tar_path = _download_repo_tarball(owner, repo, temp_dir)

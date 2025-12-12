@@ -73,9 +73,9 @@ class BusFactorMetric(Metric):
             )
             return {"bus_factor": bus_factor}
         except Exception as e:
-            clogger.error(
-                f"Failed to calculate bus factor for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"Failed to calculate bus factor for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {"bus_factor": 0.0}
 

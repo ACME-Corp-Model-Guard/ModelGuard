@@ -47,16 +47,14 @@ def log_operation(
         )
     except Exception as e:
         duration_ms = int((time.time() - start) * 1000)
-        clogger.error(
+        clogger.exception(
             f"Operation failed: {operation_name} ({duration_ms}ms)",
             extra={
                 **metadata,
                 "duration_ms": duration_ms,
                 "status": "failure",
                 "error_type": type(e).__name__,
-                "error_message": str(e),
             },
-            exc_info=True,
         )
         raise
 
@@ -131,8 +129,7 @@ class BatchOperationLogger:
                 extra=summary,
             )
         else:
-            clogger.error(
+            clogger.exception(
                 f"Batch operation failed: {self.operation_name}",
                 extra={**summary, "error_type": exc_type.__name__},
-                exc_info=True,
             )

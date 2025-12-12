@@ -83,7 +83,7 @@ def lambda_handler(
     try:
         tokens = authenticate_user(username, password)
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Authentication failed",
             extra={"username": username, "error_type": type(e).__name__},
         )

@@ -117,7 +117,7 @@ def lambda_handler(
             extra={
                 "artifact_type": artifact_type,
                 "source_url": url,
-                "error": str(e),
+                "error_type": type(e).__name__,
             },
         )
         return error_response(
@@ -126,14 +126,13 @@ def lambda_handler(
             error_code="SOURCE_NOT_FOUND",
         )
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Unexpected metadata ingestion failure",
             extra={
                 "artifact_type": artifact_type,
                 "source_url": url,
                 "error_type": type(e).__name__,
             },
-            exc_info=True,
         )
         return error_response(
             500,
@@ -156,13 +155,12 @@ def lambda_handler(
     try:
         save_artifact_metadata(artifact)
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Failed to save metadata",
             extra={
                 "artifact_id": artifact.artifact_id,
                 "error_type": type(e).__name__,
             },
-            exc_info=True,
         )
         return error_response(
             500,

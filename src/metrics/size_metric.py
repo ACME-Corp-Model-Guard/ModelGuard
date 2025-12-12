@@ -82,9 +82,9 @@ class SizeMetric(Metric):
             return scores
 
         except Exception as e:
-            clogger.error(
-                f"Failed to calculate size scores for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"Failed to calculate size scores for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {
                 "size_pi": 0.5,

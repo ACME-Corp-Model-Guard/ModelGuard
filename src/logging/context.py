@@ -98,6 +98,13 @@ class ContextualLogger:
             self._enrich_message(msg), **kwargs
         )
 
+    def exception(
+        self, msg: str, extra: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> None:
+        logger.bind(**self._add_context(extra)).exception(
+            self._enrich_message(msg), **kwargs
+        )
+
 
 # Create singleton instance
 clogger = ContextualLogger()

@@ -150,9 +150,9 @@ This metric evaluates the overall quality of a code repository, including:
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            clogger.error(
-                f"[code_quality] Evaluation failed for {code_artifact.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[code_quality] Evaluation failed for {code_artifact.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}
 

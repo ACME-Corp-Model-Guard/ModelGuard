@@ -202,9 +202,9 @@ class PerformanceClaimsMetric(Metric):
             return {"performance_claims": score}
 
         except Exception as e:
-            clogger.error(
-                f"Failed to calculate performance claims for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"Failed to calculate performance claims for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {"performance_claims": 0.0}
 

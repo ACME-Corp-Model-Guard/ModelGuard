@@ -91,7 +91,7 @@ def lambda_handler(
     try:
         download_url = generate_s3_download_url(artifact_id, s3_key=s3_key)
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Failed to generate presigned URL",
             extra={
                 "artifact_id": artifact_id,
@@ -99,7 +99,6 @@ def lambda_handler(
                 "s3_key": s3_key,
                 "error_type": type(e).__name__,
             },
-            exc_info=True,
         )
         return error_response(
             500, "Failed to generate download URL", error_code="S3_ERROR"

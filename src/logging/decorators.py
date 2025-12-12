@@ -220,17 +220,15 @@ def log_lambda_handler(
             except Exception as e:
                 start_time = request_start_time.get()
                 duration_ms = int((time.time() - (start_time or time.time())) * 1000)
-                clogger.error(
+                clogger.exception(
                     f"Request failed: {http_method} {path}",
                     extra={
                         "event_type": "error",
                         "endpoint": endpoint_name,
                         "correlation_id": cid,
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
                         "duration_ms": duration_ms,
+                        "error_type": type(e).__name__,
                     },
-                    exc_info=True,
                 )
                 raise
 

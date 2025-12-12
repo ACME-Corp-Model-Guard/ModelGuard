@@ -69,7 +69,10 @@ def fetch_github_license(github_url: str) -> Optional[str]:
         return license_info.get("spdx_id")
 
     except Exception as e:
-        clogger.error(f"[license_check] GitHub license fetch error: {e}")
+        clogger.exception(
+            "[license_check] GitHub license fetch error",
+            extra={"error_type": type(e).__name__},
+        )
         raise
 
 

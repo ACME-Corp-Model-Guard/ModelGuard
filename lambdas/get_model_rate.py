@@ -159,10 +159,9 @@ def lambda_handler(
         artifact_dict = artifact.to_dict()
         rate_data = _format_rate_response(artifact_dict)
     except Exception as e:
-        clogger.error(
+        clogger.exception(
             "Failed to format rate data",
             extra={"model_id": model_id, "error_type": type(e).__name__},
-            exc_info=True,
         )
         return error_response(
             500,

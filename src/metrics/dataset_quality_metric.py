@@ -146,9 +146,9 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            clogger.error(
-                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}
 

@@ -249,18 +249,20 @@ def lambda_handler(
     """
     try:
         new_artifact = create_artifact(artifact_type, source_url=url)
-    except FileDownloadError as exc:
+    except FileDownloadError as e:
         clogger.error(
-            f"[put_artifact_update] Upstream artifact download/metadata failed: {exc}"
+            "[put_artifact_update] Upstream artifact download/metadata failed",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             404,
             "Artifact metadata could not be fetched from the source URL",
             error_code="SOURCE_NOT_FOUND",
         )
-    except Exception as exc:  # pragma: no cover - safety net
-        clogger.error(
-            f"[put_artifact_update] Unexpected error during artifact creation: {exc}"
+    except Exception as e:  # pragma: no cover - safety net
+        clogger.exception(
+            "[put_artifact_update] Unexpected error during artifact creation",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             500,
@@ -317,10 +319,11 @@ def lambda_handler(
             )
             try:
                 delete_objects(ARTIFACTS_BUCKET, [new_s3_key])
-            except Exception as exc:  # pragma: no cover - best effort cleanup
-                clogger.error(
+            except Exception as e:  # pragma: no cover - best effort cleanup
+                clogger.exception(
                     f"[put_artifact_update] Failed to delete new artifact S3 key "
-                    f"{new_s3_key}: {exc}"
+                    f"{new_s3_key}",
+                    extra={"error_type": type(e).__name__},
                 )
 
         return error_response(
@@ -342,10 +345,11 @@ def lambda_handler(
         )
         try:
             delete_objects(ARTIFACTS_BUCKET, [old_s3_key])
-        except Exception as exc:  # pragma: no cover - best effort cleanup
-            clogger.error(
+        except Exception as e:  # pragma: no cover - best effort cleanup
+            clogger.exception(
                 f"[put_artifact_update] Failed to delete old artifact S3 key "
-                f"{old_s3_key}: {exc}"
+                f"{old_s3_key}",
+                extra={"error_type": type(e).__name__},
             )
 
     # Align IDs so we overwrite the existing artifact row in DynamoDB.
@@ -354,9 +358,10 @@ def lambda_handler(
 
     try:
         save_artifact_metadata(new_artifact)
-    except Exception as exc:
-        clogger.error(
-            f"[put_artifact_update] Failed to save updated artifact metadata: {exc}"
+    except Exception as e:
+        clogger.exception(
+            "[put_artifact_update] Failed to save updated artifact metadata",
+            extra={"error_type": type(e).__name__},
         )
         return error_response(
             500,

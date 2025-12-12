@@ -120,9 +120,9 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            clogger.error(
-                f"[ramp_up] Evaluation failed for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[ramp_up] Evaluation failed for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}
 

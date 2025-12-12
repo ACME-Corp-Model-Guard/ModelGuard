@@ -142,16 +142,14 @@ class ModelArtifact(BaseArtifact):
                     return metric_name, value, elapsed_ms, True
                 except Exception as e:
                     elapsed_ms = (time.perf_counter() - t0) * 1000.0
-                    clogger.error(
+                    clogger.exception(
                         f"Metric computation failed: {metric_name}",
                         extra={
                             "metric": metric_name,
                             "artifact_id": self.artifact_id,
-                            "error_type": type(e).__name__,
-                            "error_message": str(e),
                             "duration_ms": elapsed_ms,
+                            "error_type": type(e).__name__,
                         },
-                        exc_info=True,
                     )
                     return metric_name, 0.0, elapsed_ms, False
 
