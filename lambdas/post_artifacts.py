@@ -273,7 +273,7 @@ def lambda_handler(
     # Step 4.1 - Check for too many results (413 Payload Too Large)
     # ---------------------------------------------------------------------
     if len(filtered) > MAX_QUERY_RESULTS:
-        logger.warning(
+        clogger.warning(
             f"[post_artifacts] Query returned {len(filtered)} artifacts, "
             f"exceeds maximum of {MAX_QUERY_RESULTS}"
         )

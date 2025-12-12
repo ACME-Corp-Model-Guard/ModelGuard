@@ -59,7 +59,7 @@ def lambda_handler(
     # Step 0 — Verify admin permission (401 per OpenAPI spec)
     # ---------------------------------------------------------------------
     if "Admin" not in auth["groups"]:
-        logger.warning(
+        clogger.warning(
             f"[/reset] Non-admin user attempted reset: {auth['username']}, "
             f"groups={auth['groups']}"
         )

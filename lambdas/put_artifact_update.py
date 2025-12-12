@@ -168,7 +168,7 @@ def lambda_handler(
     auth: AuthContext,  # Use for auth side effects
     # ) -> Dict[str, Any]:
 ) -> LambdaResponse:
-    clogger.info("[put_artifact_update] Handling artifact upodate request")
+    clogger.info("[put_artifact_update] Handling artifact update request")
 
     # ------------------------------------------------------------------
     # Step 1 - Extract & validate path parameters
