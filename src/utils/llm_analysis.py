@@ -76,13 +76,19 @@ def ask_llm(
             f"temperature={temperature}"
         )
 
+        # Nova models use Messages API format
         request_body = {
-            "inputText": prompt,
-            "textGenerationConfig": {
-                "maxTokenCount": max_tokens,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"text": prompt}]
+                }
+            ],
+            "inferenceConfig": {
+                "max_new_tokens": max_tokens,
                 "temperature": temperature,
-                "stopSequences": [],
-            },
+                "stopSequences": []
+            }
         }
 
         clogger.debug(
@@ -107,14 +113,14 @@ def ask_llm(
             return None
 
         parsed = json.loads(raw_text)
-        # Defensive parsing with visibility
+        # Nova response format: output.message.content[0].text
         try:
-            result = parsed["results"][0]
-            content = result["outputText"]
-            stop_reason = result.get("completionReason", "unknown")
-        except (KeyError, IndexError, TypeError):
+            content = parsed["output"]["message"]["content"][0]["text"]
+            stop_reason = parsed.get("stopReason", "unknown")
+        except (KeyError, IndexError, TypeError) as e:
             clogger.error(
-                "[llm] Unexpected response schema; 'results[0].outputText' not found"
+                f"[llm] Unexpected response schema; expected Nova format with "
+                f"'output.message.content[0].text': {e}"
             )
             clogger.debug(f"[llm] Raw parsed keys: {list(parsed.keys())}")
             clogger.debug(f"[llm] Raw text (first 500 chars):\n{raw_text[:500]}")
