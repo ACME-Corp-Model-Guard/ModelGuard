@@ -385,7 +385,7 @@ def extract_llm_score_field(
 def _trim_section_to_budget(
     text: str, token_budget: int, important_terms: List[str]
 ) -> str:
-    """Trim section to budget: keep important lines + tail lines, preserving original order."""
+    """Trim section to budget: keep important lines + head lines, preserving original order."""
     if _estimate_token_count(text) <= token_budget:
         return text
 
@@ -421,8 +421,8 @@ def _trim_section_to_budget(
         selected_indices.add(i)
         running_tokens += line_tokens + 1
 
-    # Add tail lines from the end until budget would be exceeded
-    for i in range(len(lines) - 1, -1, -1):
+    # Add head lines from the beginning until budget would be exceeded
+    for i in range(len(lines)):
         if i not in selected_indices:
             # Check BEFORE adding to avoid exceeding budget
             line_tokens = _estimate_token_count(lines[i])
