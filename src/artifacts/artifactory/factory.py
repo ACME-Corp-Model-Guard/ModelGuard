@@ -153,9 +153,9 @@ def _enrich_kwargs_with_metadata(
     # (it's not a constructor parameter)
     kwargs.pop("artifact_type", None)
 
-    # Only fetch metadata if name is not provided
+    # Only fetch metadata if this is a new artifact with a source_url
     url = kwargs.get("source_url")
-    if not kwargs.get("name") and isinstance(url, str):
+    if _is_new_artifact(kwargs) and isinstance(url, str):
         try:
             clogger.debug(f"Fetching metadata for {artifact_type} from {url}")
             metadata = fetch_artifact_metadata(url=url, artifact_type=artifact_type)
