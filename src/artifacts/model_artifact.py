@@ -7,7 +7,7 @@ import time
 from typing import Any, Dict, List, Optional, Union
 
 from src.artifacts.base_artifact import BaseArtifact
-from src.logging import BatchOperationLogger, clogger
+from src.logutil import BatchOperationLogger, clogger
 from src.metrics import Metric
 from src.metrics.net_score import calculate_net_score
 

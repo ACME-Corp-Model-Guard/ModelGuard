@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Union
 
-from src.logging import clogger
+from src.logutil import clogger
 
 from .metric import Metric
 
