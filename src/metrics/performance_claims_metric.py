@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from src.logutil import clogger
 
@@ -10,18 +10,331 @@ if TYPE_CHECKING:
     from src.artifacts import ModelArtifact
 
 
+# =============================================================================
+# Configuration Constants
+# =============================================================================
+
+# Recognized metric names (expanded from 8 to ~25)
+_KNOWN_METRICS = {
+    # Classification
+    "accuracy",
+    "precision",
+    "recall",
+    "f1",
+    "f1_score",
+    "auc",
+    "roc_auc",
+    "top_k_accuracy",
+    "top1_accuracy",
+    "top5_accuracy",
+    # NLP
+    "bleu",
+    "rouge",
+    "rouge1",
+    "rouge2",
+    "rougel",
+    "meteor",
+    "wer",
+    "cer",
+    "perplexity",
+    "ppl",
+    # Object Detection / Segmentation
+    "map",
+    "map50",
+    "map75",
+    "iou",
+    "miou",
+    "dice",
+    # Regression
+    "mse",
+    "rmse",
+    "mae",
+    "r2",
+    "r2_score",
+    # General
+    "loss",
+    "score",
+    "em",
+    "exact_match",
+    "spearmanr",
+    "pearsonr",
+}
+
+# Field names to check for performance data (expanded)
+_PERFORMANCE_FIELDS = [
+    "performance",
+    "evaluation",
+    "eval",
+    "eval_results",
+    "metrics",
+    "results",
+    "benchmarks",
+    "scores",
+    "model-index",
+]
+
+# Paper citation fields
+_PAPER_FIELDS = ["paperswithcode", "arxiv", "citation", "bibtex", "paper", "doi"]
+_TEXT_FIELDS = ["model_card", "readme", "description", "summary"]
+_CITATION_PATTERNS = ["arxiv.org", "doi.org", "paperswithcode.com"]
+
+# Scoring weights
+_WEIGHTS = {
+    "structured_metrics": 0.5,
+    "unstructured_metrics": 0.3,
+    "benchmarks": 0.25,
+    "papers": 0.15,
+}
+
+_METRIC_COUNT_BONUS = {5: 0.1, 3: 0.07, 2: 0.04}
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def _get_card_data(metadata: Dict[str, Any], artifact_id: str = "") -> Dict[str, Any]:
+    """
+    Extract cardData from metadata, handling nested structures.
+
+    Args:
+        metadata: Model metadata dictionary
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        cardData dictionary, or empty dict if not found
+    """
+    log_prefix = (
+        f"[performance_claims] [{artifact_id}]"
+        if artifact_id
+        else "[performance_claims]"
+    )
+
+    if not metadata:
+        clogger.debug(f"{log_prefix} metadata is empty or None")
+        return {}
+
+    clogger.debug(f"{log_prefix} metadata keys: {list(metadata.keys())}")
+
+    # Get cardData from various possible locations
+    card_data = (
+        metadata.get("metadata", {}).get("cardData", {})
+        or metadata.get("cardData", {})
+        or {}
+    )
+
+    if not card_data:
+        clogger.debug(f"{log_prefix} cardData is empty or missing")
+    elif isinstance(card_data, dict):
+        clogger.debug(f"{log_prefix} cardData keys: {list(card_data.keys())}")
+
+    return card_data
+
+
+def _extract_model_index_metrics(
+    card_data: Dict[str, Any], artifact_id: str = ""
+) -> Tuple[List[str], bool, bool]:
+    """
+    Extract metrics from HuggingFace model-index structure.
+
+    Args:
+        card_data: The cardData dictionary
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        Tuple of (metrics_list, has_structured_metrics, has_benchmarks)
+    """
+    log_prefix = (
+        f"[performance_claims] [{artifact_id}]"
+        if artifact_id
+        else "[performance_claims]"
+    )
+    metrics_list: List[str] = []
+    has_structured = False
+    has_benchmarks = False
+
+    if not isinstance(card_data, dict):
+        return metrics_list, has_structured, has_benchmarks
+
+    model_index = card_data.get("model-index", {})
+    if not model_index or not isinstance(model_index, dict):
+        clogger.debug(f"{log_prefix} no model-index structure found")
+        return metrics_list, has_structured, has_benchmarks
+
+    results = model_index.get("results", [])
+    if not results or not isinstance(results, list):
+        clogger.debug(f"{log_prefix} model-index exists but has no results")
+        return metrics_list, has_structured, has_benchmarks
+
+    clogger.debug(f"{log_prefix} model-index found with {len(results)} result(s)")
+    has_benchmarks = True
+    has_structured = True
+
+    for result_item in results:
+        if not isinstance(result_item, dict):
+            continue
+
+        # Check for task type (indicates proper benchmark structure)
+        if result_item.get("task"):
+            has_benchmarks = True
+
+        # Extract metrics from results
+        metrics = result_item.get("metrics", [])
+        if metrics and isinstance(metrics, list):
+            for metric in metrics:
+                if isinstance(metric, dict):
+                    metric_name = metric.get("name", "")
+                    metric_value = metric.get("value")
+                    # Only count if it has both name and value
+                    if metric_name and metric_value is not None:
+                        metrics_list.append(metric_name.lower())
+
+    return metrics_list, has_structured, has_benchmarks
+
+
+def _extract_performance_field_metrics(
+    card_data: Dict[str, Any], artifact_id: str = ""
+) -> Tuple[List[str], bool]:
+    """
+    Extract metrics from performance-related fields in cardData.
+
+    Args:
+        card_data: The cardData dictionary
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        Tuple of (metrics_list, has_benchmarks)
+    """
+    log_prefix = (
+        f"[performance_claims] [{artifact_id}]"
+        if artifact_id
+        else "[performance_claims]"
+    )
+    metrics_list: List[str] = []
+    has_benchmarks = False
+
+    if not isinstance(card_data, dict):
+        return metrics_list, has_benchmarks
+
+    found_perf_fields: List[str] = []
+    for field in _PERFORMANCE_FIELDS:
+        if field not in card_data:
+            continue
+
+        field_value = card_data[field]
+        if not isinstance(field_value, (dict, list)) or not field_value:
+            continue
+
+        found_perf_fields.append(field)
+        has_benchmarks = True
+
+        # Try to extract metrics from dict fields
+        if isinstance(field_value, dict):
+            for key, value in field_value.items():
+                if isinstance(value, (int, float)) and key.lower() in _KNOWN_METRICS:
+                    metrics_list.append(key.lower())
+
+    if found_perf_fields:
+        clogger.debug(f"{log_prefix} found performance fields: {found_perf_fields}")
+    else:
+        clogger.debug(
+            f"{log_prefix} no performance fields found (checked: {_PERFORMANCE_FIELDS})"
+        )
+
+    return metrics_list, has_benchmarks
+
+
+def _extract_paper_citations(
+    card_data: Dict[str, Any], artifact_id: str = ""
+) -> Tuple[bool, Optional[str]]:
+    """
+    Check for paper citations in cardData.
+
+    Args:
+        card_data: The cardData dictionary
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        Tuple of (has_papers, source_field) where source_field indicates where citation was found
+    """
+    log_prefix = (
+        f"[performance_claims] [{artifact_id}]"
+        if artifact_id
+        else "[performance_claims]"
+    )
+
+    if not isinstance(card_data, dict):
+        return False, None
+
+    # Check for paper-related fields
+    for field in _PAPER_FIELDS:
+        if field not in card_data:
+            continue
+
+        field_value = card_data[field]
+        if field_value and (
+            isinstance(field_value, str)
+            or (isinstance(field_value, list) and len(field_value) > 0)
+            or (isinstance(field_value, dict) and len(field_value) > 0)
+        ):
+            clogger.debug(f"{log_prefix} found paper citation in field: {field}")
+            return True, field
+
+    # Check for citations in text fields
+    for field in _TEXT_FIELDS:
+        if field not in card_data:
+            continue
+
+        field_value = str(card_data[field]).lower()
+        for pattern in _CITATION_PATTERNS:
+            if pattern in field_value:
+                clogger.debug(
+                    f"{log_prefix} found paper citation ({pattern}) in text field: {field}"
+                )
+                return True, field
+
+    clogger.debug(
+        f"{log_prefix} no paper citations found "
+        f"(checked fields: {_PAPER_FIELDS}, text: {_TEXT_FIELDS})"
+    )
+    return False, None
+
+
+def _get_metric_count_bonus(count: int) -> float:
+    """
+    Get bonus score for number of metrics reported.
+
+    Args:
+        count: Number of distinct metrics
+
+    Returns:
+        Bonus score (0.0 to 0.1)
+    """
+    for threshold in sorted(_METRIC_COUNT_BONUS.keys(), reverse=True):
+        if count >= threshold:
+            return _METRIC_COUNT_BONUS[threshold]
+    return 0.0
+
+
+# =============================================================================
+# Main Extraction Function
+# =============================================================================
+
+
 def _extract_performance_claims_from_metadata(
     metadata: Dict[str, Any],
+    artifact_id: str = "",
 ) -> Dict[str, Any]:
     """
     Extract performance claims and metrics from model metadata.
 
-    Helper function for PerformanceClaimsMetric. Checks various fields where
-    performance information might be stored, including HuggingFace model card data.
-    Uses structured field checking to avoid false positives from keyword matching.
+    Orchestrates helper functions to check various fields where performance
+    information might be stored, including HuggingFace model card data.
 
     Args:
         metadata: Model metadata dictionary (from artifact.metadata)
+        artifact_id: Optional artifact ID for logging context
 
     Returns:
         Dictionary with performance claims information:
@@ -33,10 +346,16 @@ def _extract_performance_claims_from_metadata(
         - has_structured_metrics: bool - whether metrics are in structured format
         - card_data: dict - raw cardData if available
     """
-    metrics_list: List[str] = []
+    log_prefix = (
+        f"[performance_claims] [{artifact_id}]"
+        if artifact_id
+        else "[performance_claims]"
+    )
+
+    # Initialize result with defaults
     result: Dict[str, Any] = {
         "has_metrics": False,
-        "metrics": metrics_list,
+        "metrics": [],
         "has_benchmarks": False,
         "has_papers": False,
         "metric_count": 0,
@@ -44,111 +363,39 @@ def _extract_performance_claims_from_metadata(
         "card_data": {},
     }
 
-    if not metadata:
-        return result
-
-    # Get cardData from various possible locations
-    card_data = (
-        metadata.get("metadata", {}).get("cardData", {})
-        or metadata.get("cardData", {})
-        or {}
-    )
-
+    # Step 1: Get cardData from metadata
+    card_data = _get_card_data(metadata, artifact_id)
     result["card_data"] = card_data
 
     if not card_data:
         return result
 
-    # Primary: Check HuggingFace model-index structure (most reliable)
-    if isinstance(card_data, dict):
-        model_index = card_data.get("model-index", {})
-        if model_index and isinstance(model_index, dict):
-            results = model_index.get("results", [])
-            if results and isinstance(results, list):
-                result["has_benchmarks"] = True
-                result["has_structured_metrics"] = True
+    # Step 2: Extract metrics from model-index (primary source)
+    model_index_metrics, has_structured, has_benchmarks = _extract_model_index_metrics(
+        card_data, artifact_id
+    )
 
-                # Extract metrics from structured results
-                for result_item in results:
-                    if isinstance(result_item, dict):
-                        # Check for task type (indicates proper benchmark structure)
-                        task_type = result_item.get("task", {})
-                        if task_type:
-                            result["has_benchmarks"] = True
+    # Step 3: Extract metrics from performance fields (secondary source)
+    perf_field_metrics, perf_has_benchmarks = _extract_performance_field_metrics(
+        card_data, artifact_id
+    )
 
-                        # Extract metrics from results
-                        metrics = result_item.get("metrics", [])
-                        if metrics and isinstance(metrics, list):
-                            result["has_metrics"] = True
-                            for metric in metrics:
-                                if isinstance(metric, dict):
-                                    metric_name = metric.get("name", "")
-                                    metric_value = metric.get("value")
-                                    # Only count if it has both name and value (actual metric)
-                                    if metric_name and metric_value is not None:
-                                        metrics_list.append(metric_name.lower())
+    # Step 4: Check for paper citations
+    has_papers, _ = _extract_paper_citations(card_data, artifact_id)
 
-    # Secondary: Check for performance-related fields in cardData
-    if isinstance(card_data, dict):
-        # Check for explicit performance/evaluation sections
-        performance_fields = [
-            "performance",
-            "evaluation",
-            "metrics",
-            "results",
-            "benchmarks",
-            "scores",
-        ]
+    # Combine results
+    all_metrics = model_index_metrics + perf_field_metrics
+    unique_metrics = list(set(all_metrics))
 
-        for field in performance_fields:
-            if field in card_data:
-                field_value = card_data[field]
-                if isinstance(field_value, (dict, list)) and field_value:
-                    result["has_benchmarks"] = True
-                    # Try to extract metrics from these fields
-                    if isinstance(field_value, dict):
-                        for key, value in field_value.items():
-                            if isinstance(value, (int, float)) and key.lower() in [
-                                "accuracy",
-                                "f1",
-                                "precision",
-                                "recall",
-                                "bleu",
-                                "rouge",
-                                "perplexity",
-                                "auc",
-                            ]:
-                                result["has_metrics"] = True
-                                metrics_list.append(key.lower())
+    result["metrics"] = unique_metrics
+    result["metric_count"] = len(unique_metrics)
+    result["has_metrics"] = len(unique_metrics) > 0
+    result["has_structured_metrics"] = has_structured
+    result["has_benchmarks"] = has_benchmarks or perf_has_benchmarks
+    result["has_papers"] = has_papers
 
-    # Tertiary: Check for paper citations (more reliable than keyword matching)
-    if isinstance(card_data, dict):
-        # Check for paper-related fields
-        paper_fields = ["paperswithcode", "arxiv", "citation", "bibtex", "paper"]
-        for field in paper_fields:
-            if field in card_data:
-                field_value = card_data[field]
-                if field_value and (
-                    isinstance(field_value, str)
-                    or (isinstance(field_value, list) and len(field_value) > 0)
-                    or (isinstance(field_value, dict) and len(field_value) > 0)
-                ):
-                    result["has_papers"] = True
-                    break
-
-        # Check for model card text fields that might contain citations
-        text_fields = ["model_card", "readme", "description", "summary"]
-        for field in text_fields:
-            if field in card_data:
-                field_value = str(card_data[field]).lower()
-                # Look for arxiv links or DOI patterns (more reliable than keywords)
-                if "arxiv.org" in field_value or "doi.org" in field_value:
-                    result["has_papers"] = True
-                    break
-
-    # Remove duplicates and set count
-    result["metrics"] = list(set(metrics_list))
-    result["metric_count"] = len(result["metrics"])
+    if unique_metrics:
+        clogger.debug(f"{log_prefix} extracted metrics: {unique_metrics}")
 
     return result
 
@@ -166,6 +413,8 @@ class PerformanceClaimsMetric(Metric):
     Higher scores indicate better documented and more verifiable performance claims.
     """
 
+    SCORE_FIELD = "performance_claims"
+
     def score(self, model: ModelArtifact) -> Union[float, Dict[str, float]]:
         """
         Score model performance claims.
@@ -177,26 +426,28 @@ class PerformanceClaimsMetric(Metric):
             Performance claims score as a dictionary with value between 0.0 and 1.0
             (higher is better - more comprehensive and verifiable performance documentation)
         """
+        clogger.debug(f"[performance_claims] Scoring model {model.artifact_id}")
+
         if not model.metadata:
             clogger.debug(
-                f"No metadata available for model {model.artifact_id}, returning default score"
+                f"[performance_claims] [{model.artifact_id}] metadata is None, returning 0.0"
             )
             return {"performance_claims": 0.0}
 
         try:
             # Extract performance claims from metadata
-            claims_info = _extract_performance_claims_from_metadata(model.metadata)
+            claims_info = _extract_performance_claims_from_metadata(
+                model.metadata, artifact_id=model.artifact_id
+            )
 
             # Calculate score based on various factors
-            score = self._calculate_performance_claims_score(claims_info)
+            score, score_breakdown = self._calculate_performance_claims_score(
+                claims_info, artifact_id=model.artifact_id
+            )
 
             clogger.debug(
-                f"Performance claims score for {model.artifact_id}: {score:.3f} "
-                f"(metrics: {claims_info['has_metrics']}, "
-                f"metric_count: {claims_info.get('metric_count', 0)}, "
-                f"structured: {claims_info.get('has_structured_metrics', False)}, "
-                f"benchmarks: {claims_info['has_benchmarks']}, "
-                f"papers: {claims_info['has_papers']})"
+                f"[performance_claims] [{model.artifact_id}] final score: {score:.3f} "
+                f"(breakdown: {score_breakdown})"
             )
 
             return {"performance_claims": score}
@@ -208,30 +459,29 @@ class PerformanceClaimsMetric(Metric):
             )
             return {"performance_claims": 0.0}
 
-    def _calculate_performance_claims_score(self, claims_info: Dict[str, Any]) -> float:
+    def _calculate_performance_claims_score(
+        self, claims_info: Dict[str, Any], artifact_id: str = ""
+    ) -> tuple[float, Dict[str, float]]:
         """
         Calculate performance claims score from extracted information.
 
-        Improved scoring that considers quality and structure:
-        - Structured metrics (model-index format): Higher weight
-        - Multiple metrics: Indicates comprehensive evaluation
-        - Benchmarks: Shows verifiable evaluation
-        - Papers: Indicates peer-reviewed claims
-
-        Scoring breakdown:
-        - Has structured metrics (model-index): 0.5 points
-        - Has unstructured metrics: 0.3 points
-        - Has benchmarks/evaluation datasets: 0.25 points
-        - Has paper citations: 0.15 points
-        - Multiple metrics bonus: Up to 0.1 points
+        Uses module-level _WEIGHTS and _METRIC_COUNT_BONUS constants for scoring.
 
         Args:
             claims_info: Dictionary from _extract_performance_claims_from_metadata
+            artifact_id: Optional artifact ID for logging context
 
         Returns:
-            Score between 0.0 and 1.0
+            Tuple of (score, breakdown) where:
+            - score: float between 0.0 and 1.0
+            - breakdown: dict showing contribution from each component
         """
-        score = 0.0
+        breakdown: Dict[str, float] = {
+            "metrics": 0.0,
+            "metric_bonus": 0.0,
+            "benchmarks": 0.0,
+            "papers": 0.0,
+        }
 
         has_metrics = claims_info.get("has_metrics", False)
         has_structured = claims_info.get("has_structured_metrics", False)
@@ -240,27 +490,22 @@ class PerformanceClaimsMetric(Metric):
         # Score for having performance metrics
         if has_metrics:
             if has_structured:
-                # Structured metrics (model-index) are more reliable
-                score += 0.5
+                breakdown["metrics"] = _WEIGHTS["structured_metrics"]
             else:
-                # Unstructured metrics are less reliable but still valuable
-                score += 0.3
+                breakdown["metrics"] = _WEIGHTS["unstructured_metrics"]
 
-            # Bonus for having multiple metrics (indicates comprehensive evaluation)
-            if metric_count >= 5:
-                score += 0.1
-            elif metric_count >= 3:
-                score += 0.07
-            elif metric_count >= 2:
-                score += 0.04
+            # Bonus for having multiple metrics
+            breakdown["metric_bonus"] = _get_metric_count_bonus(metric_count)
 
         # Score for having benchmarks/evaluation datasets
         if claims_info.get("has_benchmarks", False):
-            score += 0.25
+            breakdown["benchmarks"] = _WEIGHTS["benchmarks"]
 
         # Score for having paper citations (indicates peer review)
         if claims_info.get("has_papers", False):
-            score += 0.15
+            breakdown["papers"] = _WEIGHTS["papers"]
 
-        # Clamp to [0.0, 1.0]
-        return max(0.0, min(1.0, score))
+        # Sum up the breakdown and clamp to [0.0, 1.0]
+        score = max(0.0, min(1.0, sum(breakdown.values())))
+
+        return score, breakdown
