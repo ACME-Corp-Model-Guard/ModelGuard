@@ -179,11 +179,7 @@ def test_connect_model_skips_already_connected_code(
 
     connect_artifact(artifact)
 
-    calls = [
-        c
-        for c in mock_load_by_fields.call_args_list
-        if c[1].get("artifact_type") == "code"
-    ]
+    calls = [c for c in mock_load_by_fields.call_args_list if c[1].get("artifact_type") == "code"]
     assert len(calls) == 0
 
 
@@ -205,11 +201,7 @@ def test_connect_model_skips_when_no_code_name(
 
     connect_artifact(artifact)
 
-    calls = [
-        c
-        for c in mock_load_by_fields.call_args_list
-        if c[1].get("artifact_type") == "code"
-    ]
+    calls = [c for c in mock_load_by_fields.call_args_list if c[1].get("artifact_type") == "code"]
     assert len(calls) == 0
 
 

@@ -59,9 +59,7 @@ def download_artifact(
         FileDownloadError: If no backend matches or the download fails.
     """
 
-    clogger.info(
-        f"[dispatcher] Selecting downloader for artifact {artifact_id}: {source_url}"
-    )
+    clogger.info(f"[dispatcher] Selecting downloader for artifact {artifact_id}: {source_url}")
 
     # HuggingFace
     if "huggingface.co" in source_url:

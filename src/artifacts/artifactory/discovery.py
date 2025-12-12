@@ -68,9 +68,7 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
             f"for model artifact: {artifact.artifact_id}"
         )
     except Exception as e:
-        clogger.error(
-            f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}"
-        )
+        clogger.error(f"Failed to extract connected artifact names for {artifact.artifact_id}: {e}")
     finally:
         # Clean up temp file
         if tmp_path and os.path.exists(tmp_path):
@@ -136,9 +134,7 @@ def _download_and_extract_files(
     return tmp_path, files
 
 
-def _llm_extract_fields(
-    artifact: ModelArtifact, files: Dict[str, str]
-) -> Optional[Dict[str, Any]]:
+def _llm_extract_fields(artifact: ModelArtifact, files: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
     Use LLM to analyze files and extract connection field values.
 
@@ -177,9 +173,7 @@ def _llm_extract_fields(
     return response
 
 
-def _update_connection_fields(
-    artifact: ModelArtifact, extracted_data: Dict[str, Any]
-) -> None:
+def _update_connection_fields(artifact: ModelArtifact, extracted_data: Dict[str, Any]) -> None:
     """
     Update artifact connection fields with extracted data.
 
@@ -208,6 +202,4 @@ def _update_connection_fields(
         artifact.parent_model_source = extracted_data.get("parent_model_source")
 
     if not artifact.parent_model_relationship:
-        artifact.parent_model_relationship = extracted_data.get(
-            "parent_model_relationship"
-        )
+        artifact.parent_model_relationship = extracted_data.get("parent_model_relationship")

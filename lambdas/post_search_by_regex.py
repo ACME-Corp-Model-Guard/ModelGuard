@@ -113,9 +113,7 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         # Download artifact from S3
-        clogger.debug(
-            f"[post_search_by_regex] Downloading artifact {artifact.artifact_id} from S3"
-        )
+        clogger.debug(f"[post_search_by_regex] Downloading artifact {artifact.artifact_id} from S3")
         download_artifact_from_s3(
             artifact_id=artifact.artifact_id,
             s3_key=artifact.s3_key,
@@ -158,9 +156,7 @@ def _extract_readme_from_s3(artifact: BaseArtifact) -> str:
             try:
                 os.unlink(tmp_tar)
             except Exception as e:
-                clogger.warning(
-                    f"[post_search_by_regex] Failed to remove temp file {tmp_tar}: {e}"
-                )
+                clogger.warning(f"[post_search_by_regex] Failed to remove temp file {tmp_tar}: {e}")
 
 
 def _build_search_text(artifact: BaseArtifact, readme_text: str = "") -> str:
@@ -206,9 +202,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
     Searches artifact name, metadata, and README content (fetched from S3).
     """
     artifacts = load_all_artifacts()
-    clogger.info(
-        f"[post_search_by_regex] Loaded {len(artifacts)} artifacts for regex search"
-    )
+    clogger.info(f"[post_search_by_regex] Loaded {len(artifacts)} artifacts for regex search")
 
     matches: List[Dict[str, str]] = []
 
@@ -246,9 +240,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
 @translate_exceptions
 @log_lambda_handler("POST /artifact/byRegEx", log_request_body=True)
 @auth_required
-def lambda_handler(
-    event: Dict[str, Any], context: Any, auth: AuthContext
-) -> LambdaResponse:
+def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> LambdaResponse:
     """
     Stub handler for POST /artifact/byRegEx - Search by regex
     Search for artifacts using regular expression over names and READMEs
@@ -279,9 +271,7 @@ def lambda_handler(
     results = _search_artifacts(pattern)
 
     if not results:
-        return error_response(
-            404, "No artifact found under this regex", error_code="NOT_FOUND"
-        )
+        return error_response(404, "No artifact found under this regex", error_code="NOT_FOUND")
 
     # ------------------------------------------------------------------
     # Step 3 - Build response

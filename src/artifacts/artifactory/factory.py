@@ -165,9 +165,7 @@ def _enrich_kwargs_with_metadata(
             clogger.error(f"Failed to fetch metadata for artifact creation: {e}")
             raise
         except KeyError as e:
-            clogger.error(
-                f"Missing expected metadata field during artifact creation: {e}"
-            )
+            clogger.error(f"Missing expected metadata field during artifact creation: {e}")
             raise
 
     return kwargs

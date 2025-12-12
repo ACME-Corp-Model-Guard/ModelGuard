@@ -48,9 +48,7 @@ def extract_files_from_tar(
                     files[m.name] = text[:max_chars]
 
                 except Exception as e:
-                    clogger.warning(
-                        f"[file_extraction] Failed to extract {m.name}: {e}"
-                    )
+                    clogger.warning(f"[file_extraction] Failed to extract {m.name}: {e}")
 
     except Exception as e:
         clogger.error(f"[file_extraction] Failed to open tar: {e}")

@@ -38,16 +38,13 @@ class BusFactorMetric(Metric):
         # Load the connected CodeArtifact
         if not model.code_artifact_id:
             clogger.debug(
-                f"No code artifact_id for model {model.artifact_id}, "
-                f"returning default score"
+                f"No code artifact_id for model {model.artifact_id}, " f"returning default score"
             )
             return {"bus_factor": 0.0}
 
         code_artifact = load_artifact_metadata(model.code_artifact_id)
         if not isinstance(code_artifact, CodeArtifact):
-            clogger.debug(
-                f"Missing or invalid code artifact for model {model.artifact_id}"
-            )
+            clogger.debug(f"Missing or invalid code artifact for model {model.artifact_id}")
             return {"bus_factor": 0.0}
 
         if not code_artifact.metadata:
@@ -93,9 +90,7 @@ class BusFactorMetric(Metric):
             return 0.0
 
         # Calculate total contributions
-        total_contributions = sum(
-            contrib.get("contributions", 0) for contrib in contributors
-        )
+        total_contributions = sum(contrib.get("contributions", 0) for contrib in contributors)
 
         if total_contributions == 0:
             clogger.warning("Zero total contributions")

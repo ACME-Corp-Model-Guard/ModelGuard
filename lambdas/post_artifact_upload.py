@@ -56,9 +56,7 @@ from src.utils.http import (
 
 
 @translate_exceptions
-@log_lambda_handler(
-    "POST /artifact/{type}", log_request_body=True, log_response_body=True
-)
+@log_lambda_handler("POST /artifact/{type}", log_request_body=True, log_response_body=True)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
@@ -119,9 +117,7 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     existing = load_all_artifacts_by_fields({"source_url": url})
     if existing:
-        clogger.info(
-            f"[post_artifact] Duplicate artifact detected: {existing[0].artifact_id}"
-        )
+        clogger.info(f"[post_artifact] Duplicate artifact detected: {existing[0].artifact_id}")
         return error_response(
             409,
             f"Artifact already exists with this source URL (id: {existing[0].artifact_id})",
@@ -187,9 +183,7 @@ def lambda_handler(
                 for platform, platform_score in score_value.items():
                     if isinstance(platform_score, (int, float)):
                         if platform_score < MINIMUM_METRIC_THRESHOLD:
-                            failing_metrics.append(
-                                f"Size.{platform}={platform_score:.2f}"
-                            )
+                            failing_metrics.append(f"Size.{platform}={platform_score:.2f}")
             elif isinstance(score_value, (int, float)):
                 if score_value < MINIMUM_METRIC_THRESHOLD:
                     failing_metrics.append(f"{metric_name}={score_value:.2f}")
@@ -203,13 +197,9 @@ def lambda_handler(
             if artifact.s3_key and ARTIFACTS_BUCKET:
                 try:
                     delete_objects(ARTIFACTS_BUCKET, [artifact.s3_key])
-                    clogger.info(
-                        f"[post_artifact] Cleaned up S3 object: {artifact.s3_key}"
-                    )
+                    clogger.info(f"[post_artifact] Cleaned up S3 object: {artifact.s3_key}")
                 except Exception as cleanup_err:
-                    clogger.warning(
-                        f"[post_artifact] Failed to clean up S3: {cleanup_err}"
-                    )
+                    clogger.warning(f"[post_artifact] Failed to clean up S3: {cleanup_err}")
 
             return error_response(
                 424,
@@ -241,9 +231,7 @@ def lambda_handler(
     # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
     # Generate presigned download URL (same as GET /artifacts/{type}/{id})
-    download_url = generate_s3_download_url(
-        artifact.artifact_id, s3_key=artifact.s3_key
-    )
+    download_url = generate_s3_download_url(artifact.artifact_id, s3_key=artifact.s3_key)
 
     response_body = {
         "metadata": {

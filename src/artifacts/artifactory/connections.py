@@ -46,9 +46,7 @@ def connect_artifact(artifact: BaseArtifact) -> None:
     Raises:
         NotImplementedError: If no implementation exists for the artifact type
     """
-    raise NotImplementedError(
-        f"No connector logic for artifact type: {artifact.artifact_type}"
-    )
+    raise NotImplementedError(f"No connector logic for artifact type: {artifact.artifact_type}")
 
 
 @connect_artifact.register
@@ -130,26 +128,20 @@ def _(artifact: ModelArtifact) -> None:
             )
             if not isinstance(child_model_artifact, ModelArtifact):
                 continue
-            child_model_artifact.parent_model_id = (
-                artifact.artifact_id
-            )  # link to this parent model
+            child_model_artifact.parent_model_id = artifact.artifact_id  # link to this parent model
 
             from src.metrics.registry import (
                 LINEAGE_METRICS,
             )  # Lazy import to avoid circular dependency
 
-            child_model_artifact.compute_scores(
-                LINEAGE_METRICS
-            )  # recompute relevant scores
+            child_model_artifact.compute_scores(LINEAGE_METRICS)  # recompute relevant scores
 
             save_artifact_metadata(child_model_artifact)  # save updated child model
             artifact.child_model_ids.append(
                 child_model_artifact.artifact_id
             )  # update this model for lineage
 
-    clogger.info(
-        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
-    )
+    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
 
 
 @connect_artifact.register
@@ -176,10 +168,7 @@ def _(artifact: CodeArtifact) -> None:
 
     # Update linked model artifacts to reference this code artifact
     for model_artifact in model_artifacts:
-        if (
-            not isinstance(model_artifact, ModelArtifact)
-            or model_artifact.code_artifact_id
-        ):
+        if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
             continue
         model_artifact.code_artifact_id = artifact.artifact_id
 
@@ -191,9 +180,7 @@ def _(artifact: CodeArtifact) -> None:
 
         save_artifact_metadata(model_artifact)
 
-    clogger.info(
-        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
-    )
+    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
 
 
 @connect_artifact.register
@@ -220,10 +207,7 @@ def _(artifact: DatasetArtifact) -> None:
 
     # Update linked model artifacts to reference this dataset artifact
     for model_artifact in model_artifacts:
-        if (
-            not isinstance(model_artifact, ModelArtifact)
-            or model_artifact.dataset_artifact_id
-        ):
+        if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
             continue
         model_artifact.dataset_artifact_id = artifact.artifact_id
 
@@ -235,6 +219,4 @@ def _(artifact: DatasetArtifact) -> None:
 
         save_artifact_metadata(model_artifact)
 
-    clogger.info(
-        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})"
-    )
+    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")

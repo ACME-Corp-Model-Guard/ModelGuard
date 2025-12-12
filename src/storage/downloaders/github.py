@@ -148,9 +148,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         # Fetch contributors for bus factor metric
         contributors = []
         try:
-            contributors_url = (
-                f"https://api.github.com/repos/{owner}/{repo}/contributors"
-            )
+            contributors_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
             contributors_response = requests.get(
                 contributors_url, timeout=10, params={"per_page": 100}
             )
@@ -170,9 +168,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
                     f"[GitHub] Fetched {len(contributors)} contributors for {owner}/{repo}"
                 )
         except Exception as e:
-            clogger.warning(
-                f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}"
-            )
+            clogger.warning(f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}")
 
         metadata = {
             "name": data.get("name", repo),

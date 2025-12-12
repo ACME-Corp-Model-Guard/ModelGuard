@@ -67,9 +67,7 @@ This metric evaluates the overall quality of a code repository, including:
         # Step 0 — Identify code artifact
         # ------------------------------------------------------------------
         if not model.code_artifact_id:
-            clogger.warning(
-                f"[code_quality] No code artifact_id for {model.artifact_id}"
-            )
+            clogger.warning(f"[code_quality] No code artifact_id for {model.artifact_id}")
             return {self.SCORE_FIELD: 0.0}
 
         code_artifact = load_artifact_metadata(model.code_artifact_id)

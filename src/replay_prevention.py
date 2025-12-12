@@ -149,9 +149,7 @@ def is_request_replayed(
     Raises:
         Exception on DynamoDB errors (logged and re-raised)
     """
-    fingerprint = calculate_request_fingerprint(
-        token, http_method, resource_path, request_body
-    )
+    fingerprint = calculate_request_fingerprint(token, http_method, resource_path, request_body)
 
     try:
         table = get_ddb_table(FINGERPRINTS_TABLE)
@@ -202,9 +200,7 @@ def record_request_fingerprint(
         resource_path: API resource path
         request_body: JSON request body (or None)
     """
-    fingerprint = calculate_request_fingerprint(
-        token, http_method, resource_path, request_body
-    )
+    fingerprint = calculate_request_fingerprint(token, http_method, resource_path, request_body)
 
     current_time = int(time.time())
     ttl_expiry = current_time + REPLAY_WINDOW_SECONDS
@@ -222,8 +218,7 @@ def record_request_fingerprint(
             }
         )
         clogger.debug(
-            f"[replay] Recorded fingerprint: {fingerprint[:16]}... "
-            f"expires_at={ttl_expiry}"
+            f"[replay] Recorded fingerprint: {fingerprint[:16]}... " f"expires_at={ttl_expiry}"
         )
     except Exception as e:
         clogger.error(f"[replay] Failed to record fingerprint: {e}")

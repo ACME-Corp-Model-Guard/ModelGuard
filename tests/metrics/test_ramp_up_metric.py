@@ -42,9 +42,7 @@ def test_ramp_up_metric_success():
 
     with (
         patch("src.metrics.ramp_up_metric.download_artifact_from_s3") as mock_s3,
-        patch(
-            "src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files
-        ),
+        patch("src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files),
         patch("src.metrics.ramp_up_metric.ask_llm", return_value=fake_llm_response),
     ):
         metric = RampUpMetric()
@@ -100,9 +98,7 @@ def test_ramp_up_metric_invalid_llm_output_none():
 
     with (
         patch("src.metrics.ramp_up_metric.download_artifact_from_s3"),
-        patch(
-            "src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files
-        ),
+        patch("src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files),
         patch("src.metrics.ramp_up_metric.ask_llm", return_value=None),
     ):
         metric = RampUpMetric()
@@ -120,9 +116,7 @@ def test_ramp_up_metric_invalid_llm_missing_field():
 
     with (
         patch("src.metrics.ramp_up_metric.download_artifact_from_s3"),
-        patch(
-            "src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files
-        ),
+        patch("src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files),
         patch("src.metrics.ramp_up_metric.ask_llm", return_value=bad_llm_response),
     ):
         metric = RampUpMetric()
@@ -140,9 +134,7 @@ def test_ramp_up_metric_invalid_llm_non_numeric():
 
     with (
         patch("src.metrics.ramp_up_metric.download_artifact_from_s3"),
-        patch(
-            "src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files
-        ),
+        patch("src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files),
         patch("src.metrics.ramp_up_metric.ask_llm", return_value=llm_response),
     ):
         metric = RampUpMetric()
@@ -161,9 +153,7 @@ def test_ramp_up_metric_clamps_score():
 
     with (
         patch("src.metrics.ramp_up_metric.download_artifact_from_s3"),
-        patch(
-            "src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files
-        ),
+        patch("src.metrics.ramp_up_metric.extract_relevant_files", return_value=fake_files),
     ):
         metric = RampUpMetric()
 
@@ -176,9 +166,7 @@ def test_ramp_up_metric_clamps_score():
             assert result == {"ramp_up": 2.5}
 
         # Score < 0.0 → returned directly
-        with patch(
-            "src.metrics.ramp_up_metric.ask_llm", return_value={"ramp_up": -1.0}
-        ):
+        with patch("src.metrics.ramp_up_metric.ask_llm", return_value={"ramp_up": -1.0}):
             result = metric.score(model)
             assert result == {"ramp_up": -1.0}
 

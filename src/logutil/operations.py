@@ -18,9 +18,7 @@ __all__ = ["log_operation", "BatchOperationLogger"]
 # Operation Timing Context Manager
 # -----------------------------------------------------------------------------
 @contextmanager
-def log_operation(
-    operation_name: str, log_level: str = "debug", **metadata: Any
-) -> Any:
+def log_operation(operation_name: str, log_level: str = "debug", **metadata: Any) -> Any:
     """
     Context manager for timing and logging operations.
 
@@ -87,16 +85,12 @@ class BatchOperationLogger:
         )
         return self
 
-    def log_item(
-        self, item_name: str, status: str = "success", **metadata: Any
-    ) -> None:
+    def log_item(self, item_name: str, status: str = "success", **metadata: Any) -> None:
         """Log progress for individual item."""
         self.results.append({"item": item_name, "status": status, **metadata})
 
         progress_msg = (
-            f"[{len(self.results)}/{self.total}]"
-            if self.total
-            else f"[{len(self.results)}]"
+            f"[{len(self.results)}/{self.total}]" if self.total else f"[{len(self.results)}]"
         )
         clogger.debug(
             f"{progress_msg} {item_name}: {status}",

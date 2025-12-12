@@ -124,9 +124,7 @@ def test_mixed_float_and_dict_metrics():
     }
 
     expected_total = (
-        WEIGHTS["availability"] * 0.5
-        + WEIGHTS["bus_factor"] * 0.3
-        + WEIGHTS["license"] * 1.0
+        WEIGHTS["availability"] * 0.5 + WEIGHTS["bus_factor"] * 0.3 + WEIGHTS["license"] * 1.0
     )
     expected_sum = WEIGHTS["availability"] + WEIGHTS["bus_factor"] + WEIGHTS["license"]
 

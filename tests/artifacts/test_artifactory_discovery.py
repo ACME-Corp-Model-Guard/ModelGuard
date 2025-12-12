@@ -99,9 +99,7 @@ def test_download_and_extract_files_returns_files_dict(mock_download, mock_extra
 
 @patch("src.artifacts.artifactory.discovery.extract_relevant_files")
 @patch("src.artifacts.artifactory.discovery.download_artifact_from_s3")
-def test_download_and_extract_files_download_before_extract(
-    mock_download, mock_extract
-):
+def test_download_and_extract_files_download_before_extract(mock_download, mock_extract):
     """Test that download happens before extraction."""
     artifact = ModelArtifact(
         artifact_id="test-id",
@@ -126,9 +124,7 @@ def test_download_and_extract_files_download_before_extract(
 
 @patch("src.artifacts.artifactory.discovery.extract_relevant_files")
 @patch("src.artifacts.artifactory.discovery.download_artifact_from_s3")
-def test_download_and_extract_files_propagates_download_error(
-    mock_download, mock_extract
-):
+def test_download_and_extract_files_propagates_download_error(mock_download, mock_extract):
     """Test that download errors are propagated."""
     artifact = ModelArtifact(
         artifact_id="test-id",
@@ -145,9 +141,7 @@ def test_download_and_extract_files_propagates_download_error(
 
 @patch("src.artifacts.artifactory.discovery.extract_relevant_files")
 @patch("src.artifacts.artifactory.discovery.download_artifact_from_s3")
-def test_download_and_extract_files_propagates_extract_error(
-    mock_download, mock_extract
-):
+def test_download_and_extract_files_propagates_extract_error(mock_download, mock_extract):
     """Test that extraction errors are propagated."""
     artifact = ModelArtifact(
         artifact_id="test-id",
@@ -171,9 +165,7 @@ def test_download_and_extract_files_propagates_extract_error(
 @patch("src.artifacts.artifactory.discovery.build_extract_fields_from_files_prompt")
 def test_llm_extract_fields_builds_prompt(mock_build_prompt, mock_ask_llm):
     """Test that LLM prompt is built with correct parameters."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -198,9 +190,7 @@ def test_llm_extract_fields_builds_prompt(mock_build_prompt, mock_ask_llm):
 @patch("src.artifacts.artifactory.discovery.build_extract_fields_from_files_prompt")
 def test_llm_extract_fields_calls_llm(mock_build_prompt, mock_ask_llm):
     """Test that LLM is called with built prompt."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -216,9 +206,7 @@ def test_llm_extract_fields_calls_llm(mock_build_prompt, mock_ask_llm):
 @patch("src.artifacts.artifactory.discovery.build_extract_fields_from_files_prompt")
 def test_llm_extract_fields_returns_extracted_data(mock_build_prompt, mock_ask_llm):
     """Test that extracted data dictionary is returned."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -237,13 +225,9 @@ def test_llm_extract_fields_returns_extracted_data(mock_build_prompt, mock_ask_l
 
 @patch("src.artifacts.artifactory.discovery.ask_llm")
 @patch("src.artifacts.artifactory.discovery.build_extract_fields_from_files_prompt")
-def test_llm_extract_fields_returns_none_when_llm_returns_none(
-    mock_build_prompt, mock_ask_llm
-):
+def test_llm_extract_fields_returns_none_when_llm_returns_none(mock_build_prompt, mock_ask_llm):
     """Test that None is returned when LLM returns None."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -256,13 +240,9 @@ def test_llm_extract_fields_returns_none_when_llm_returns_none(
 
 @patch("src.artifacts.artifactory.discovery.ask_llm")
 @patch("src.artifacts.artifactory.discovery.build_extract_fields_from_files_prompt")
-def test_llm_extract_fields_returns_none_when_llm_returns_string(
-    mock_build_prompt, mock_ask_llm
-):
+def test_llm_extract_fields_returns_none_when_llm_returns_string(mock_build_prompt, mock_ask_llm):
     """Test that None is returned when LLM returns string instead of dict."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -279,9 +259,7 @@ def test_llm_extract_fields_returns_none_when_llm_returns_empty_dict(
     mock_build_prompt, mock_ask_llm
 ):
     """Test that None is returned when LLM returns empty dict (falsy value)."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     files = {"README.md": "content"}
     mock_build_prompt.return_value = "test prompt"
@@ -438,9 +416,7 @@ def test_update_connection_fields_handles_none_values():
 @patch("src.artifacts.artifactory.discovery._download_and_extract_files")
 def test_find_connected_artifact_names_full_flow(mock_download, mock_llm, mock_update):
     """Test full discovery flow with successful extraction."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     # Mock successful flow - now returns tuple of (tmp_path, files)
     mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})
@@ -461,9 +437,7 @@ def test_find_connected_artifact_names_skips_update_when_llm_fails(
     mock_download, mock_llm, mock_update
 ):
     """Test that field update is skipped when LLM extraction fails."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     # Now returns tuple of (tmp_path, files)
     mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})
@@ -480,13 +454,9 @@ def test_find_connected_artifact_names_skips_update_when_llm_fails(
 @patch("src.artifacts.artifactory.discovery._update_connection_fields")
 @patch("src.artifacts.artifactory.discovery._llm_extract_fields")
 @patch("src.artifacts.artifactory.discovery._download_and_extract_files")
-def test_find_connected_artifact_names_handles_download_error(
-    mock_download, mock_llm, mock_update
-):
+def test_find_connected_artifact_names_handles_download_error(mock_download, mock_llm, mock_update):
     """Test that download errors are caught and logged."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     mock_download.side_effect = Exception("S3 error")
 
@@ -502,13 +472,9 @@ def test_find_connected_artifact_names_handles_download_error(
 @patch("src.artifacts.artifactory.discovery._update_connection_fields")
 @patch("src.artifacts.artifactory.discovery._llm_extract_fields")
 @patch("src.artifacts.artifactory.discovery._download_and_extract_files")
-def test_find_connected_artifact_names_handles_llm_error(
-    mock_download, mock_llm, mock_update
-):
+def test_find_connected_artifact_names_handles_llm_error(mock_download, mock_llm, mock_update):
     """Test that LLM errors are caught and logged."""
-    artifact = ModelArtifact(
-        artifact_id="test-id", name="test", source_url="https://example.com"
-    )
+    artifact = ModelArtifact(artifact_id="test-id", name="test", source_url="https://example.com")
 
     # Now returns tuple of (tmp_path, files)
     mock_download.return_value = ("/tmp/test.tar.gz", {"README.md": "content"})

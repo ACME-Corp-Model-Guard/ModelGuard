@@ -120,9 +120,7 @@ def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
         raise
 
 
-def load_item_from_key(
-    table_name: str, key: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+def load_item_from_key(table_name: str, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Load a generic item from a DynamoDB table by its key.
     """
@@ -136,9 +134,7 @@ def load_item_from_key(
             clogger.warning(f"[DDB] No item found in {table_name} with key={key}")
         return item
     except ClientError as e:
-        clogger.error(
-            f"[DDB] Failed to load item from {table_name} with key={key}: {e}"
-        )
+        clogger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
         raise
 
 

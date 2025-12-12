@@ -61,9 +61,7 @@ def _parse_artifact_queries(body: Any) -> List[Dict[str, Any]]:
         if "types" in q:
             types_value = q["types"]
             if not isinstance(types_value, list):
-                raise ValueError(
-                    f"ArtifactQuery at index {i}: 'types' must be an array."
-                )
+                raise ValueError(f"ArtifactQuery at index {i}: 'types' must be an array.")
             # Validate each type value
             valid_types = {"model", "dataset", "code"}
             for t in types_value:
@@ -105,9 +103,7 @@ def _filter_artifacts(
             # If types filter is specified, filter by those types
             if types_filter:
                 for artifact_type in types_filter:
-                    matched = [
-                        a for a in all_artifacts if a.artifact_type == artifact_type
-                    ]
+                    matched = [a for a in all_artifacts if a.artifact_type == artifact_type]
                     results.extend(matched)
             else:
                 # No type filter: return all artifacts

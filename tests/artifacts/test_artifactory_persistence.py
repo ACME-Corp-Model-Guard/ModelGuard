@@ -121,9 +121,7 @@ def test_matches_all_fields_multiple_fields_all_match():
 
 def test_matches_all_fields_multiple_fields_partial_match():
     """Test partial match fails (all must match)."""
-    artifact = ModelArtifact(
-        name="test-model", source_url="https://example.com", license="MIT"
-    )
+    artifact = ModelArtifact(name="test-model", source_url="https://example.com", license="MIT")
     fields = {"name": "test-model", "license": "Apache-2.0"}  # Second field wrong
 
     assert _matches_all_fields(artifact, fields) is False
@@ -131,9 +129,7 @@ def test_matches_all_fields_multiple_fields_partial_match():
 
 def test_matches_all_fields_case_insensitive_match():
     """Test case-insensitive string matching."""
-    artifact = ModelArtifact(
-        name="TEST-Model", source_url="https://example.com", license="MIT"
-    )
+    artifact = ModelArtifact(name="TEST-Model", source_url="https://example.com", license="MIT")
     fields = {"name": "test-model", "license": "mit"}
 
     assert _matches_all_fields(artifact, fields) is True
@@ -212,15 +208,9 @@ def test_filter_by_fields_empty_list():
 
 def test_filter_by_fields_multiple_criteria():
     """Test filtering with multiple field criteria."""
-    artifact1 = ModelArtifact(
-        name="test", source_url="https://example.com", license="MIT"
-    )
-    artifact2 = ModelArtifact(
-        name="test", source_url="https://example.com", license="Apache-2.0"
-    )
-    artifact3 = ModelArtifact(
-        name="other", source_url="https://example.com", license="MIT"
-    )
+    artifact1 = ModelArtifact(name="test", source_url="https://example.com", license="MIT")
+    artifact2 = ModelArtifact(name="test", source_url="https://example.com", license="Apache-2.0")
+    artifact3 = ModelArtifact(name="other", source_url="https://example.com", license="MIT")
 
     artifacts = [artifact1, artifact2, artifact3]
     fields = {"name": "test", "license": "MIT"}
@@ -524,12 +514,8 @@ def test_load_all_artifacts_by_fields_uses_provided_list():
         ModelArtifact(name="test-2", source_url="https://example.com/2"),
     ]
 
-    with patch(
-        "src.artifacts.artifactory.persistence.load_all_artifacts"
-    ) as mock_load_all:
-        result = load_all_artifacts_by_fields(
-            fields={"name": "test-1"}, artifact_list=artifacts
-        )
+    with patch("src.artifacts.artifactory.persistence.load_all_artifacts") as mock_load_all:
+        result = load_all_artifacts_by_fields(fields={"name": "test-1"}, artifact_list=artifacts)
 
         # Should NOT call load_all_artifacts
         mock_load_all.assert_not_called()
@@ -558,15 +544,11 @@ def test_load_all_artifacts_by_fields_filters_by_fields():
     """Test filtering by field values."""
     artifacts = [
         ModelArtifact(name="test-1", source_url="https://example.com", license="MIT"),
-        ModelArtifact(
-            name="test-2", source_url="https://example.com", license="Apache-2.0"
-        ),
+        ModelArtifact(name="test-2", source_url="https://example.com", license="Apache-2.0"),
         ModelArtifact(name="test-3", source_url="https://example.com", license="MIT"),
     ]
 
-    result = load_all_artifacts_by_fields(
-        fields={"license": "MIT"}, artifact_list=artifacts
-    )
+    result = load_all_artifacts_by_fields(fields={"license": "MIT"}, artifact_list=artifacts)
 
     assert len(result) == 2
     assert all(a.license == "MIT" for a in result)
@@ -576,9 +558,7 @@ def test_load_all_artifacts_by_fields_combines_type_and_field_filters():
     """Test combining type and field filters."""
     artifacts = [
         ModelArtifact(name="model-1", source_url="https://example.com", license="MIT"),
-        ModelArtifact(
-            name="model-2", source_url="https://example.com", license="Apache-2.0"
-        ),
+        ModelArtifact(name="model-2", source_url="https://example.com", license="Apache-2.0"),
         DatasetArtifact(name="dataset-1", source_url="https://example.com"),
     ]
 

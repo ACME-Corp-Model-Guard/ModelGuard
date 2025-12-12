@@ -59,9 +59,7 @@ def test_dataset_quality_success(metric, model_artifact, dataset_artifact):
             "src.metrics.dataset_quality_metric.load_artifact_metadata",
             return_value=dataset_artifact,
         ),
-        patch(
-            "src.metrics.dataset_quality_metric.download_artifact_from_s3"
-        ) as mock_dl,
+        patch("src.metrics.dataset_quality_metric.download_artifact_from_s3") as mock_dl,
         patch(
             "src.metrics.dataset_quality_metric.extract_relevant_files",
             return_value=fake_files,
@@ -91,9 +89,7 @@ def test_dataset_quality_no_dataset_artifact_id(metric, model_artifact):
 
     model_artifact.dataset_artifact_id = None
 
-    with patch(
-        "src.metrics.dataset_quality_metric.load_artifact_metadata"
-    ) as mock_load:
+    with patch("src.metrics.dataset_quality_metric.load_artifact_metadata") as mock_load:
         result = metric.score(model_artifact)
 
     assert result["dataset_quality"] == 0.0
@@ -112,9 +108,7 @@ def test_dataset_quality_invalid_dataset_artifact(metric, model_artifact):
             "src.metrics.dataset_quality_metric.load_artifact_metadata",
             return_value=None,
         ),
-        patch(
-            "src.metrics.dataset_quality_metric.download_artifact_from_s3"
-        ) as mock_dl,
+        patch("src.metrics.dataset_quality_metric.download_artifact_from_s3") as mock_dl,
     ):
         result = metric.score(model_artifact)
 
