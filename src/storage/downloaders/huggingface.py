@@ -239,7 +239,12 @@ def download_from_huggingface(
 # =====================================================================================
 def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
     """
-    Fetch model metadata from HuggingFace Hub API.
+    Fetch model metadata from HuggingFace Hub API, including README content.
+
+    This fetches:
+    - Basic model info (name, size, license)
+    - Full cardData (tags, datasets, model-index, etc.)
+    - README content for performance claims detection
     """
     clogger.info(f"[HF] Fetching model metadata: {url}")
 
@@ -249,27 +254,65 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
             raise ValueError(f"Invalid HuggingFace model URL: {url}")
 
         model_id = parts[1]
+        # Remove any prefix like 'models/' if present
+        if model_id.startswith("models/"):
+            model_id = model_id[len("models/") :]
+
         api_url = f"https://huggingface.co/api/models/{model_id}"
 
         response = requests.get(api_url, timeout=10)
         response.raise_for_status()
         data = response.json()
 
+        # Get full cardData for model-index, tags, datasets, etc.
+        card_data = data.get("cardData", {}) or {}
+
         metadata = {
             "name": model_id.split("/")[-1],
             "size": data.get("safetensors", {}).get("total", 0),
-            "license": data.get("cardData", {}).get("license", "unknown"),
+            "license": card_data.get("license", "unknown"),
             "metadata": {
                 "downloads": data.get("downloads", 0),
                 "likes": data.get("likes", 0),
+                "cardData": card_data,  # Include full cardData for metrics
             },
         }
+
+        # Fetch README content for performance claims detection
+        readme_content = _fetch_readme_content(model_id)
+        if readme_content:
+            metadata["metadata"]["model_card_content"] = readme_content
+            clogger.debug(f"[HF] Fetched README ({len(readme_content)} chars) for {model_id}")
 
         return metadata
 
     except Exception as e:
         clogger.error(f"[HF] Failed to fetch model metadata: {e}")
         raise
+
+
+def _fetch_readme_content(model_id: str) -> Optional[str]:
+    """
+    Fetch README.md content from HuggingFace repo.
+
+    Args:
+        model_id: HuggingFace model ID (e.g., "google-bert/bert-base-uncased")
+
+    Returns:
+        README content as string, or None if not found
+    """
+    readme_url = f"https://huggingface.co/{model_id}/raw/main/README.md"
+
+    try:
+        response = requests.get(readme_url, timeout=10)
+        if response.status_code == 200:
+            return response.text
+        else:
+            clogger.debug(f"[HF] README not found for {model_id} (status {response.status_code})")
+            return None
+    except Exception as e:
+        clogger.debug(f"[HF] Failed to fetch README for {model_id}: {e}")
+        return None
 
 
 # =====================================================================================
