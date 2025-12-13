@@ -28,8 +28,8 @@ __all__ = ["log_lambda_handler"]
 # -----------------------------------------------------------------------------
 def log_lambda_handler(
     endpoint_name: str,
-    log_request_body: bool = False,
-    log_response_body: bool = False,
+    log_request_body: bool = True,
+    log_response_body: bool = True,
     mask_request: bool = True,
     mask_response: bool = True,
     validate_openapi: bool = True,
@@ -111,8 +111,7 @@ def log_lambda_handler(
                         )
                     except json.JSONDecodeError:
                         detailed_request["body"] = "[NON_JSON_BODY]"
-
-                clogger.debug(f"Request details: {http_method} {path}", extra=detailed_request)
+                    clogger.debug(f"Request details: {http_method} {path}", extra=detailed_request)
 
             # Execute handler
             try:
@@ -148,10 +147,9 @@ def log_lambda_handler(
                                 mask_sensitive_data(body_dict) if mask_response else body_dict
                             ),
                         }
-                        clogger.debug(f"Response details: {status_code}", extra=detailed_response)
                     except json.JSONDecodeError:
-                        clogger.debug("Response details: [NON_JSON_BODY]")
-                        pass
+                        detailed_response["body"] = "[NON_JSON_BODY]"
+                    clogger.debug(f"Response details: {status_code}", extra=detailed_response)
 
                 # OpenAPI validation (if enabled)
                 if validate_openapi:
