@@ -87,6 +87,23 @@ _KNOWN_METRICS = {
     "arc",
     "mmlu",
     "truthfulqa",
+    # Language modeling benchmarks (GPT-2, etc.)
+    "lambada",
+    "wikitext",
+    "wikitext2",
+    "wikitext103",
+    "ptb",
+    "enwik8",
+    "text8",
+    "1bw",
+    "cbt",
+    "cbt-cn",
+    "cbt-ne",
+    # Metric abbreviations often found in table headers
+    "ppl",  # perplexity
+    "acc",  # accuracy
+    "bpb",  # bits per byte
+    "bpc",  # bits per character
 }
 
 # Field names to check for performance data (expanded)
@@ -105,7 +122,54 @@ _PERFORMANCE_FIELDS = [
 # Paper citation fields
 _PAPER_FIELDS = ["paperswithcode", "arxiv", "citation", "bibtex", "paper", "doi"]
 _TEXT_FIELDS = ["model_card", "readme", "description", "summary"]
-_CITATION_PATTERNS = ["arxiv.org", "doi.org", "paperswithcode.com"]
+_CITATION_PATTERNS = ["arxiv.org", "doi.org", "paperswithcode.com", "aclweb.org", "openreview.net"]
+
+# Lenient detection patterns - ANY mention of these indicates performance claims exist
+# Section header patterns that indicate evaluation/results content
+_SECTION_HEADER_PATTERNS = [
+    r"#+\s*(?:evaluation|results?|performance|benchmarks?|metrics?|experiments?|testing)",
+    r"\*\*(?:evaluation|results?|performance|benchmarks?|metrics?)\*\*",
+    r"^(?:evaluation|results?|performance|benchmarks?|metrics?)\s*$",
+]
+
+# Paper reference patterns
+_PAPER_REFERENCE_PATTERNS = [
+    r"arxiv[:\s]*\d+\.\d+",  # arxiv:1234.5678 or arxiv 1234.5678
+    r"arxiv\.org/abs/\d+\.\d+",  # arxiv.org/abs/1234.5678
+    r"doi[:\s]*10\.\d+",  # doi:10.1234/...
+    r"\[paper\]",  # [paper] link
+    r"(?:see|refer to|described in)\s+(?:the\s+)?(?:original\s+)?paper",
+    r"(?:our|the)\s+paper",
+    r"published\s+(?:at|in)\s+\w+",  # published at/in conference
+    r"@(?:article|inproceedings|misc)\{",  # BibTeX entry
+]
+
+# Generic keywords that indicate performance discussion
+_PERFORMANCE_KEYWORDS = [
+    "evaluation",
+    "results",
+    "performance",
+    "benchmark",
+    "accuracy",
+    "precision",
+    "recall",
+    "f1",
+    "score",
+    "metric",
+    "evaluated",
+    "achieves",
+    "outperforms",
+    "state-of-the-art",
+    "sota",
+    "baseline",
+    "compared to",
+    "comparison",
+    "fine-tuned",
+    "trained on",
+    "test set",
+    "validation",
+    "leaderboard",
+]
 
 # Regex patterns for extracting metrics from text
 # These match common patterns like "accuracy: 92%", "F1 score of 0.85", "BLEU: 32.5"
@@ -139,6 +203,7 @@ _WEIGHTS = {
     "benchmarks": 0.25,
     "papers": 0.15,
     "has_documentation": 0.2,  # Base credit for having any documentation
+    "lenient_evidence": 0.5,  # ANY mention of evaluation/results/performance - enough to pass
 }
 
 _METRIC_COUNT_BONUS = {5: 0.1, 3: 0.07, 2: 0.04}
@@ -352,7 +417,80 @@ def _get_metric_count_bonus(count: int) -> float:
     return 0.0
 
 
-def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[str], bool]:
+def _lenient_performance_detection(text: str, artifact_id: str = "") -> Dict[str, Any]:
+    """
+    Perform lenient detection for ANY evidence of performance claims.
+
+    This is intentionally very permissive - we just want to know if the model
+    makes ANY mention of evaluation, results, performance, or references papers.
+
+    Args:
+        text: The text content to scan (README, model card, etc.)
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        Dictionary with detection results:
+        - has_section_header: bool - found evaluation/results section header
+        - has_paper_reference: bool - found reference to external paper
+        - has_performance_keywords: bool - found performance-related keywords
+        - has_any_evidence: bool - any of the above is True
+        - detected_evidence: list of strings describing what was found
+    """
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
+
+    result = {
+        "has_section_header": False,
+        "has_paper_reference": False,
+        "has_performance_keywords": False,
+        "has_any_evidence": False,
+        "detected_evidence": [],
+    }
+
+    if not text or not isinstance(text, str):
+        return result
+
+    text_lower = text.lower()
+
+    # Check for section headers indicating evaluation/results
+    for pattern in _SECTION_HEADER_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE | re.MULTILINE):
+            result["has_section_header"] = True
+            result["detected_evidence"].append("evaluation/results section")
+            clogger.debug(f"{log_prefix} found evaluation/results section header")
+            break
+
+    # Check for paper references
+    for pattern in _PAPER_REFERENCE_PATTERNS:
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            result["has_paper_reference"] = True
+            result["detected_evidence"].append("paper reference")
+            clogger.debug(f"{log_prefix} found paper reference")
+            break
+
+    # Check for performance keywords (require at least 2 to avoid false positives)
+    keyword_count = 0
+    found_keywords = []
+    for keyword in _PERFORMANCE_KEYWORDS:
+        if keyword in text_lower:
+            keyword_count += 1
+            found_keywords.append(keyword)
+            if keyword_count >= 2:
+                result["has_performance_keywords"] = True
+                result["detected_evidence"].append(f"keywords: {', '.join(found_keywords[:3])}")
+                clogger.debug(f"{log_prefix} found performance keywords: {found_keywords[:3]}")
+                break
+
+    # Overall check
+    result["has_any_evidence"] = (
+        result["has_section_header"]
+        or result["has_paper_reference"]
+        or result["has_performance_keywords"]
+    )
+
+    return result
+
+
+def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[str], bool, bool]:
     """
     Extract performance metrics from free-form text (README, description, etc.).
 
@@ -362,21 +500,25 @@ def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[s
     - "achieves 95% accuracy"
     - Markdown tables with benchmark results (GLUE, SuperGLUE, etc.)
 
+    Also performs lenient detection for any mention of performance/evaluation.
+
     Args:
         text: The text content to scan
         artifact_id: Optional artifact ID for logging context
 
     Returns:
-        Tuple of (metrics_found, has_documentation) where:
+        Tuple of (metrics_found, has_documentation, has_lenient_evidence) where:
         - metrics_found: list of metric names found
         - has_documentation: whether any substantial text was present
+        - has_lenient_evidence: whether lenient detection found any evidence
     """
     log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
     metrics_found: List[str] = []
     has_documentation = False
+    has_lenient_evidence = False
 
     if not text or not isinstance(text, str):
-        return metrics_found, has_documentation
+        return metrics_found, has_documentation, has_lenient_evidence
 
     # Consider it documentation if text is reasonably long
     if len(text.strip()) > 100:
@@ -384,6 +526,10 @@ def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[s
         clogger.debug(f"{log_prefix} found documentation text ({len(text)} chars)")
 
     text_lower = text.lower()
+
+    # Lenient detection first - this is the most important check
+    lenient_result = _lenient_performance_detection(text, artifact_id)
+    has_lenient_evidence = lenient_result["has_any_evidence"]
 
     # Check for benchmark tables (indicates structured performance reporting)
     if re.search(_BENCHMARK_TABLE_PATTERN, text_lower, re.IGNORECASE):
@@ -411,7 +557,7 @@ def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[s
     if metrics_found:
         clogger.debug(f"{log_prefix} found metrics in text: {metrics_found}")
 
-    return metrics_found, has_documentation
+    return metrics_found, has_documentation, has_lenient_evidence
 
 
 # =============================================================================
@@ -458,6 +604,7 @@ def _extract_performance_claims_from_metadata(
         "has_structured_metrics": False,
         "has_text_metrics": False,
         "has_documentation": False,
+        "has_lenient_evidence": False,  # Any mention of evaluation/results/performance
         "card_data": {},
     }
 
@@ -484,12 +631,15 @@ def _extract_performance_claims_from_metadata(
     # Step 5: Extract metrics from text fields (README, model_card, description)
     text_metrics: List[str] = []
     has_documentation = False
+    has_lenient_evidence = False
 
     # Check various text fields in metadata
+    # Also check metadata.metadata for nested model_card_content (from HuggingFace)
     text_sources = [
         metadata.get("model_card_content"),
         metadata.get("readme"),
         metadata.get("description"),
+        metadata.get("metadata", {}).get("model_card_content"),
         card_data.get("model_card"),
         card_data.get("readme"),
         card_data.get("description"),
@@ -498,10 +648,14 @@ def _extract_performance_claims_from_metadata(
 
     for text_source in text_sources:
         if text_source and isinstance(text_source, str):
-            found_metrics, found_docs = _extract_metrics_from_text(text_source, artifact_id)
+            found_metrics, found_docs, found_lenient = _extract_metrics_from_text(
+                text_source, artifact_id
+            )
             text_metrics.extend(found_metrics)
             if found_docs:
                 has_documentation = True
+            if found_lenient:
+                has_lenient_evidence = True
 
     text_metrics = list(set(text_metrics))
     has_text_metrics = len(text_metrics) > 0
@@ -518,9 +672,13 @@ def _extract_performance_claims_from_metadata(
     result["has_benchmarks"] = has_benchmarks or perf_has_benchmarks
     result["has_papers"] = has_papers
     result["has_documentation"] = has_documentation
+    result["has_lenient_evidence"] = has_lenient_evidence
 
     if unique_metrics:
         clogger.debug(f"{log_prefix} extracted metrics: {unique_metrics}")
+
+    if has_lenient_evidence:
+        clogger.debug(f"{log_prefix} found lenient evidence of performance claims")
 
     return result
 
@@ -592,6 +750,9 @@ class PerformanceClaimsMetric(Metric):
 
         Uses module-level _WEIGHTS and _METRIC_COUNT_BONUS constants for scoring.
 
+        IMPORTANT: The scoring is intentionally lenient - any mention of evaluation,
+        results, performance, or paper references is sufficient to pass the 0.5 threshold.
+
         Args:
             claims_info: Dictionary from _extract_performance_claims_from_metadata
             artifact_id: Optional artifact ID for logging context
@@ -607,13 +768,21 @@ class PerformanceClaimsMetric(Metric):
             "benchmarks": 0.0,
             "papers": 0.0,
             "documentation": 0.0,
+            "lenient_evidence": 0.0,
         }
 
         has_metrics = claims_info.get("has_metrics", False)
         has_structured = claims_info.get("has_structured_metrics", False)
         has_text_metrics = claims_info.get("has_text_metrics", False)
         has_documentation = claims_info.get("has_documentation", False)
+        has_lenient_evidence = claims_info.get("has_lenient_evidence", False)
         metric_count = claims_info.get("metric_count", 0)
+
+        # FIRST: Check for lenient evidence (any mention of evaluation/results)
+        # This is the most important check - ensures models with ANY performance
+        # discussion pass the 0.5 threshold
+        if has_lenient_evidence:
+            breakdown["lenient_evidence"] = _WEIGHTS["lenient_evidence"]
 
         # Score for having performance metrics
         if has_metrics:
@@ -638,7 +807,8 @@ class PerformanceClaimsMetric(Metric):
 
         # Base score for having documentation (even without metrics)
         # This ensures models with READMEs aren't scored 0.0
-        if has_documentation and not has_metrics:
+        # Only apply if no lenient evidence found (to avoid double-counting)
+        if has_documentation and not has_metrics and not has_lenient_evidence:
             breakdown["documentation"] = _WEIGHTS["has_documentation"]
 
         # Sum up the breakdown and clamp to [0.0, 1.0]

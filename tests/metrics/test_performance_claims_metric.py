@@ -363,6 +363,7 @@ def test_calculate_score_no_factors(performance_claims_metric):
         "benchmarks": 0.0,
         "papers": 0.0,
         "documentation": 0.0,
+        "lenient_evidence": 0.0,
     }
 
 
@@ -518,6 +519,7 @@ def test_calculate_score_all_factors_combined(performance_claims_metric):
         "benchmarks": 0.25,
         "papers": 0.15,
         "documentation": 0.0,  # No documentation bonus when metrics present
+        "lenient_evidence": 0.0,
     }
 
 
@@ -535,6 +537,7 @@ def test_calculate_score_missing_keys_use_defaults(performance_claims_metric):
         "benchmarks": 0.0,
         "papers": 0.0,
         "documentation": 0.0,
+        "lenient_evidence": 0.0,
     }
 
 
