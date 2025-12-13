@@ -22,6 +22,7 @@ from .persistence import (
     load_all_artifacts,
     load_all_artifacts_by_fields,
 )
+from .utils import scores_below_threshold
 
 __all__ = [
     "create_artifact",
@@ -29,4 +30,5 @@ __all__ = [
     "load_artifact_metadata",
     "load_all_artifacts",
     "load_all_artifacts_by_fields",
+    "scores_below_threshold",
 ]
