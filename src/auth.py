@@ -12,11 +12,12 @@ from jose import jwk, jwt
 from jose.utils import base64url_decode
 
 from src.logutil import clogger
-from src.replay_prevention import (
-    extract_resource_path,
-    is_request_replayed,
-    record_request_fingerprint,
-)
+
+# from src.replay_prevention import (
+#     extract_resource_path,
+#     is_request_replayed,
+#     record_request_fingerprint,
+# )
 from src.utils.http import LambdaResponse, error_response
 
 # ====================================================================================
