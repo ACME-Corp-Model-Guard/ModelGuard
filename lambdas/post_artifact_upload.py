@@ -214,6 +214,14 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     try:
         save_artifact_metadata(artifact)
+        clogger.info(
+            f"Artifact saved to DynamoDB: {artifact.artifact_id}",
+            extra={
+                "artifact_id": artifact.artifact_id,
+                "artifact_type": artifact_type,
+                "artifact_name": artifact.name,
+            },
+        )
     except Exception as e:
         clogger.exception(
             "Failed to save metadata",

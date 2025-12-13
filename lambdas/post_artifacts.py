@@ -264,6 +264,16 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     filtered = _filter_artifacts(all_artifacts, artifact_queries)
 
+    # Diagnostic logging for query results
+    clogger.info(
+        f"Query matched {len(filtered)} artifacts from {len(all_artifacts)} total",
+        extra={
+            "query_count": len(artifact_queries),
+            "total_artifacts": len(all_artifacts),
+            "matched_count": len(filtered),
+        },
+    )
+
     # ---------------------------------------------------------------------
     # Step 4.1 - Check for too many results (413 Payload Too Large)
     # ---------------------------------------------------------------------

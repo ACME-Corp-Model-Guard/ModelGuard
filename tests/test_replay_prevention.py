@@ -3,7 +3,7 @@ Comprehensive tests for replay attack prevention.
 
 Test coverage:
 - Fingerprint calculation (deterministic, idempotent)
-- Replay detection (within/outside 60s window)
+- Replay detection (within/outside 5s window)
 - Recording and cleanup via DynamoDB TTL
 - Edge cases (empty body, same token different paths, etc.)
 """
@@ -370,7 +370,7 @@ def test_fingerprint_recording_sets_ttl():
 
     ttl = items[0]["ttl_expiry"]
     now = int(time.time())
-    assert now + 59 <= ttl <= now + 61
+    assert now + 4 <= ttl <= now + 6
 
 
 @mock_aws
