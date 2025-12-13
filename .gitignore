@@ -29,7 +29,8 @@ CLAUDE.md
 # OpenAPI Specification
 ece461_fall_2025_openapi_spec.yaml
 
-# Test Shell
+# Utility Scripts
+scripts/
 shell.py
 
 # Downloaded Logs
