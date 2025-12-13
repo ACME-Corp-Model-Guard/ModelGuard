@@ -188,9 +188,8 @@ def _(artifact: CodeArtifact) -> None:
 
     def update_connected_models(artifacts: List[BaseArtifact], rejected: bool = False) -> None:
         # Update linked model artifacts to reference this code artifact
-        for model_artifact in model_artifacts:
+        for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
-                model_artifacts.pop(model_artifacts.index(model_artifact))
                 continue
             model_artifact.code_artifact_id = artifact.artifact_id
 
@@ -260,9 +259,8 @@ def _(artifact: DatasetArtifact) -> None:
 
     def update_connected_models(artifacts: List[BaseArtifact], rejected: bool = False) -> None:
         # Update linked model artifacts to reference this dataset artifact
-        for model_artifact in model_artifacts:
+        for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
-                model_artifacts.pop(model_artifacts.index(model_artifact))
                 continue
             model_artifact.dataset_artifact_id = artifact.artifact_id
 
