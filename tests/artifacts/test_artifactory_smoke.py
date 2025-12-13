@@ -56,7 +56,7 @@ def test_create_model_artifact_with_metadata():
     artifact = create_artifact(
         artifact_type="model",
         name="test-model",
-        source_url="https://huggingface.co/test/model",
+        source_url="https://example.com",
         size=1000,
         license="MIT",
         s3_key="models/test-123",  # Existing artifact (skips S3 upload)
