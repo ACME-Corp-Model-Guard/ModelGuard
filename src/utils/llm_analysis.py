@@ -137,6 +137,8 @@ def ask_llm(
 
         if return_json:
             result = _extract_json_from_response(content)
+            clogger.debug(f"[llm] Extracted JSON from response: {result}")
+            return result
             if result is None:
                 # Log what the LLM actually output when JSON extraction fails
                 clogger.debug(f"[llm] Raw output (first 500 chars):\n{content[:500]}")
@@ -299,7 +301,8 @@ Instructions:
 Output requirements:
 - Format: {{ "{score_name}": <float value> }}
 - Score must be in range {score_range}
-- Use actual analysis (not placeholder values)
+- Do not include any additional text, explanations, or commentary
+- Ensure valid JSON format
 
 Begin reading the files now:
     """.strip()
