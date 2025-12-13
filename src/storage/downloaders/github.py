@@ -134,11 +134,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
     clogger.info(f"[GitHub] Fetching code metadata: {url}")
 
     try:
-        parts = url.rstrip("/").split("github.com/")
-        if len(parts) < 2:
-            raise ValueError(f"Invalid GitHub URL: {url}")
-
-        owner, repo = parts[1].split("/")[:2]
+        owner, repo = _parse_github_url(url)
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
         response = requests.get(api_url, timeout=10)

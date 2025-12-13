@@ -172,7 +172,7 @@ def test_fetch_github_code_metadata_success(monkeypatch):
 
 
 def test_fetch_github_code_metadata_invalid_url():
-    with pytest.raises(ValueError):
+    with pytest.raises(FileDownloadError):
         fetch_github_code_metadata("https://example.com/notgithub")
 
 
