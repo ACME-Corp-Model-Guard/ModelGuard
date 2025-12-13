@@ -56,21 +56,21 @@ Resources:
         SSEEnabled: false
   
   RejectedArtifactsTable:
-  Type: AWS::DynamoDB::Table
-  Properties:
-    TableName: ModelGuard-Rejected-Artifacts-Metadata
-    BillingMode: PAY_PER_REQUEST  # On-demand pricing
-    AttributeDefinitions:
-      - AttributeName: artifact_id
-        AttributeType: S
-    KeySchema:
-      - AttributeName: artifact_id
-        KeyType: HASH  # Primary key
-    Tags:
-      - Key: Project
-        Value: ModelGuard
-    SSESpecification: # Set server-side encryption to use AWS owned key (free)
-      SSEEnabled: false
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-Rejected-Artifacts-Metadata
+      BillingMode: PAY_PER_REQUEST  # On-demand pricing
+      AttributeDefinitions:
+        - AttributeName: artifact_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: artifact_id
+          KeyType: HASH  # Primary key
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
 
   TokensTable:
     Type: AWS::DynamoDB::Table
