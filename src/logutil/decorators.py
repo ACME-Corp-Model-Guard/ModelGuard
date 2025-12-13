@@ -66,7 +66,11 @@ def log_lambda_handler(
         @wraps(func)
         def wrapper(event: Dict[str, Any], context: Any, **kwargs: Any) -> Dict[str, Any]:
             # Initialize correlation context
-            cid = context.request_id if hasattr(context, "request_id") else str(uuid.uuid4())
+            cid = (
+                getattr(context, "aws_request_id", None)
+                or getattr(context, "request_id", None)
+                or str(uuid.uuid4())
+            )
             correlation_id.set(cid)
             request_start_time.set(time.time())
 
@@ -146,6 +150,7 @@ def log_lambda_handler(
                         }
                         clogger.debug(f"Response details: {status_code}", extra=detailed_response)
                     except json.JSONDecodeError:
+                        clogger.debug("Response details: [NON_JSON_BODY]")
                         pass
 
                 # OpenAPI validation (if enabled)
