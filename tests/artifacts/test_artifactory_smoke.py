@@ -255,6 +255,14 @@ def test_load_all_artifacts_by_fields_with_type_filter():
 @patch("src.artifacts.artifactory.factory._enrich_kwargs_with_metadata")
 def test_create_new_artifact_triggers_upload_and_connect(enrich_mock, mock_upload, mock_connect):
     """Test that creating NEW artifact (no s3_key) triggers S3 upload and connection."""
+    # Configure mock to return enriched kwargs (as the real function would)
+    enrich_mock.return_value = {
+        "name": "new-model",
+        "source_url": "https://huggingface.co/new/model",
+        "size": 1000,
+        "license": "MIT",
+    }
+
     create_artifact(
         artifact_type="model",
         name="new-model",
