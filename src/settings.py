@@ -48,7 +48,7 @@ LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 # BEDROCK_MODEL_ID is optional but we provide a safe default to avoid breakage.
 BEDROCK_MODEL_ID: str = os.environ.get(
     "BEDROCK_MODEL_ID",
-    "amazon.titan-text-lite-v1",
+    "us.amazon.nova-lite-v1:0",
 )
 
 # BEDROCK_REGION defaults to AWS_REGION if not explicitly defined.

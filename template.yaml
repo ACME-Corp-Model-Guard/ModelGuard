@@ -24,7 +24,7 @@ Globals:
         PYTHONPATH: /var/task:/var/task/src
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
-        BEDROCK_MODEL_ID: amazon.titan-text-lite-v1
+        BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
         BEDROCK_REGION: us-east-1
         USER_POOL_ID: !Ref ModelGuardUserPool
         USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
