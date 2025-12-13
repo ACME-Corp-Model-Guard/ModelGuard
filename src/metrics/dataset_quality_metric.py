@@ -66,10 +66,10 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         # ------------------------------------------------------------------
         dataset_id = model.dataset_artifact_id
         if dataset_id is None:
-            clogger.warning(
-                f"[dataset_quality] No dataset artifact_id for model {model.artifact_id}"
+            clogger.debug(
+                f"No dataset artifact_id for model {model.artifact_id}, returning default score"
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score when no artifact linked
 
         dataset_artifact = load_artifact_metadata(dataset_id)
 

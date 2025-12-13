@@ -81,7 +81,7 @@ def test_dataset_quality_success(metric, model_artifact, dataset_artifact):
 
 
 # =====================================================================================
-# FAILURE: Model has no dataset_artifact_id
+# NO DATASET ARTIFACT: Model has no dataset_artifact_id → expect neutral 0.5
 # =====================================================================================
 
 
@@ -92,7 +92,7 @@ def test_dataset_quality_no_dataset_artifact_id(metric, model_artifact):
     with patch("src.metrics.dataset_quality_metric.load_artifact_metadata") as mock_load:
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score when no artifact linked
     mock_load.assert_not_called()
 
 

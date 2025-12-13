@@ -32,7 +32,7 @@ python_files = "test_*.py"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["tests/*", "__init__.py", "src/settings.py", "src/logger.py"]
+omit = ["tests/*", "__init__.py", "src/settings.py", "src/logutil/*"]
 
 [tool.coverage.report]
 exclude_lines = [

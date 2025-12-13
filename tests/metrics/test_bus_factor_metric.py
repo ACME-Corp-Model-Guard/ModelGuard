@@ -26,8 +26,8 @@ def model():
 # =============================================================================
 # No Code Artifact Tests
 # =============================================================================
-def test_no_code_artifact_id_returns_zero(bus_factor_metric):
-    """Test that model without code_artifact_id returns 0.0 score."""
+def test_no_code_artifact_id_returns_neutral_score(bus_factor_metric):
+    """Test that model without code_artifact_id returns neutral 0.5 score."""
     model = ModelArtifact(
         artifact_id="test-model-123",
         name="test-model",
@@ -40,7 +40,7 @@ def test_no_code_artifact_id_returns_zero(bus_factor_metric):
 
     assert isinstance(score, dict)
     assert "bus_factor" in score
-    assert score["bus_factor"] == 0.0
+    assert score["bus_factor"] == 0.5  # Neutral score when no artifact linked
 
 
 def test_invalid_code_artifact_returns_zero(bus_factor_metric, model, monkeypatch):

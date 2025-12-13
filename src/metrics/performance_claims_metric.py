@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from src.logutil import clogger
@@ -78,12 +79,28 @@ _PAPER_FIELDS = ["paperswithcode", "arxiv", "citation", "bibtex", "paper", "doi"
 _TEXT_FIELDS = ["model_card", "readme", "description", "summary"]
 _CITATION_PATTERNS = ["arxiv.org", "doi.org", "paperswithcode.com"]
 
+# Regex patterns for extracting metrics from text
+# These match common patterns like "accuracy: 92%", "F1 score of 0.85", "BLEU: 32.5"
+_TEXT_METRIC_PATTERNS = [
+    # Pattern: "metric_name: value%" or "metric_name: value"
+    r"\b(accuracy|precision|recall|f1|bleu|rouge|wer|cer|perplexity|em|map|iou)"
+    r"\s*[=:]\s*(\d+\.?\d*)\s*%?",
+    # Pattern: "metric_name score of value"
+    r"\b(accuracy|precision|recall|f1|bleu|rouge)\s+(?:score\s+)?(?:of\s+)?(\d+\.?\d*)\s*%?",
+    # Pattern: "achieved/reaches X% accuracy"
+    r"(?:achieved?|reaches?|obtains?)\s+(\d+\.?\d*)\s*%?\s*(accuracy|precision|recall|f1)",
+    # Pattern: "top-1 accuracy: X%"
+    r"top[- ]?[15]\s+accuracy\s*[=:]\s*(\d+\.?\d*)\s*%?",
+]
+
 # Scoring weights
 _WEIGHTS = {
     "structured_metrics": 0.5,
     "unstructured_metrics": 0.3,
+    "text_metrics": 0.25,  # Metrics found in text/README
     "benchmarks": 0.25,
     "papers": 0.15,
+    "has_documentation": 0.2,  # Base credit for having any documentation
 }
 
 _METRIC_COUNT_BONUS = {5: 0.1, 3: 0.07, 2: 0.04}
@@ -297,6 +314,56 @@ def _get_metric_count_bonus(count: int) -> float:
     return 0.0
 
 
+def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[str], bool]:
+    """
+    Extract performance metrics from free-form text (README, description, etc.).
+
+    Uses regex patterns to find common metric reporting patterns like:
+    - "accuracy: 92%"
+    - "F1 score of 0.85"
+    - "achieves 95% accuracy"
+
+    Args:
+        text: The text content to scan
+        artifact_id: Optional artifact ID for logging context
+
+    Returns:
+        Tuple of (metrics_found, has_documentation) where:
+        - metrics_found: list of metric names found
+        - has_documentation: whether any substantial text was present
+    """
+    log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
+    metrics_found: List[str] = []
+    has_documentation = False
+
+    if not text or not isinstance(text, str):
+        return metrics_found, has_documentation
+
+    # Consider it documentation if text is reasonably long
+    if len(text.strip()) > 100:
+        has_documentation = True
+        clogger.debug(f"{log_prefix} found documentation text ({len(text)} chars)")
+
+    text_lower = text.lower()
+
+    for pattern in _TEXT_METRIC_PATTERNS:
+        matches = re.findall(pattern, text_lower, re.IGNORECASE)
+        for match in matches:
+            # Extract metric name from match groups
+            if isinstance(match, tuple):
+                for group in match:
+                    if group and group.lower() in _KNOWN_METRICS:
+                        metrics_found.append(group.lower())
+
+    # Deduplicate
+    metrics_found = list(set(metrics_found))
+
+    if metrics_found:
+        clogger.debug(f"{log_prefix} found metrics in text: {metrics_found}")
+
+    return metrics_found, has_documentation
+
+
 # =============================================================================
 # Main Extraction Function
 # =============================================================================
@@ -310,7 +377,8 @@ def _extract_performance_claims_from_metadata(
     Extract performance claims and metrics from model metadata.
 
     Orchestrates helper functions to check various fields where performance
-    information might be stored, including HuggingFace model card data.
+    information might be stored, including HuggingFace model card data and
+    free-form text in README/model_card fields.
 
     Args:
         metadata: Model metadata dictionary (from artifact.metadata)
@@ -324,6 +392,8 @@ def _extract_performance_claims_from_metadata(
         - has_papers: bool - whether papers are cited
         - metric_count: int - number of distinct metrics found
         - has_structured_metrics: bool - whether metrics are in structured format
+        - has_text_metrics: bool - whether metrics were found in free-form text
+        - has_documentation: bool - whether model has documentation
         - card_data: dict - raw cardData if available
     """
     log_prefix = f"[performance_claims] [{artifact_id}]" if artifact_id else "[performance_claims]"
@@ -336,15 +406,17 @@ def _extract_performance_claims_from_metadata(
         "has_papers": False,
         "metric_count": 0,
         "has_structured_metrics": False,
+        "has_text_metrics": False,
+        "has_documentation": False,
         "card_data": {},
     }
+
+    if not metadata:
+        return result
 
     # Step 1: Get cardData from metadata
     card_data = _get_card_data(metadata, artifact_id)
     result["card_data"] = card_data
-
-    if not card_data:
-        return result
 
     # Step 2: Extract metrics from model-index (primary source)
     model_index_metrics, has_structured, has_benchmarks = _extract_model_index_metrics(
@@ -359,16 +431,43 @@ def _extract_performance_claims_from_metadata(
     # Step 4: Check for paper citations
     has_papers, _ = _extract_paper_citations(card_data, artifact_id)
 
-    # Combine results
-    all_metrics = model_index_metrics + perf_field_metrics
+    # Step 5: Extract metrics from text fields (README, model_card, description)
+    text_metrics: List[str] = []
+    has_documentation = False
+
+    # Check various text fields in metadata
+    text_sources = [
+        metadata.get("model_card_content"),
+        metadata.get("readme"),
+        metadata.get("description"),
+        card_data.get("model_card"),
+        card_data.get("readme"),
+        card_data.get("description"),
+        card_data.get("summary"),
+    ]
+
+    for text_source in text_sources:
+        if text_source and isinstance(text_source, str):
+            found_metrics, found_docs = _extract_metrics_from_text(text_source, artifact_id)
+            text_metrics.extend(found_metrics)
+            if found_docs:
+                has_documentation = True
+
+    text_metrics = list(set(text_metrics))
+    has_text_metrics = len(text_metrics) > 0
+
+    # Combine all metrics
+    all_metrics = model_index_metrics + perf_field_metrics + text_metrics
     unique_metrics = list(set(all_metrics))
 
     result["metrics"] = unique_metrics
     result["metric_count"] = len(unique_metrics)
     result["has_metrics"] = len(unique_metrics) > 0
     result["has_structured_metrics"] = has_structured
+    result["has_text_metrics"] = has_text_metrics
     result["has_benchmarks"] = has_benchmarks or perf_has_benchmarks
     result["has_papers"] = has_papers
+    result["has_documentation"] = has_documentation
 
     if unique_metrics:
         clogger.debug(f"{log_prefix} extracted metrics: {unique_metrics}")
@@ -457,16 +556,22 @@ class PerformanceClaimsMetric(Metric):
             "metric_bonus": 0.0,
             "benchmarks": 0.0,
             "papers": 0.0,
+            "documentation": 0.0,
         }
 
         has_metrics = claims_info.get("has_metrics", False)
         has_structured = claims_info.get("has_structured_metrics", False)
+        has_text_metrics = claims_info.get("has_text_metrics", False)
+        has_documentation = claims_info.get("has_documentation", False)
         metric_count = claims_info.get("metric_count", 0)
 
         # Score for having performance metrics
         if has_metrics:
             if has_structured:
                 breakdown["metrics"] = _WEIGHTS["structured_metrics"]
+            elif has_text_metrics:
+                # Text metrics are worth less than structured but more than nothing
+                breakdown["metrics"] = _WEIGHTS["text_metrics"]
             else:
                 breakdown["metrics"] = _WEIGHTS["unstructured_metrics"]
 
@@ -480,6 +585,11 @@ class PerformanceClaimsMetric(Metric):
         # Score for having paper citations (indicates peer review)
         if claims_info.get("has_papers", False):
             breakdown["papers"] = _WEIGHTS["papers"]
+
+        # Base score for having documentation (even without metrics)
+        # This ensures models with READMEs aren't scored 0.0
+        if has_documentation and not has_metrics:
+            breakdown["documentation"] = _WEIGHTS["has_documentation"]
 
         # Sum up the breakdown and clamp to [0.0, 1.0]
         score = max(0.0, min(1.0, sum(breakdown.values())))
