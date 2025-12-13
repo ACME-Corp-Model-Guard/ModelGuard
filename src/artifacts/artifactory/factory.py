@@ -79,7 +79,8 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
         name = kwargs["name"]
 
     # Step 2: Enrich kwargs with external metadata if needed
-    kwargs = _enrich_kwargs_with_metadata(artifact_type, kwargs)
+    if _is_new_artifact(kwargs):
+        kwargs = _enrich_kwargs_with_metadata(artifact_type, kwargs)
 
     # Step 2.5: Overwrite fetched name with provided name if given
     if "name" in locals():
