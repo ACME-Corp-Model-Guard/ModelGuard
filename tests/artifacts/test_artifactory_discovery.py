@@ -179,7 +179,7 @@ def test_llm_extract_fields_builds_prompt(mock_build_prompt, mock_ask_llm):
             "code_name": "Name of the code artifact",
             "dataset_name": "Name of the dataset artifact",
             "parent_model_name": "Name of the parent model",
-            "parent_model_source": "File name where parent model was found (if any)",
+            "parent_model_source": "File name where you learned parent model name (if any)",
             "parent_model_relationship": "Relationship to the parent model (if any)",
         },
         files=files,
