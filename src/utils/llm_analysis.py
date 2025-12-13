@@ -78,17 +78,12 @@ def ask_llm(
 
         # Nova models use Messages API format
         request_body = {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}]
-                }
-            ],
+            "messages": [{"role": "user", "content": [{"text": prompt}]}],
             "inferenceConfig": {
                 "max_new_tokens": max_tokens,
                 "temperature": temperature,
-                "stopSequences": []
-            }
+                "stopSequences": [],
+            },
         }
 
         clogger.debug(
@@ -137,11 +132,11 @@ def ask_llm(
 
         if return_json:
             result = _extract_json_from_response(content)
-            clogger.debug(f"[llm] Extracted JSON from response: {result}")
-            return result
             if result is None:
                 # Log what the LLM actually output when JSON extraction fails
                 clogger.debug(f"[llm] Raw output (first 500 chars):\n{content[:500]}")
+            else:
+                clogger.debug(f"[llm] Extracted JSON from response: {result}")
             return result
 
         return content
@@ -341,8 +336,7 @@ def build_extract_fields_from_files_prompt(
 
     # Use fields dict directly or convert to placeholder format
     fields_json: Dict[str, str] = {
-        field_name: value or "PUT VALUE HERE"
-        for field_name, value in fields.items()
+        field_name: value or "PUT VALUE HERE" for field_name, value in fields.items()
     }
 
     instructions = f"""
@@ -361,8 +355,9 @@ Instructions:
 
 Output requirements:
 - Format: {{ "field_name": "extracted_value" }}
-- Include all requested fields that you can find. If you are not confident in a value, use null.
-- Use actual values found in the files (not placeholders)
+- Include all requested fields that you can find
+- If you cannot find a value or are not confident, use JSON null
+- Use actual values found in the files (not placeholders like "PUT VALUE HERE")
 
 Begin reading the files now:
     """
@@ -438,9 +433,7 @@ def extract_llm_score_field(
 # ====================================================================================
 
 
-def _trim_section_to_budget(
-    text: str, token_budget: int, important_terms: List[str]
-) -> str:
+def _trim_section_to_budget(text: str, token_budget: int, important_terms: List[str]) -> str:
     """Trim section to budget: keep important lines + head lines, preserving original order."""
     if _estimate_token_count(text) <= token_budget:
         return text
@@ -499,6 +492,41 @@ def _trim_section_to_budget(
 # ====================================================================================
 
 
+def _sanitize_json_value(value: Any) -> Any:
+    """
+    Sanitize a single JSON value, converting string representations of None to actual None.
+
+    Converts:
+    - String "None", "null", "n/a", "" to None
+    - Placeholder values like "PUT VALUE HERE" to None
+    - Recursively processes dicts and lists
+    """
+    if value is None:
+        return None
+
+    # Handle string values
+    if isinstance(value, str):
+        cleaned = value.strip()
+        # Convert various "none" representations to None
+        if cleaned.lower() in ("none", "null", "n/a", ""):
+            return None
+        # Reject placeholder values
+        if "PUT VALUE HERE" in cleaned.upper():
+            return None
+        return cleaned
+
+    # Recursively handle dicts
+    if isinstance(value, dict):
+        return {k: _sanitize_json_value(v) for k, v in value.items()}
+
+    # Recursively handle lists
+    if isinstance(value, list):
+        return [_sanitize_json_value(item) for item in value]
+
+    # Return other types as-is (int, float, bool)
+    return value
+
+
 def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     """
     Extract JSON from LLM response, even if embedded in explanatory text.
@@ -507,6 +535,8 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     1. Direct JSON parsing
     2. Extract JSON block using regex
     3. Extract first {...} or [...] structure
+
+    Also sanitizes the extracted JSON to convert string "None" to actual None.
 
     Returns parsed JSON dict on success, None on failure.
     """
@@ -524,7 +554,8 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
 
     # Strategy 1: Direct parse
     try:
-        return json.loads(content)
+        parsed = json.loads(content)
+        return _sanitize_json_value(parsed)
     except json.JSONDecodeError:
         pass
 
@@ -532,7 +563,8 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", content, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(1))
+            parsed = json.loads(match.group(1))
+            return _sanitize_json_value(parsed)
         except json.JSONDecodeError:
             pass
 
@@ -540,7 +572,8 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
     match = re.search(r"\{[^{}]*\}", content, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(0))
+            parsed = json.loads(match.group(0))
+            return _sanitize_json_value(parsed)
         except json.JSONDecodeError:
             pass
 

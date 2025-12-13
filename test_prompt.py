@@ -91,7 +91,7 @@ if __name__ == "__main__":
         fields=FIELDS,
         files=SAMPLE_FILES,
     )
-    
+
     print(prompt)
     print("\n" + "=" * 80)
     print(f"Prompt length: {len(prompt)} chars (~{len(prompt) // 3} tokens)")

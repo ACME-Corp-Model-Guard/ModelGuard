@@ -64,7 +64,9 @@ def _find_connected_artifact_names(artifact: ModelArtifact) -> None:
 
         clogger.info(
             f"Extracted code_name='{artifact.code_name}', dataset_name='{artifact.dataset_name}', "
-            f"parent_model_name='{artifact.parent_model_name}' "
+            f"parent_model_name='{artifact.parent_model_name}', "
+            f"parent_model_source='{artifact.parent_model_source}', "
+            f"parent_model_relationship='{artifact.parent_model_relationship}' "
             f"for model artifact: {artifact.artifact_id}"
         )
     except Exception as e:
