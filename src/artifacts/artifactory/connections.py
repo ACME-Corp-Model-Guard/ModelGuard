@@ -304,6 +304,4 @@ def _(artifact: DatasetArtifact) -> None:
     )
     update_connected_models(connected_rejected_model_artifacts, rejected=True)
 
-    clogger.info(
-        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) "
-    )
+    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) ")

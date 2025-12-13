@@ -72,7 +72,8 @@ def test_connect_model_loads_all_artifacts_once(
 
     connect_artifact(artifact)
 
-    mock_load_all.assert_called_once()
+    # Called twice: once for regular artifacts, once for rejected artifacts
+    assert mock_load_all.call_count == 2
 
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
@@ -212,25 +213,31 @@ def test_connect_model_skips_when_no_code_name(
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_code_finds_models_by_name(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_code_finds_models_by_name(mock_load_all, mock_load_by_fields, mock_save):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-training-code",
         source_url="https://github.com/test/repo",
     )
 
+    mock_load_all.return_value = []
     mock_load_by_fields.return_value = []
     connect_artifact(artifact)
 
-    mock_load_by_fields.assert_called_once_with(
+    # Should be called for both regular and rejected artifacts
+    assert mock_load_by_fields.call_count == 2
+    mock_load_by_fields.assert_any_call(
         fields={"code_name": "my-training-code"},
         artifact_type="model",
+        artifact_list=[],
     )
 
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_code_links_to_models(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_code_links_to_models(mock_load_all, mock_load_by_fields, mock_save):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-training-code",
@@ -251,7 +258,8 @@ def test_connect_code_links_to_models(mock_load_by_fields, mock_save):
         code_name="my-training-code",
     )
 
-    mock_load_by_fields.return_value = [model1, model2]
+    mock_load_all.return_value = [model1, model2]
+    mock_load_by_fields.side_effect = [[model1, model2], []]  # regular, then rejected
 
     with patch("src.metrics.registry.CODE_METRICS", []):
         with patch.object(model1, "compute_scores"):
@@ -265,7 +273,8 @@ def test_connect_code_links_to_models(mock_load_by_fields, mock_save):
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_code_skips_already_linked_models(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_code_skips_already_linked_models(mock_load_all, mock_load_by_fields, mock_save):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-training-code",
@@ -280,7 +289,8 @@ def test_connect_code_skips_already_linked_models(mock_load_by_fields, mock_save
         code_artifact_id="already-linked",
     )
 
-    mock_load_by_fields.return_value = [model]
+    mock_load_all.return_value = [model]
+    mock_load_by_fields.side_effect = [[model], []]  # regular, then rejected
     connect_artifact(artifact)
 
     assert model.code_artifact_id == "already-linked"
@@ -289,7 +299,8 @@ def test_connect_code_skips_already_linked_models(mock_load_by_fields, mock_save
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_code_recomputes_metrics(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_code_recomputes_metrics(mock_load_all, mock_load_by_fields, mock_save):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-training-code",
@@ -303,7 +314,8 @@ def test_connect_code_recomputes_metrics(mock_load_by_fields, mock_save):
         code_name="my-training-code",
     )
 
-    mock_load_by_fields.return_value = [model]
+    mock_load_all.return_value = [model]
+    mock_load_by_fields.side_effect = [[model], []]  # regular, then rejected
     mock_metrics = [MagicMock()]
 
     with patch("src.metrics.registry.CODE_METRICS", mock_metrics):
@@ -319,25 +331,31 @@ def test_connect_code_recomputes_metrics(mock_load_by_fields, mock_save):
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_finds_models_by_name(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_finds_models_by_name(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="wikitext-103",
         source_url="https://huggingface.co/datasets/wikitext",
     )
 
+    mock_load_all.return_value = []
     mock_load_by_fields.return_value = []
     connect_artifact(artifact)
 
-    mock_load_by_fields.assert_called_once_with(
+    # Should be called for both regular and rejected artifacts
+    assert mock_load_by_fields.call_count == 2
+    mock_load_by_fields.assert_any_call(
         fields={"dataset_name": "wikitext-103"},
         artifact_type="model",
+        artifact_list=[],
     )
 
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_links_to_models(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_links_to_models(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="wikitext-103",
@@ -358,7 +376,8 @@ def test_connect_dataset_links_to_models(mock_load_by_fields, mock_save):
         dataset_name="wikitext-103",
     )
 
-    mock_load_by_fields.return_value = [model1, model2]
+    mock_load_all.return_value = [model1, model2]
+    mock_load_by_fields.side_effect = [[model1, model2], []]  # regular, then rejected
 
     with patch("src.metrics.registry.DATASET_METRICS", []):
         with patch.object(model1, "compute_scores"):
@@ -372,7 +391,8 @@ def test_connect_dataset_links_to_models(mock_load_by_fields, mock_save):
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_skips_already_linked_models(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_skips_already_linked_models(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="wikitext-103",
@@ -387,7 +407,8 @@ def test_connect_dataset_skips_already_linked_models(mock_load_by_fields, mock_s
         dataset_artifact_id="already-linked",
     )
 
-    mock_load_by_fields.return_value = [model]
+    mock_load_all.return_value = [model]
+    mock_load_by_fields.side_effect = [[model], []]  # regular, then rejected
     connect_artifact(artifact)
 
     assert model.dataset_artifact_id == "already-linked"
@@ -396,7 +417,8 @@ def test_connect_dataset_skips_already_linked_models(mock_load_by_fields, mock_s
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_recomputes_metrics(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_recomputes_metrics(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="wikitext-103",
@@ -410,7 +432,8 @@ def test_connect_dataset_recomputes_metrics(mock_load_by_fields, mock_save):
         dataset_name="wikitext-103",
     )
 
-    mock_load_by_fields.return_value = [model]
+    mock_load_all.return_value = [model]
+    mock_load_by_fields.side_effect = [[model], []]  # regular, then rejected
     mock_metrics = [MagicMock()]
 
     with patch("src.metrics.registry.DATASET_METRICS", mock_metrics):
@@ -421,13 +444,15 @@ def test_connect_dataset_recomputes_metrics(mock_load_by_fields, mock_save):
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_handles_no_matches(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_handles_no_matches(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="wikitext-103",
         source_url="https://huggingface.co/datasets/wikitext",
     )
 
+    mock_load_all.return_value = []
     mock_load_by_fields.return_value = []
     connect_artifact(artifact)
 
@@ -441,7 +466,8 @@ def test_connect_dataset_handles_no_matches(mock_load_by_fields, mock_save):
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_code_handles_non_model_artifacts(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_code_handles_non_model_artifacts(mock_load_all, mock_load_by_fields, mock_save):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-code",
@@ -454,7 +480,8 @@ def test_connect_code_handles_non_model_artifacts(mock_load_by_fields, mock_save
         source_url="https://example.com",
     )
 
-    mock_load_by_fields.return_value = [dataset]
+    mock_load_all.return_value = [dataset]
+    mock_load_by_fields.side_effect = [[dataset], []]  # regular, then rejected
     connect_artifact(artifact)
 
     mock_save.assert_not_called()
@@ -462,7 +489,8 @@ def test_connect_code_handles_non_model_artifacts(mock_load_by_fields, mock_save
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
-def test_connect_dataset_handles_non_model_artifacts(mock_load_by_fields, mock_save):
+@patch("src.artifacts.artifactory.connections.load_all_artifacts")
+def test_connect_dataset_handles_non_model_artifacts(mock_load_all, mock_load_by_fields, mock_save):
     artifact = DatasetArtifact(
         artifact_id="dataset-456",
         name="my-dataset",
@@ -475,7 +503,8 @@ def test_connect_dataset_handles_non_model_artifacts(mock_load_by_fields, mock_s
         source_url="https://github.com/test/repo",
     )
 
-    mock_load_by_fields.return_value = [code]
+    mock_load_all.return_value = [code]
+    mock_load_by_fields.side_effect = [[code], []]  # regular, then rejected
     connect_artifact(artifact)
 
     mock_save.assert_not_called()

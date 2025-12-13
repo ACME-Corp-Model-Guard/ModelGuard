@@ -11,7 +11,10 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.artifacts.model_artifact import ModelArtifact
 
 from src.artifacts.artifactory import (
     create_artifact,
@@ -170,7 +173,7 @@ def lambda_handler(
     # Step 3.1 — Check quality threshold for models (424 Failed Dependency)
     # ---------------------------------------------------------------------
     if artifact.artifact_type == "model":
-        failing_metrics = scores_below_threshold(artifact)
+        failing_metrics = scores_below_threshold(cast("ModelArtifact", artifact))
 
         if failing_metrics:
             clogger.warning(
