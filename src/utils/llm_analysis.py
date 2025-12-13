@@ -240,7 +240,6 @@ def build_llm_prompt(
     prompt = _truncate_to_token_limit(prompt, max_tokens=token_budget)
     clogger.debug(
         f"[llm_prompt_builder] Built prompt with {1 + len(trimmed_sections)} block(s), "
-        f"{list(sections.keys())}, "
         f"estimated {_estimate_token_count(prompt)} tokens"
     )
     return prompt
