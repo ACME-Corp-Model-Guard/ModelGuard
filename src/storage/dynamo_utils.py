@@ -166,3 +166,27 @@ def clear_table(table_name: str, key_name: str) -> int:
     """
     items = scan_table(table_name)
     return batch_delete(table_name, items, key_name)
+
+
+def delete_item(table_name: str, key_name: str, key_value: str) -> bool:
+    """
+    Delete a single item from a DynamoDB table by its key.
+
+    Args:
+        table_name: Name of the DynamoDB table
+        key_name: Name of the partition key field
+        key_value: Value of the partition key
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    table = get_ddb_table(table_name)
+    try:
+        table.delete_item(Key={key_name: key_value})
+        clogger.info(f"[DDB] Deleted item from {table_name} with {key_name}={key_value}")
+        return True
+    except ClientError as e:
+        clogger.error(
+            f"[DDB] Failed to delete item from {table_name} with {key_name}={key_value}: {e}"
+        )
+        raise

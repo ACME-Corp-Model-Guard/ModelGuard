@@ -594,6 +594,25 @@ Resources:
             RestApiId: !Ref ModelGuardApi
             Path: /reset
             Method: DELETE
+
+  ############################################################
+  # DELETE /artifacts/{artifact_type}/{id}
+  ############################################################
+  DeleteArtifactFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.delete_artifact.lambda_handler
+      Description: Delete artifact by ID
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        DeleteArtifact:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/{artifact_type}/{id}
+            Method: DELETE
+
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
