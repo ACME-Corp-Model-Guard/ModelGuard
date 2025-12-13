@@ -166,8 +166,16 @@ def test_replay_detection_first_request():
         BillingMode="PAY_PER_REQUEST",
     )
 
-    # Patch get_ddb_table to return our mocked table
-    with patch("src.aws.clients.get_ddb_table", return_value=table):
+    # Reset cached DDB resource inside clients.py
+    from src.aws import clients
+
+    clients._dynamodb_resource = None
+
+    # Patch get_ddb_table where it's used (in replay_prevention module)
+    with (
+        patch("src.replay_prevention.get_ddb_table", return_value=table),
+        patch("src.aws.clients.get_dynamodb", return_value=dynamodb),
+    ):
         is_replay = is_request_replayed(
             token="token1",
             http_method="POST",
