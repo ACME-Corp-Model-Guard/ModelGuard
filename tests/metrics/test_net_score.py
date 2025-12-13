@@ -1,18 +1,16 @@
 from src.metrics.net_score import calculate_net_score
 
-# The weights from the implementation
+# The weights from the implementation (reviewedness/reproducibility removed)
 WEIGHTS = {
-    "availability": 0.07,
-    "bus_factor": 0.05,
-    "code_quality": 0.09,
-    "dataset_quality": 0.09,
-    "license": 0.20,
-    "performance_claims": 0.05,
-    "ramp_up": 0.09,
-    "size": 0.10,
-    "reproducibility": 0.10,
-    "reviewedness": 0.06,
-    "tree_score": 0.10,
+    "availability": 0.08,
+    "bus_factor": 0.06,
+    "code_quality": 0.10,
+    "dataset_quality": 0.10,
+    "license": 0.22,
+    "performance_claims": 0.06,
+    "ramp_up": 0.10,
+    "size": 0.12,
+    "tree_score": 0.16,
 }
 
 
