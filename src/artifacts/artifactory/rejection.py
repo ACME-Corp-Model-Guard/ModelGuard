@@ -14,11 +14,20 @@ from typing import List
 def scores_below_threshold(artifact: ModelArtifact) -> List[str]:
     """
     Check if any of the model's scores are below the minimum threshold.
+
+    Per spec: "package must score at least 0.5 on each of the non-latency metrics"
+    This checks individual metrics only - NetScore is excluded as it's an aggregate.
     """
     scores = getattr(artifact, "scores", {})
     failing_metrics = []
+
+    # NetScore is an aggregate, not an individual metric - exclude from threshold check
+    skip_metrics = {"NetScore"}
+
     # Check each non-latency metric against threshold
     for metric_name, score_value in scores.items():
+        if metric_name in skip_metrics:
+            continue
         # Skip special cases and handle Size dict
         if isinstance(score_value, dict):
             # Size metric has per-platform scores - check each one

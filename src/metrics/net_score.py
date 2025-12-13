@@ -11,23 +11,22 @@ def calculate_net_score(scores: Dict[str, Union[float, Dict[str, float]]]) -> fl
                 Values can be floats or nested dicts of scores (which are averaged)
                 Expected keys: availability, bus_factor, code_quality,
                 dataset_quality, license, performance_claims, ramp_up,
-                size, reproducibility, reviewedness, tree_score
+                size, tree_score
 
     Returns:
         Weighted net score clamped to [0.0, 1.0]
     """
+    # Weights sum to 1.0 (reviewedness and reproducibility removed per requirements)
     weights = {
-        "availability": 0.07,
-        "bus_factor": 0.05,
-        "code_quality": 0.09,
-        "dataset_quality": 0.09,
-        "license": 0.20,
-        "performance_claims": 0.05,
-        "ramp_up": 0.09,
-        "size": 0.10,
-        "reproducibility": 0.10,
-        "reviewedness": 0.06,
-        "tree_score": 0.10,
+        "availability": 0.08,
+        "bus_factor": 0.06,
+        "code_quality": 0.10,
+        "dataset_quality": 0.10,
+        "license": 0.22,
+        "performance_claims": 0.06,
+        "ramp_up": 0.10,
+        "size": 0.12,
+        "tree_score": 0.16,
     }
 
     total = 0.0
