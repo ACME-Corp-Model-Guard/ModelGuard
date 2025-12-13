@@ -1,574 +1,360 @@
-"""Tests for performance claims metric."""
+"""
+Tests for the Performance Claims Metric (Lenient Detection).
+
+The metric uses simple heuristics to detect ANY evidence of performance claims:
+1. Section headers (## Evaluation, ## Results, etc.)
+2. Paper references (arxiv, doi, BibTeX, etc.)
+3. Performance keywords (at least 2 of: evaluation, results, benchmark, etc.)
+
+If any evidence is found, score = 1.0, otherwise score = 0.0.
+"""
 
 import pytest
 
 from src.artifacts.model_artifact import ModelArtifact
 from src.metrics.performance_claims_metric import (
     PerformanceClaimsMetric,
-    _extract_performance_claims_from_metadata,
+    _detect_performance_evidence,
+    _get_text_content,
 )
 
 
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
 @pytest.fixture
-def performance_claims_metric():
+def metric():
     return PerformanceClaimsMetric()
 
 
 @pytest.fixture
 def model():
     return ModelArtifact(
-        artifact_id="test-model-123",
         name="test-model",
-        source_url="https://huggingface.co/model",
-        s3_key="models/test-model-123",
-        metadata={},
+        source_url="https://example.com/model",
+        size=100,
+        license="MIT",
+        artifact_id="test-123",
     )
 
 
 # =============================================================================
-# _extract_performance_claims_from_metadata Tests
+# Detection Function Tests
 # =============================================================================
-def test_extract_empty_metadata_returns_defaults():
-    """Test that empty metadata returns default values."""
-    result = _extract_performance_claims_from_metadata({})
-
-    assert result["has_metrics"] is False
-    assert result["metrics"] == []
-    assert result["has_benchmarks"] is False
-    assert result["has_papers"] is False
-    assert result["metric_count"] == 0
-    assert result["has_structured_metrics"] is False
-    assert result["card_data"] == {}
 
 
-def test_extract_none_metadata_returns_defaults():
-    """Test that None metadata returns default values."""
-    result = _extract_performance_claims_from_metadata(None)
+class TestDetectPerformanceEvidence:
+    """Tests for the _detect_performance_evidence function."""
 
-    assert result["has_metrics"] is False
-    assert result["metrics"] == []
-    assert result["has_benchmarks"] is False
-    assert result["has_papers"] is False
-    assert result["metric_count"] == 0
-    assert result["has_structured_metrics"] is False
+    def test_empty_text_returns_no_evidence(self):
+        """Empty text should return no evidence."""
+        result = _detect_performance_evidence("")
+        assert result["has_evidence"] is False
+        assert result["evidence_types"] == []
 
+    def test_none_text_returns_no_evidence(self):
+        """None text should return no evidence."""
+        result = _detect_performance_evidence(None)
+        assert result["has_evidence"] is False
 
-def test_extract_structured_metrics_from_model_index():
-    """Test extraction of structured metrics from HuggingFace model-index."""
-    metadata = {
-        "cardData": {
-            "model-index": {
-                "results": [
-                    {
-                        "task": {"type": "text-classification"},
-                        "metrics": [
-                            {"name": "accuracy", "value": 0.95},
-                            {"name": "f1", "value": 0.93},
-                        ],
-                    }
-                ]
-            }
-        }
-    }
+    def test_detects_evaluation_section_header(self):
+        """Should detect ## Evaluation section header."""
+        text = "# Model\n\n## Evaluation\n\nThis model was evaluated on GLUE."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_section_header"] is True
+        assert "section_header" in result["evidence_types"]
 
-    result = _extract_performance_claims_from_metadata(metadata)
+    def test_detects_results_section_header(self):
+        """Should detect ## Results section header."""
+        text = "# Model\n\n## Results\n\nHere are the results."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_section_header"] is True
 
-    assert result["has_metrics"] is True
-    assert result["has_structured_metrics"] is True
-    assert result["has_benchmarks"] is True
-    assert "accuracy" in result["metrics"]
-    assert "f1" in result["metrics"]
-    assert result["metric_count"] == 2
+    def test_detects_performance_section_header(self):
+        """Should detect ## Performance section header."""
+        text = "# Model\n\n## Performance\n\nPerformance details."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_section_header"] is True
 
+    def test_detects_benchmarks_section_header(self):
+        """Should detect ## Benchmarks section header."""
+        text = "# Model\n\n## Benchmarks\n\nBenchmark results."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_section_header"] is True
 
-def test_extract_metrics_from_nested_metadata():
-    """Test extraction when cardData is nested in metadata."""
-    metadata = {
-        "metadata": {
-            "cardData": {
-                "model-index": {
-                    "results": [
-                        {
-                            "metrics": [
-                                {"name": "bleu", "value": 0.45},
-                            ],
-                        }
-                    ]
-                }
-            }
-        }
-    }
+    def test_detects_arxiv_link(self):
+        """Should detect arxiv.org links."""
+        text = "See our paper at https://arxiv.org/abs/1234.5678"
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
+        assert "paper_reference" in result["evidence_types"]
 
-    result = _extract_performance_claims_from_metadata(metadata)
+    def test_detects_arxiv_id(self):
+        """Should detect arxiv:1234.5678 format."""
+        text = "Citation: arxiv:1910.01108"
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
 
-    assert result["has_metrics"] is True
-    assert "bleu" in result["metrics"]
+    def test_detects_doi_link(self):
+        """Should detect DOI links."""
+        text = "DOI: doi:10.1234/example"
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
 
+    def test_detects_bibtex_entry(self):
+        """Should detect BibTeX entries."""
+        text = "@article{smith2021,\n  title={A Great Model}\n}"
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
 
-def test_extract_performance_fields():
-    """Test extraction from performance-related fields."""
-    metadata = {
-        "cardData": {
-            "performance": {
-                "accuracy": 0.95,
-                "f1": 0.93,
-            }
-        }
-    }
+    def test_detects_see_paper_reference(self):
+        """Should detect 'see the paper' style references."""
+        text = "For more details, see the original paper."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
 
-    result = _extract_performance_claims_from_metadata(metadata)
+    def test_detects_openreview_link(self):
+        """Should detect OpenReview links."""
+        text = "Published at https://openreview.net/forum?id=abc123"
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_paper_reference"] is True
 
-    assert result["has_benchmarks"] is True
-    assert result["has_metrics"] is True
-    assert "accuracy" in result["metrics"]
-    assert "f1" in result["metrics"]
+    def test_detects_two_keywords(self):
+        """Should detect when 2+ performance keywords are present."""
+        text = "The model achieves good accuracy on the benchmark."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_performance_keywords"] is True
+        assert "keywords" in result["evidence_types"]
 
+    def test_single_keyword_not_enough(self):
+        """Single keyword should not be sufficient."""
+        text = "This is a model with good accuracy."
+        result = _detect_performance_evidence(text)
+        # "accuracy" is only 1 keyword
+        assert result["has_performance_keywords"] is False
 
-def test_extract_paper_from_arxiv_field():
-    """Test extraction of papers from arxiv field."""
-    metadata = {"cardData": {"arxiv": "2301.12345"}}
+    def test_multiple_keywords_detected(self):
+        """Multiple keywords should trigger detection."""
+        text = "Evaluation results show good performance on the benchmark."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is True
+        assert result["has_performance_keywords"] is True
 
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    assert result["has_papers"] is True
-
-
-def test_extract_paper_from_citation_field():
-    """Test extraction of papers from citation field."""
-    metadata = {"cardData": {"citation": "Smith et al., 2023"}}
-
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    assert result["has_papers"] is True
-
-
-def test_extract_paper_from_arxiv_link_in_text():
-    """Test extraction of papers from arxiv.org link in description."""
-    metadata = {
-        "cardData": {"description": "See our paper at https://arxiv.org/abs/2301.12345 for details"}
-    }
-
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    assert result["has_papers"] is True
-
-
-def test_extract_paper_from_doi_link_in_text():
-    """Test extraction of papers from doi.org link in text."""
-    metadata = {"cardData": {"model_card": "Published at https://doi.org/10.1234/abcd"}}
-
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    assert result["has_papers"] is True
-
-
-def test_extract_ignores_metrics_without_values():
-    """Test that metrics without values are not counted."""
-    metadata = {
-        "cardData": {
-            "model-index": {
-                "results": [
-                    {
-                        "metrics": [
-                            {"name": "accuracy"},  # Missing value
-                            {"value": 0.95},  # Missing name
-                            {"name": "f1", "value": 0.93},  # Valid
-                        ],
-                    }
-                ]
-            }
-        }
-    }
-
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    # Only f1 should be counted
-    assert result["metric_count"] == 1
-    assert "f1" in result["metrics"]
-    assert "accuracy" not in result["metrics"]
-
-
-def test_extract_deduplicates_metrics():
-    """Test that duplicate metrics are deduplicated."""
-    metadata = {
-        "cardData": {
-            "model-index": {
-                "results": [
-                    {
-                        "metrics": [
-                            {"name": "accuracy", "value": 0.95},
-                            {
-                                "name": "Accuracy",
-                                "value": 0.96,
-                            },  # Duplicate (lowercase)
-                        ],
-                    }
-                ]
-            }
-        }
-    }
-
-    result = _extract_performance_claims_from_metadata(metadata)
-
-    # Should only count once
-    assert result["metric_count"] == 1
-    assert "accuracy" in result["metrics"]
+    def test_no_evidence_in_plain_text(self):
+        """Plain text without performance info should return no evidence."""
+        text = "This is a language model. It can generate text."
+        result = _detect_performance_evidence(text)
+        assert result["has_evidence"] is False
 
 
 # =============================================================================
-# PerformanceClaimsMetric.score() Tests
+# Get Text Content Tests
 # =============================================================================
-def test_score_no_metadata_returns_zero(performance_claims_metric):
-    """Test that model without metadata returns 0.0 score."""
-    model = ModelArtifact(
-        artifact_id="test-model-123",
-        name="test-model",
-        source_url="https://huggingface.co/model",
-        s3_key="models/test-model-123",
-        metadata=None,
-    )
-
-    score = performance_claims_metric.score(model)
-
-    assert isinstance(score, dict)
-    assert "performance_claims" in score
-    assert score["performance_claims"] == 0.0
 
 
-def test_score_empty_metadata_returns_zero(performance_claims_metric, model):
-    """Test that model with empty metadata returns 0.0 score."""
-    model.metadata = {}
+class TestGetTextContent:
+    """Tests for the _get_text_content function."""
 
-    score = performance_claims_metric.score(model)
+    def test_empty_metadata_returns_empty_string(self):
+        """Empty metadata should return empty string."""
+        assert _get_text_content({}) == ""
+        assert _get_text_content(None) == ""
 
-    assert score["performance_claims"] == 0.0
+    def test_extracts_model_card_content(self):
+        """Should extract model_card_content field."""
+        metadata = {"model_card_content": "This is the model card."}
+        result = _get_text_content(metadata)
+        assert "This is the model card." in result
 
+    def test_extracts_readme(self):
+        """Should extract readme field."""
+        metadata = {"readme": "README content here."}
+        result = _get_text_content(metadata)
+        assert "README content here." in result
 
-def test_score_with_structured_metrics(performance_claims_metric, model):
-    """Test scoring with structured metrics."""
-    model.metadata = {
-        "cardData": {
-            "model-index": {
-                "results": [
-                    {
-                        "metrics": [
-                            {"name": "accuracy", "value": 0.95},
-                        ],
-                    }
-                ]
-            }
+    def test_extracts_nested_metadata(self):
+        """Should extract from nested metadata.metadata structure."""
+        metadata = {"metadata": {"model_card_content": "Nested content."}}
+        result = _get_text_content(metadata)
+        assert "Nested content." in result
+
+    def test_extracts_from_card_data(self):
+        """Should extract from cardData structure."""
+        metadata = {"cardData": {"model_card": "Card data content."}}
+        result = _get_text_content(metadata)
+        assert "Card data content." in result
+
+    def test_combines_multiple_sources(self):
+        """Should combine content from multiple sources."""
+        metadata = {
+            "readme": "README here.",
+            "description": "Description here.",
         }
-    }
-
-    score = performance_claims_metric.score(model)
-
-    # Structured metrics give 0.5 base score + 0.25 for benchmarks = 0.75
-    assert score["performance_claims"] == 0.75
+        result = _get_text_content(metadata)
+        assert "README here." in result
+        assert "Description here." in result
 
 
-def test_score_with_unstructured_metrics(performance_claims_metric, model):
-    """Test scoring with unstructured metrics."""
-    model.metadata = {
-        "cardData": {
-            "performance": {
-                "accuracy": 0.95,
-            }
+# =============================================================================
+# Metric Scoring Tests
+# =============================================================================
+
+
+class TestPerformanceClaimsMetric:
+    """Tests for the PerformanceClaimsMetric class."""
+
+    def test_no_metadata_returns_zero(self, metric, model):
+        """Model without metadata should score 0.0."""
+        model.metadata = None
+        result = metric.score(model)
+        assert result == {"performance_claims": 0.0}
+
+    def test_empty_metadata_returns_zero(self, metric, model):
+        """Model with empty metadata should score 0.0."""
+        model.metadata = {}
+        result = metric.score(model)
+        assert result == {"performance_claims": 0.0}
+
+    def test_metadata_without_text_returns_zero(self, metric, model):
+        """Model with metadata but no text content should score 0.0."""
+        model.metadata = {"size": 100, "license": "MIT"}
+        result = metric.score(model)
+        assert result == {"performance_claims": 0.0}
+
+    def test_section_header_scores_one(self, metric, model):
+        """Model with evaluation section header should score 1.0."""
+        model.metadata = {"model_card_content": "# Model\n\n## Evaluation Results\n\nGood results."}
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
+
+    def test_paper_reference_scores_one(self, metric, model):
+        """Model with paper reference should score 1.0."""
+        model.metadata = {"model_card_content": "See https://arxiv.org/abs/1234.5678 for details."}
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
+
+    def test_keywords_score_one(self, metric, model):
+        """Model with performance keywords should score 1.0."""
+        model.metadata = {
+            "model_card_content": "The model achieves state-of-the-art results on benchmark."
         }
-    }
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
 
-    score = performance_claims_metric.score(model)
+    def test_nested_metadata_detected(self, metric, model):
+        """Should detect evidence in nested metadata structure."""
+        model.metadata = {"metadata": {"model_card_content": "## Evaluation\n\nResults are good."}}
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
 
-    # Unstructured metrics give 0.3 base score + 0.25 for benchmarks = 0.55
-    assert score["performance_claims"] == 0.55
-
-
-def test_score_with_papers(performance_claims_metric, model):
-    """Test scoring with paper citations."""
-    model.metadata = {"cardData": {"arxiv": "2301.12345"}}
-
-    score = performance_claims_metric.score(model)
-
-    # Papers only give 0.15 score
-    assert score["performance_claims"] == 0.15
-
-
-def test_score_with_all_factors(performance_claims_metric, model):
-    """Test scoring with all factors combined."""
-    model.metadata = {
-        "cardData": {
-            "model-index": {
-                "results": [
-                    {
-                        "metrics": [
-                            {"name": "accuracy", "value": 0.95},
-                            {"name": "f1", "value": 0.93},
-                            {"name": "precision", "value": 0.92},
-                            {"name": "recall", "value": 0.94},
-                            {"name": "auc", "value": 0.96},
-                        ],
-                    }
-                ]
-            },
-            "arxiv": "2301.12345",
+    def test_card_data_detected(self, metric, model):
+        """Should detect evidence in cardData structure."""
+        model.metadata = {
+            "cardData": {"model_card": "Paper: arxiv:1234.5678\n\nGreat performance."}
         }
-    }
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
 
-    score = performance_claims_metric.score(model)
-
-    # Structured metrics: 0.5
-    # 5 metrics bonus: 0.1
-    # Benchmarks: 0.25
-    # Papers: 0.15
-    # Total: 1.0
-    assert score["performance_claims"] == 1.0
-
-
-def test_score_exception_handling(performance_claims_metric, model, monkeypatch):
-    """Test that exceptions during calculation return 0.0 score."""
-
-    def raise_error(*args, **kwargs):
-        raise ValueError("Test error")
-
-    monkeypatch.setattr(
-        "src.metrics.performance_claims_metric._extract_performance_claims_from_metadata",
-        raise_error,
-    )
-
-    model.metadata = {"some": "data"}
-
-    score = performance_claims_metric.score(model)
-
-    assert score["performance_claims"] == 0.0
+    def test_no_evidence_scores_zero(self, metric, model):
+        """Model without any performance evidence should score 0.0."""
+        model.metadata = {"model_card_content": "This is a model. It does things. Nothing special."}
+        result = metric.score(model)
+        assert result == {"performance_claims": 0.0}
 
 
 # =============================================================================
-# _calculate_performance_claims_score Tests
+# Integration Tests with Realistic Content
 # =============================================================================
-def test_calculate_score_no_factors(performance_claims_metric):
-    """Test calculation with no performance factors."""
-    claims_info = {
-        "has_metrics": False,
-        "has_benchmarks": False,
-        "has_papers": False,
-        "metric_count": 0,
-        "has_structured_metrics": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    assert score == 0.0
-    assert breakdown == {
-        "metrics": 0.0,
-        "metric_bonus": 0.0,
-        "benchmarks": 0.0,
-        "papers": 0.0,
-        "documentation": 0.0,
-        "lenient_evidence": 0.0,
-    }
 
 
-def test_calculate_score_structured_metrics_only(performance_claims_metric):
-    """Test calculation with only structured metrics."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 1,
-        "has_benchmarks": False,
-        "has_papers": False,
-    }
+class TestRealWorldExamples:
+    """Tests with realistic model card content."""
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
+    def test_bert_style_readme(self, metric, model):
+        """BERT-style README with evaluation results should pass."""
+        model.metadata = {
+            "model_card_content": """
+# BERT Base
 
-    assert score == 0.5
-    assert breakdown["metrics"] == 0.5
+## Model description
+BERT is a transformer model.
 
+## Evaluation results
+When fine-tuned on downstream tasks, this model achieves the following results:
 
-def test_calculate_score_unstructured_metrics_only(performance_claims_metric):
-    """Test calculation with only unstructured metrics."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": False,
-        "metric_count": 1,
-        "has_benchmarks": False,
-        "has_papers": False,
-    }
+| Task | MNLI | QQP | QNLI | SST-2 |
+|------|------|-----|------|-------|
+| Score | 84.6 | 71.2 | 90.5 | 93.5 |
 
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    assert score == 0.3
-    assert breakdown["metrics"] == 0.3
-
-
-def test_calculate_score_two_metrics_bonus(performance_claims_metric):
-    """Test bonus for 2 metrics."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 2,
-        "has_benchmarks": False,
-        "has_papers": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # 0.5 (structured) + 0.04 (2 metrics bonus)
-    assert score == 0.54
-    assert breakdown["metric_bonus"] == 0.04
-
-
-def test_calculate_score_three_metrics_bonus(performance_claims_metric):
-    """Test bonus for 3 metrics."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 3,
-        "has_benchmarks": False,
-        "has_papers": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # 0.5 (structured) + 0.07 (3 metrics bonus)
-    assert score == pytest.approx(0.57)
-    assert breakdown["metric_bonus"] == 0.07
-
-
-def test_calculate_score_five_metrics_bonus(performance_claims_metric):
-    """Test bonus for 5+ metrics."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 5,
-        "has_benchmarks": False,
-        "has_papers": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # 0.5 (structured) + 0.1 (5+ metrics bonus)
-    assert score == 0.6
-    assert breakdown["metric_bonus"] == 0.1
-
-
-def test_calculate_score_benchmarks_only(performance_claims_metric):
-    """Test calculation with only benchmarks."""
-    claims_info = {
-        "has_metrics": False,
-        "has_benchmarks": True,
-        "has_papers": False,
-        "metric_count": 0,
-        "has_structured_metrics": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    assert score == 0.25
-    assert breakdown["benchmarks"] == 0.25
-
-
-def test_calculate_score_papers_only(performance_claims_metric):
-    """Test calculation with only papers."""
-    claims_info = {
-        "has_metrics": False,
-        "has_benchmarks": False,
-        "has_papers": True,
-        "metric_count": 0,
-        "has_structured_metrics": False,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    assert score == 0.15
-    assert breakdown["papers"] == 0.15
-
-
-def test_calculate_score_clamped_at_one(performance_claims_metric):
-    """Test that score is clamped at 1.0."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 10,  # Large number
-        "has_benchmarks": True,
-        "has_papers": True,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # Should be clamped at 1.0
-    assert score <= 1.0
-    assert score == 1.0  # 0.5 + 0.1 + 0.25 + 0.15 = 1.0
-
-
-def test_calculate_score_all_factors_combined(performance_claims_metric):
-    """Test calculation with all factors."""
-    claims_info = {
-        "has_metrics": True,
-        "has_structured_metrics": True,
-        "metric_count": 5,
-        "has_benchmarks": True,
-        "has_papers": True,
-    }
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # 0.5 (structured) + 0.1 (5 metrics) + 0.25 (benchmarks) + 0.15 (papers) = 1.0
-    assert score == 1.0
-    assert breakdown == {
-        "metrics": 0.5,
-        "metric_bonus": 0.1,
-        "benchmarks": 0.25,
-        "papers": 0.15,
-        "documentation": 0.0,  # No documentation bonus when metrics present
-        "lenient_evidence": 0.0,
-    }
-
-
-def test_calculate_score_missing_keys_use_defaults(performance_claims_metric):
-    """Test that missing keys use default False/0 values."""
-    claims_info = {}  # Empty dict
-
-    score, breakdown = performance_claims_metric._calculate_performance_claims_score(claims_info)
-
-    # Should use defaults and return 0.0
-    assert score == 0.0
-    assert breakdown == {
-        "metrics": 0.0,
-        "metric_bonus": 0.0,
-        "benchmarks": 0.0,
-        "papers": 0.0,
-        "documentation": 0.0,
-        "lenient_evidence": 0.0,
-    }
-
-
-# =============================================================================
-# Integration Tests
-# =============================================================================
-def test_full_integration_with_real_model_card(performance_claims_metric, model):
-    """Test full integration with realistic model card data."""
-    model.metadata = {
-        "metadata": {
-            "cardData": {
-                "model-index": {
-                    "results": [
-                        {
-                            "task": {"type": "text-classification"},
-                            "dataset": {"name": "IMDB"},
-                            "metrics": [
-                                {"name": "Accuracy", "value": 0.93},
-                                {"name": "F1", "value": 0.92},
-                                {"name": "Precision", "value": 0.91},
-                            ],
-                        }
-                    ]
-                },
-                "arxiv": "2301.12345",
-                "description": "Model trained on IMDB dataset",
-            }
+## Citation
+@article{devlin2018bert,
+  title={BERT: Pre-training of Deep Bidirectional Transformers},
+  author={Devlin, Jacob and others},
+  journal={arXiv preprint arXiv:1810.04805},
+  year={2018}
+}
+"""
         }
-    }
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
 
-    score = performance_claims_metric.score(model)
+    def test_gpt2_style_readme(self, metric, model):
+        """GPT-2 style README with benchmarks should pass."""
+        model.metadata = {
+            "model_card_content": """
+# GPT-2
 
-    # Should have high score with structured metrics, papers, and benchmarks
-    assert score["performance_claims"] > 0.8
+Language Models are Unsupervised Multitask Learners.
+
+## Evaluation results
+
+| Benchmark | Score |
+|-----------|-------|
+| LAMBADA (PPL) | 35.13 |
+| WikiText2 (PPL) | 29.41 |
+
+"""
+        }
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
+
+    def test_minimal_but_valid_readme(self, metric, model):
+        """Minimal README with just paper reference should pass."""
+        model.metadata = {
+            "model_card_content": """
+# My Model
+
+A fine-tuned model for text classification.
+
+For more details, see the paper at arxiv:2301.12345
+"""
+        }
+        result = metric.score(model)
+        assert result == {"performance_claims": 1.0}
+
+    def test_model_with_only_description(self, metric, model):
+        """Model with generic description but no performance info should fail."""
+        model.metadata = {
+            "model_card_content": """
+# My Model
+
+This is a language model that can generate text.
+It was created using transformers library.
+You can use it for various NLP tasks.
+"""
+        }
+        result = metric.score(model)
+        assert result == {"performance_claims": 0.0}
