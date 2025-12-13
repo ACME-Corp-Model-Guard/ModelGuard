@@ -39,13 +39,8 @@ def test_ask_llm_returns_string(mock_bedrock):
     """
     # Fake Amazon Nova response structure
     response_json = {
-        "output": {
-            "message": {
-                "content": [{"text": "Hello world"}],
-                "role": "assistant"
-            }
-        },
-        "stopReason": "end_turn"
+        "output": {"message": {"content": [{"text": "Hello world"}], "role": "assistant"}},
+        "stopReason": "end_turn",
     }
 
     mock_bedrock.invoke_model.return_value = {
@@ -63,13 +58,8 @@ def test_ask_llm_returns_json_parsed(mock_bedrock):
     ask_llm(return_json=True) should JSON-decode the model output.
     """
     response_json = {
-        "output": {
-            "message": {
-                "content": [{"text": '{"score": 0.95}'}],
-                "role": "assistant"
-            }
-        },
-        "stopReason": "end_turn"
+        "output": {"message": {"content": [{"text": '{"score": 0.95}'}], "role": "assistant"}},
+        "stopReason": "end_turn",
     }
 
     mock_bedrock.invoke_model.return_value = {
