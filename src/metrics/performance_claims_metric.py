@@ -59,6 +59,34 @@ _KNOWN_METRICS = {
     "exact_match",
     "spearmanr",
     "pearsonr",
+    # GLUE benchmark tasks (common NLP benchmarks)
+    "mnli",
+    "qqp",
+    "qnli",
+    "sst-2",
+    "sst2",
+    "cola",
+    "sts-b",
+    "stsb",
+    "mrpc",
+    "rte",
+    "wnli",
+    # SuperGLUE tasks
+    "boolq",
+    "cb",
+    "copa",
+    "multirc",
+    "record",
+    "wic",
+    "wsc",
+    # Other common benchmarks
+    "squad",
+    "squad_v2",
+    "hellaswag",
+    "winogrande",
+    "arc",
+    "mmlu",
+    "truthfulqa",
 }
 
 # Field names to check for performance data (expanded)
@@ -91,7 +119,17 @@ _TEXT_METRIC_PATTERNS = [
     r"(?:achieved?|reaches?|obtains?)\s+(\d+\.?\d*)\s*%?\s*(accuracy|precision|recall|f1)",
     # Pattern: "top-1 accuracy: X%"
     r"top[- ]?[15]\s+accuracy\s*[=:]\s*(\d+\.?\d*)\s*%?",
+    # Pattern: GLUE/SuperGLUE benchmark names followed by numbers (for markdown tables)
+    # Matches: "MNLI | 84.6" or "SST-2: 93.5" or "CoLA 52.1"
+    r"\b(mnli|qqp|qnli|sst-?2|cola|sts-?b|mrpc|rte|wnli|boolq|copa|wic|wsc|squad)"
+    r"[^\d]*(\d+\.?\d*)",
 ]
+
+# Pattern to detect markdown tables with benchmark results
+_BENCHMARK_TABLE_PATTERN = (
+    r"\|\s*(?:task|benchmark|model)?\s*\|[^|]*"
+    r"(?:mnli|qqp|qnli|sst|cola|mrpc|rte|accuracy|f1|score)[^|]*\|"
+)
 
 # Scoring weights
 _WEIGHTS = {
@@ -322,6 +360,7 @@ def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[s
     - "accuracy: 92%"
     - "F1 score of 0.85"
     - "achieves 95% accuracy"
+    - Markdown tables with benchmark results (GLUE, SuperGLUE, etc.)
 
     Args:
         text: The text content to scan
@@ -346,14 +385,25 @@ def _extract_metrics_from_text(text: str, artifact_id: str = "") -> Tuple[List[s
 
     text_lower = text.lower()
 
+    # Check for benchmark tables (indicates structured performance reporting)
+    if re.search(_BENCHMARK_TABLE_PATTERN, text_lower, re.IGNORECASE):
+        clogger.debug(f"{log_prefix} found benchmark table in text")
+        # Mark that we found benchmarks even if individual metrics aren't parsed
+        has_documentation = True
+
     for pattern in _TEXT_METRIC_PATTERNS:
         matches = re.findall(pattern, text_lower, re.IGNORECASE)
         for match in matches:
             # Extract metric name from match groups
             if isinstance(match, tuple):
                 for group in match:
-                    if group and group.lower() in _KNOWN_METRICS:
-                        metrics_found.append(group.lower())
+                    if group:
+                        # Normalize metric name (handle variations like sst-2 -> sst2)
+                        normalized = group.lower().replace("-", "")
+                        if normalized in _KNOWN_METRICS or group.lower() in _KNOWN_METRICS:
+                            metrics_found.append(group.lower())
+            elif isinstance(match, str) and match.lower() in _KNOWN_METRICS:
+                metrics_found.append(match.lower())
 
     # Deduplicate
     metrics_found = list(set(metrics_found))
