@@ -263,9 +263,14 @@ def _(artifact: DatasetArtifact) -> None:
             model_artifact.compute_scores(DATASET_METRICS)  # Recompute scores
 
             if not rejected:
+                # save updated model
                 save_artifact_metadata(model_artifact)
             elif not scores_below_threshold(model_artifact):
+                # promote if scores valid
                 promote(model_artifact)
+            else:
+                # save updated rejected model
+                save_artifact_metadata(model_artifact, rejected=True)
 
     # Get all models (both accepted and rejected)
     model_artifacts: List[BaseArtifact] = load_all_artifacts()
