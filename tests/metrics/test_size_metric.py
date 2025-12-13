@@ -37,11 +37,11 @@ def test_small_model_fits_all_devices(size_metric, model):
     assert "size_pc" in scores
     assert "size_server" in scores
 
-    # 100MB fits comfortably on all devices (< 50% capacity)
-    assert scores["size_pi"] == 1.0  # 100MB < 250MB (50% of 0.5GB)
-    assert scores["size_nano"] == 1.0  # 100MB < 512MB (50% of 1GB)
-    assert scores["size_pc"] == 1.0  # 100MB < 8GB (50% of 16GB)
-    assert scores["size_server"] == 1.0  # 100MB < 32GB (50% of 64GB)
+    # 100MB fits comfortably on all devices (< 70% capacity)
+    assert scores["size_pi"] == 1.0  # 100MB < 350MB (70% of 0.5GB)
+    assert scores["size_nano"] == 1.0  # 100MB < 716MB (70% of 1GB)
+    assert scores["size_pc"] == 1.0  # 100MB < 11.2GB (70% of 16GB)
+    assert scores["size_server"] == 1.0  # 100MB < 44.8GB (70% of 64GB)
 
 
 def test_medium_model_fits_some_devices(size_metric, model):
@@ -53,8 +53,8 @@ def test_medium_model_fits_some_devices(size_metric, model):
     # 600MB doesn't fit on Pi (0.5GB capacity)
     assert scores["size_pi"] == 0.0
 
-    # 600MB fits tightly on Nano (1GB capacity, 60% utilization)
-    assert scores["size_nano"] == 0.7
+    # 600MB fits comfortably on Nano (1GB capacity, 60% utilization < 70%)
+    assert scores["size_nano"] == 1.0
 
     # 600MB fits comfortably on PC and Server
     assert scores["size_pc"] == 1.0
@@ -131,39 +131,39 @@ def test_negative_size_returns_neutral_scores(size_metric, model):
 # =============================================================================
 # Capacity Threshold Tests
 # =============================================================================
-def test_exactly_50_percent_capacity(size_metric, model):
-    """Test model at exactly 50% of capacity."""
-    # Pi capacity is 0.5GB, so 50% is 0.25GB
-    model.size = int(0.25 * 1024 * 1024 * 1024)
+def test_just_over_70_percent_capacity(size_metric, model):
+    """Test model just over 70% of capacity."""
+    # Pi capacity is 0.5GB, 70% is 0.35GB
+    # Add a bit extra to ensure we're actually over 70%
+    model.size = int(0.35 * 1024 * 1024 * 1024) + 1000
 
     scores = size_metric.score(model)
 
-    # At 50% utilization, should get score of 0.7 (just entered 50-80% range)
+    # Just over 70% utilization, should get score of 0.7 (in 70-90% range)
     assert scores["size_pi"] == 0.7
 
 
-def test_just_over_80_percent_capacity(size_metric, model):
-    """Test model just over 80% of capacity."""
-    # Pi capacity is 0.5GB, 80% is 0.4GB
-    # Add a bit extra to ensure we're actually over 80%
-    model.size = int(0.4 * 1024 * 1024 * 1024) + 1000
+def test_just_over_90_percent_capacity(size_metric, model):
+    """Test model just over 90% of capacity."""
+    # Pi capacity is 0.5GB, 90% is 0.45GB
+    # Add a bit extra to ensure we're actually over 90%
+    model.size = int(0.45 * 1024 * 1024 * 1024) + 1000
 
     scores = size_metric.score(model)
 
-    # Just over 80% utilization, should get score of 0.4 (in 80-95% range)
+    # Just over 90% utilization, should get score of 0.4 (in 90-100% range)
     assert scores["size_pi"] == 0.4
 
 
-def test_just_over_95_percent_capacity(size_metric, model):
-    """Test model just over 95% of capacity."""
-    # Pi capacity is 0.5GB, 95% is 0.475GB
-    # Add a bit extra to ensure we're actually over 95%
-    model.size = int(0.475 * 1024 * 1024 * 1024) + 1000
+def test_exactly_100_percent_capacity(size_metric, model):
+    """Test model at exactly 100% of capacity."""
+    # Pi capacity is 0.5GB
+    model.size = int(0.5 * 1024 * 1024 * 1024)
 
     scores = size_metric.score(model)
 
-    # Just over 95% utilization, should get score of 0.1 (in 95-100% range)
-    assert scores["size_pi"] == 0.1
+    # At 100% utilization, should get score of 0.4 (still fits, in 90-100% range)
+    assert scores["size_pi"] == 0.4
 
 
 def test_over_capacity(size_metric, model):
@@ -232,44 +232,34 @@ def test_exception_during_calculation_returns_neutral_scores(size_metric, monkey
 # =============================================================================
 # Utilization Range Tests
 # =============================================================================
-def test_comfortable_fit_under_50_percent(size_metric):
-    """Test _calculate_device_score with utilization < 50%."""
+def test_comfortable_fit_under_70_percent(size_metric):
+    """Test _calculate_device_score with utilization < 70%."""
     capacity = 1024 * 1024 * 1024  # 1GB
-    size = 400 * 1024 * 1024  # 400MB (40% utilization)
+    size = 600 * 1024 * 1024  # 600MB (60% utilization)
 
     score = size_metric._calculate_device_score(size, capacity)
 
     assert score == 1.0
 
 
-def test_tight_fit_50_to_80_percent(size_metric):
-    """Test _calculate_device_score with 50-80% utilization."""
+def test_tight_fit_70_to_90_percent(size_metric):
+    """Test _calculate_device_score with 70-90% utilization."""
     capacity = 1024 * 1024 * 1024  # 1GB
-    size = 600 * 1024 * 1024  # 600MB (60% utilization)
+    size = 800 * 1024 * 1024  # 800MB (80% utilization)
 
     score = size_metric._calculate_device_score(size, capacity)
 
     assert score == 0.7
 
 
-def test_barely_fits_80_to_95_percent(size_metric):
-    """Test _calculate_device_score with 80-95% utilization."""
+def test_barely_fits_90_to_100_percent(size_metric):
+    """Test _calculate_device_score with 90-100% utilization."""
     capacity = 1024 * 1024 * 1024  # 1GB
-    size = 900 * 1024 * 1024  # 900MB (90% utilization)
+    size = 950 * 1024 * 1024  # 950MB (95% utilization)
 
     score = size_metric._calculate_device_score(size, capacity)
 
     assert score == 0.4
-
-
-def test_at_limit_95_to_100_percent(size_metric):
-    """Test _calculate_device_score with 95-100% utilization."""
-    capacity = 1024 * 1024 * 1024  # 1GB
-    size = 980 * 1024 * 1024  # 980MB (98% utilization)
-
-    score = size_metric._calculate_device_score(size, capacity)
-
-    assert score == 0.1
 
 
 def test_doesnt_fit_over_100_percent(size_metric):

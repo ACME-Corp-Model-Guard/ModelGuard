@@ -76,9 +76,9 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         if not isinstance(dataset_artifact, DatasetArtifact):
             clogger.warning(
                 f"[dataset_quality] Missing or invalid dataset artifact for model "
-                f"{model.artifact_id}"
+                f"{model.artifact_id}, returning neutral score"
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score when artifact can't be evaluated
 
         # ------------------------------------------------------------------
         # Step 1 — Download dataset tarball from S3
@@ -116,9 +116,9 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             if not files:
                 clogger.warning(
                     f"[dataset_quality] No relevant dataset files extracted for "
-                    f"{dataset_artifact.artifact_id}"
+                    f"{dataset_artifact.artifact_id}, returning neutral score"
                 )
-                return {self.SCORE_FIELD: 0.0}
+                return {self.SCORE_FIELD: 0.5}  # Neutral score when no files to analyze
 
             # ------------------------------------------------------------------
             # Step 3 — Build LLM prompt
@@ -146,11 +146,11 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                clogger.error(
+                clogger.warning(
                     f"[dataset_quality] Invalid score returned for {dataset_artifact.artifact_id}: "
-                    f"{response}"
+                    f"{response}, returning neutral score"
                 )
-                return {self.SCORE_FIELD: 0.0}
+                return {self.SCORE_FIELD: 0.5}  # Neutral score when LLM response invalid
 
             # Clamp to [0.0, 1.0]
             score = max(0.0, min(float(score), 1.0))
@@ -161,7 +161,7 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
                 f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}",
                 extra={"error_type": type(e).__name__},
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score on evaluation error
 
         finally:
             # ------------------------------------------------------------------

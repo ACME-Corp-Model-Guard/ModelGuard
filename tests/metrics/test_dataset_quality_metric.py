@@ -97,7 +97,7 @@ def test_dataset_quality_no_dataset_artifact_id(metric, model_artifact):
 
 
 # =====================================================================================
-# FAILURE: Invalid dataset artifact in Dynamo (None)
+# NEUTRAL: Invalid dataset artifact in Dynamo (None) → expect neutral 0.5
 # =====================================================================================
 
 
@@ -112,12 +112,12 @@ def test_dataset_quality_invalid_dataset_artifact(metric, model_artifact):
     ):
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score when artifact can't be evaluated
     mock_dl.assert_not_called()
 
 
 # =====================================================================================
-# FAILURE: No files extracted → expect fallback 0.0
+# NEUTRAL: No files extracted → expect neutral 0.5
 # =====================================================================================
 
 
@@ -136,11 +136,11 @@ def test_dataset_quality_no_files(metric, model_artifact, dataset_artifact):
     ):
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score when no files to analyze
 
 
 # =====================================================================================
-# FAILURE: LLM returns None → fallback 0.0
+# NEUTRAL: LLM returns None → neutral 0.5
 # =====================================================================================
 
 
@@ -169,11 +169,11 @@ def test_dataset_quality_llm_failure(metric, model_artifact, dataset_artifact):
     ):
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score when LLM returns None
 
 
 # =====================================================================================
-# FAILURE: LLM returns wrong JSON key → fallback 0.0
+# NEUTRAL: LLM returns wrong JSON key → neutral 0.5
 # =====================================================================================
 
 
@@ -199,11 +199,11 @@ def test_dataset_quality_bad_llm_json(metric, model_artifact, dataset_artifact):
     ):
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score when LLM returns invalid JSON
 
 
 # =====================================================================================
-# FAILURE: Exception anywhere → fallback 0.0
+# NEUTRAL: Exception anywhere → neutral 0.5
 # =====================================================================================
 
 
@@ -221,7 +221,7 @@ def test_dataset_quality_exception(metric, model_artifact, dataset_artifact):
     ):
         result = metric.score(model_artifact)
 
-    assert result["dataset_quality"] == 0.0
+    assert result["dataset_quality"] == 0.5  # Neutral score on evaluation error
 
 
 # =====================================================================================

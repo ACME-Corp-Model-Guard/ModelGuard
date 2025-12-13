@@ -9,24 +9,24 @@ def calculate_net_score(scores: Dict[str, Union[float, Dict[str, float]]]) -> fl
     Args:
         scores: Dictionary of metric names to scores (0.0-1.0)
                 Values can be floats or nested dicts of scores (which are averaged)
-                Expected keys: availability, bus_factor, code_quality,
-                dataset_quality, license, performance_claims, ramp_up,
-                size, tree_score
+                Keys are PascalCase metric names derived from class names
+                (e.g., "Availability", "BusFactor", "CodeQuality")
 
     Returns:
         Weighted net score clamped to [0.0, 1.0]
     """
     # Weights sum to 1.0 (reviewedness and reproducibility removed per requirements)
+    # Keys match the metric class names with "Metric" suffix removed
     weights = {
-        "availability": 0.08,
-        "bus_factor": 0.06,
-        "code_quality": 0.10,
-        "dataset_quality": 0.10,
-        "license": 0.22,
-        "performance_claims": 0.06,
-        "ramp_up": 0.10,
-        "size": 0.12,
-        "tree_score": 0.16,
+        "Availability": 0.08,
+        "BusFactor": 0.06,
+        "CodeQuality": 0.10,
+        "DatasetQuality": 0.10,
+        "License": 0.22,
+        "PerformanceClaims": 0.06,
+        "RampUp": 0.10,
+        "Size": 0.12,
+        "Treescore": 0.16,
     }
 
     total = 0.0
