@@ -218,7 +218,7 @@ def authorize(event: Dict[str, Any], allowed_roles: Optional[List[str]] = None) 
     request_body = event.get("body")
 
     if is_request_replayed(raw_token, http_method, resource_path, request_body):
-        raise Exception("Replay attack detected: duplicate request within 60s window")
+        raise Exception("Replay attack detected: duplicate request within 5s window")
 
     record_request_fingerprint(raw_token, http_method, resource_path, request_body)
 
