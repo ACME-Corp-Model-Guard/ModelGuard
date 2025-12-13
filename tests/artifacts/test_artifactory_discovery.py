@@ -176,7 +176,7 @@ def test_llm_extract_fields_builds_prompt(mock_build_prompt, mock_ask_llm):
     # Verify prompt builder was called with correct fields and files
     mock_build_prompt.assert_called_once_with(
         fields={
-            "code_name": "Name of the code artifact",
+            "code_name": "Name of the code artifact's github repository",
             "dataset_name": "Name of the dataset artifact",
             "parent_model_name": "Name of the parent model",
             "parent_model_source": "File name where you learned parent model name (if any)",

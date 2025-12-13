@@ -153,7 +153,7 @@ def _llm_extract_fields(artifact: ModelArtifact, files: Dict[str, str]) -> Optio
     # Build LLM prompt to extract connection fields
     prompt: str = build_extract_fields_from_files_prompt(
         fields={
-            "code_name": "Name of the code artifact",
+            "code_name": "Name of the code artifact's github repository",
             "dataset_name": "Name of the dataset artifact",
             "parent_model_name": "Name of the parent model",
             "parent_model_source": "File name where you learned parent model name (if any)",

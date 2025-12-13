@@ -350,6 +350,7 @@ Instructions:
 1. Read each file completely
 2. Identify relevant values for each field
 3. Select one value per field (if multiple candidates exist, choose the most relevant)
+3.5 For example, if you see dataset: example1, example2... choose example1! Do NOT list both.
 4. After reading ALL files, generate a JSON response
 
 Output requirements:

@@ -25,6 +25,7 @@ from .persistence import (
     load_artifact_metadata,
     save_artifact_metadata,
 )
+from .rejection import scores_below_threshold, promote
 
 
 # =============================================================================
@@ -101,6 +102,7 @@ def _(artifact: ModelArtifact) -> None:
                 artifact.dataset_artifact_id = dataset_artifact.artifact_id
 
     # Step 5: Connect to parent model if name was found
+    parent_model_artifact: BaseArtifact | None = None
     if artifact.parent_model_name and not artifact.parent_model_id:
         parent_model_artifacts = load_all_artifacts_by_fields(
             fields={"name": artifact.parent_model_name},
@@ -113,35 +115,58 @@ def _(artifact: ModelArtifact) -> None:
                 artifact.parent_model_id = parent_model_artifact.artifact_id
 
     # Step 6: Check if this model is the parent of any existing models
-    if artifact.child_model_ids is None:
-        artifact.child_model_ids = []
-        model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
-            fields={"parent_model_name": artifact.name},
-            artifact_type="model",
-            artifact_list=all_artifacts,
-        )
-
-        # Update child model artifacts to link to this parent model
-        for model_artifact in model_artifacts:
-            child_model_artifact: BaseArtifact | None = load_artifact_metadata(
-                model_artifact.artifact_id
+    def update_child_models(artifact_list: List[BaseArtifact]) -> List[BaseArtifact]:
+        if artifact.child_model_ids is None:
+            artifact.child_model_ids = []
+            model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+                fields={"parent_model_name": artifact.name},
+                artifact_type="model",
+                artifact_list=artifact_list,
             )
-            if not isinstance(child_model_artifact, ModelArtifact):
-                continue
-            child_model_artifact.parent_model_id = artifact.artifact_id  # link to this parent model
 
-            from src.metrics.registry import (
-                LINEAGE_METRICS,
-            )  # Lazy import to avoid circular dependency
+            # Update child model artifacts to link to this parent model
+            for model_artifact in model_artifacts:
+                child_model_artifact: BaseArtifact | None = load_artifact_metadata(
+                    model_artifact.artifact_id
+                )
+                if not isinstance(child_model_artifact, ModelArtifact):
+                    continue
+                child_model_artifact.parent_model_id = (
+                    artifact.artifact_id
+                )  # link to this parent model
 
-            child_model_artifact.compute_scores(LINEAGE_METRICS)  # recompute relevant scores
+                from src.metrics.registry import (
+                    LINEAGE_METRICS,
+                )  # Lazy import to avoid circular dependency
 
-            save_artifact_metadata(child_model_artifact)  # save updated child model
-            artifact.child_model_ids.append(
-                child_model_artifact.artifact_id
-            )  # update this model for lineage
+                child_model_artifact.compute_scores(LINEAGE_METRICS)  # recompute relevant scores
 
-    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+                save_artifact_metadata(child_model_artifact)  # save updated child model
+                artifact.child_model_ids.append(
+                    child_model_artifact.artifact_id
+                )  # update this model for lineage
+            return model_artifacts
+        return []
+
+    # Update ingested child models
+    child_models = update_child_models(all_artifacts)
+
+    # Do the same, but for rejected artifacts.
+    # If scores valid, ingest.
+    all_rejected_artifacts: List[BaseArtifact] = load_all_artifacts(rejected=True)
+    rejected_child_models = update_child_models(all_rejected_artifacts)
+
+    for child_model in rejected_child_models:
+        if isinstance(child_model, ModelArtifact):
+            failing_metrics = scores_below_threshold(child_model)
+            if not failing_metrics:
+                promote(child_model)
+
+    clogger.info(
+        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) "
+        f"to Parent {parent_model_artifact}, existing children {child_models}, "
+        f"and rejected children {rejected_child_models}"
+    )
 
 
 @connect_artifact.register
@@ -160,27 +185,59 @@ def _(artifact: CodeArtifact) -> None:
     Args:
         artifact: The code artifact to connect
     """
-    # Find all models that reference this code by name
-    model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+
+    def update_connected_models(artifacts: List[BaseArtifact], rejected: bool = False) -> None:
+        # Update linked model artifacts to reference this code artifact
+        for model_artifact in artifacts:
+            if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
+                continue
+            model_artifact.code_artifact_id = artifact.artifact_id
+
+            from src.metrics.registry import (
+                CODE_METRICS,
+            )  # Lazy import to avoid circular dependency
+
+            model_artifact.compute_scores(CODE_METRICS)  # Recompute scores
+
+            if not rejected:
+                # Save updated model
+                clogger.debug(f" Updating connected ModelArtifact {model_artifact.artifact_id} ")
+                save_artifact_metadata(model_artifact)
+            elif not scores_below_threshold(model_artifact):
+                # Promote if scores valid
+                clogger.debug(f" Promoting connected ModelArtifact {model_artifact.artifact_id} ")
+                promote(model_artifact)
+            else:
+                # Save updated rejected model
+                clogger.debug(
+                    f" Updating connected Rejected ModelArtifact {model_artifact.artifact_id} "
+                )
+                save_artifact_metadata(model_artifact, rejected=True)
+
+    # Get all models (both accepted and rejected)
+    model_artifacts: List[BaseArtifact] = load_all_artifacts()
+    rejected_model_artifacts: List[BaseArtifact] = load_all_artifacts(rejected=True)
+
+    # Find all models that reference this code by name (both accepted and rejected)
+    connected_model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
         fields={"code_name": artifact.name},
         artifact_type="model",
+        artifact_list=model_artifacts,
     )
+    update_connected_models(connected_model_artifacts)
 
-    # Update linked model artifacts to reference this code artifact
-    for model_artifact in model_artifacts:
-        if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
-            continue
-        model_artifact.code_artifact_id = artifact.artifact_id
+    connected_rejected_model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+        fields={"code_name": artifact.name},
+        artifact_type="model",
+        artifact_list=rejected_model_artifacts,
+    )
+    update_connected_models(connected_rejected_model_artifacts, rejected=True)
 
-        from src.metrics.registry import (
-            CODE_METRICS,
-        )  # Lazy import to avoid circular dependency
-
-        model_artifact.compute_scores(CODE_METRICS)  # Recompute scores
-
-        save_artifact_metadata(model_artifact)
-
-    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+    clogger.info(
+        f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) "
+        f"to Models {connected_model_artifacts} "
+        f"and Rejected Models {connected_rejected_model_artifacts}"
+    )
 
 
 @connect_artifact.register
@@ -199,24 +256,52 @@ def _(artifact: DatasetArtifact) -> None:
     Args:
         artifact: The dataset artifact to connect
     """
-    # Find all models that reference this dataset by name
-    model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+
+    def update_connected_models(artifacts: List[BaseArtifact], rejected: bool = False) -> None:
+        # Update linked model artifacts to reference this dataset artifact
+        for model_artifact in artifacts:
+            if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
+                continue
+            model_artifact.dataset_artifact_id = artifact.artifact_id
+
+            from src.metrics.registry import (
+                DATASET_METRICS,
+            )  # Lazy import to avoid circular dependency
+
+            model_artifact.compute_scores(DATASET_METRICS)  # Recompute scores
+
+            if not rejected:
+                # save updated model
+                clogger.debug(f" Updating connected ModelArtifact {model_artifact.artifact_id} ")
+                save_artifact_metadata(model_artifact)
+            elif not scores_below_threshold(model_artifact):
+                # promote if scores valid
+                clogger.debug(f" Promoting connected ModelArtifact {model_artifact.artifact_id} ")
+                promote(model_artifact)
+            else:
+                # save updated rejected model
+                clogger.debug(
+                    f" Updating connected Rejected ModelArtifact {model_artifact.artifact_id} "
+                )
+                save_artifact_metadata(model_artifact, rejected=True)
+
+    # Get all models (both accepted and rejected)
+    model_artifacts: List[BaseArtifact] = load_all_artifacts()
+    rejected_model_artifacts: List[BaseArtifact] = load_all_artifacts(rejected=True)
+
+    # Find all models that reference this dataset by name (both accepted and rejected)
+    connected_model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
         fields={"dataset_name": artifact.name},
         artifact_type="model",
+        artifact_list=model_artifacts,
     )
+    update_connected_models(connected_model_artifacts)
 
-    # Update linked model artifacts to reference this dataset artifact
-    for model_artifact in model_artifacts:
-        if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
-            continue
-        model_artifact.dataset_artifact_id = artifact.artifact_id
+    connected_rejected_model_artifacts: List[BaseArtifact] = load_all_artifacts_by_fields(
+        fields={"dataset_name": artifact.name},
+        artifact_type="model",
+        artifact_list=rejected_model_artifacts,
+    )
+    update_connected_models(connected_rejected_model_artifacts, rejected=True)
 
-        from src.metrics.registry import (
-            DATASET_METRICS,
-        )  # Lazy import to avoid circular dependency
-
-        model_artifact.compute_scores(DATASET_METRICS)  # Recompute scores
-
-        save_artifact_metadata(model_artifact)
-
-    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type})")
+    clogger.info(f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) ")

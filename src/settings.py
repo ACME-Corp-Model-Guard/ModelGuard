@@ -28,6 +28,7 @@ AWS_REGION: str = _require_env("AWS_REGION")
 
 # DynamoDB tables
 ARTIFACTS_TABLE: str = _require_env("ARTIFACTS_TABLE")
+REJECTED_ARTIFACTS_TABLE: str = _require_env("REJECTED_ARTIFACTS_TABLE")
 TOKENS_TABLE: str = _require_env("TOKENS_TABLE")
 FINGERPRINTS_TABLE: str = _require_env("FINGERPRINTS_TABLE")
 

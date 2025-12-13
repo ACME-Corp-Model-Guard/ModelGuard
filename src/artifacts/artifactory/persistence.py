@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
 from src.logutil import clogger
-from src.settings import ARTIFACTS_TABLE
+from src.settings import ARTIFACTS_TABLE, REJECTED_ARTIFACTS_TABLE
 from src.storage.dynamo_utils import save_item_to_table, load_item_from_key, scan_table
 
 
@@ -22,7 +22,7 @@ from src.storage.dynamo_utils import save_item_to_table, load_item_from_key, sca
 # =============================================================================
 
 
-def save_artifact_metadata(artifact: BaseArtifact) -> None:
+def save_artifact_metadata(artifact: BaseArtifact, rejected: bool = False) -> None:
     """
     Store artifact metadata in DynamoDB.
 
@@ -32,10 +32,14 @@ def save_artifact_metadata(artifact: BaseArtifact) -> None:
     Raises:
         ClientError: If DynamoDB operation fails
     """
-    save_item_to_table(ARTIFACTS_TABLE, artifact.to_dict())
+    if rejected:
+        table_name = REJECTED_ARTIFACTS_TABLE
+    else:
+        table_name = ARTIFACTS_TABLE
+    save_item_to_table(table_name, artifact.to_dict())
 
 
-def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
+def load_artifact_metadata(artifact_id: str, rejected: bool = False) -> Optional[BaseArtifact]:
     """
     Retrieve artifact metadata from DynamoDB and reconstruct the artifact instance.
 
@@ -53,7 +57,12 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
     """
     from .factory import create_artifact  # Lazy import to avoid circular dependency
 
-    item = load_item_from_key(ARTIFACTS_TABLE, {"artifact_id": artifact_id})
+    if rejected:
+        table_name = REJECTED_ARTIFACTS_TABLE
+    else:
+        table_name = ARTIFACTS_TABLE
+
+    item = load_item_from_key(table_name, {"artifact_id": artifact_id})
     if not item:
         clogger.warning(f"Artifact {artifact_id} not found")
         return None
@@ -71,7 +80,7 @@ def load_artifact_metadata(artifact_id: str) -> Optional[BaseArtifact]:
     return artifact
 
 
-def load_all_artifacts() -> List[BaseArtifact]:
+def load_all_artifacts(rejected: bool = False) -> List[BaseArtifact]:
     """
     Load all artifacts from the DynamoDB table.
 
@@ -89,8 +98,13 @@ def load_all_artifacts() -> List[BaseArtifact]:
 
     artifacts: List[BaseArtifact] = []
 
+    if rejected:
+        table_name = REJECTED_ARTIFACTS_TABLE
+    else:
+        table_name = ARTIFACTS_TABLE
+
     try:
-        items = scan_table(ARTIFACTS_TABLE)
+        items = scan_table(table_name)
 
         for item in items:
             artifact_id = item.get("artifact_id")
@@ -106,7 +120,7 @@ def load_all_artifacts() -> List[BaseArtifact]:
             artifact = create_artifact(artifact_type, **kwargs)
             artifacts.append(artifact)
 
-        clogger.info(f"Loaded {len(artifacts)} artifacts from {ARTIFACTS_TABLE}")
+        clogger.info(f"Loaded {len(artifacts)} artifacts from {table_name}")
         return artifacts
 
     except Exception as e:

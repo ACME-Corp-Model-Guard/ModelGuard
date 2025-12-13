@@ -11,19 +11,23 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.artifacts.model_artifact import ModelArtifact
 
 from src.artifacts.artifactory import (
     create_artifact,
     load_all_artifacts_by_fields,
     save_artifact_metadata,
+    scores_below_threshold,
 )
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
-from src.settings import ARTIFACTS_BUCKET, MINIMUM_METRIC_THRESHOLD
+from src.settings import MINIMUM_METRIC_THRESHOLD
 from src.storage.downloaders.dispatchers import FileDownloadError
-from src.storage.s3_utils import delete_objects, generate_s3_download_url
+from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -162,45 +166,36 @@ def lambda_handler(
 
     clogger.info(
         "Artifact created successfully",
-        extra={
-            "artifact_id": artifact.artifact_id,
-            "artifact_type": artifact_type,
-            "artifact_name": artifact.name,
-        },
+        extra=artifact.to_dict(),
     )
 
     # ---------------------------------------------------------------------
     # Step 3.1 — Check quality threshold for models (424 Failed Dependency)
     # ---------------------------------------------------------------------
     if artifact.artifact_type == "model":
-        scores = getattr(artifact, "scores", {})
-        failing_metrics = []
-
-        # Check each non-latency metric against threshold
-        for metric_name, score_value in scores.items():
-            # Skip special cases and handle Size dict
-            if isinstance(score_value, dict):
-                # Size metric has per-platform scores - check each one
-                for platform, platform_score in score_value.items():
-                    if isinstance(platform_score, (int, float)):
-                        if platform_score < MINIMUM_METRIC_THRESHOLD:
-                            failing_metrics.append(f"Size.{platform}={platform_score:.2f}")
-            elif isinstance(score_value, (int, float)):
-                if score_value < MINIMUM_METRIC_THRESHOLD:
-                    failing_metrics.append(f"{metric_name}={score_value:.2f}")
+        failing_metrics = scores_below_threshold(cast("ModelArtifact", artifact))
 
         if failing_metrics:
             clogger.warning(
                 f"[post_artifact] Model {artifact.artifact_id} rejected: "
                 f"metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): {failing_metrics}"
             )
-            # Clean up S3 object since we're rejecting
-            if artifact.s3_key and ARTIFACTS_BUCKET:
-                try:
-                    delete_objects(ARTIFACTS_BUCKET, [artifact.s3_key])
-                    clogger.info(f"[post_artifact] Cleaned up S3 object: {artifact.s3_key}")
-                except Exception as cleanup_err:
-                    clogger.warning(f"[post_artifact] Failed to clean up S3: {cleanup_err}")
+            # Save to rejected artifacts table
+            try:
+                save_artifact_metadata(artifact, rejected=True)
+            except Exception as e:
+                clogger.exception(
+                    "Failed to save rejected artifact metadata",
+                    extra={
+                        "artifact_id": artifact.artifact_id,
+                        "error_type": type(e).__name__,
+                    },
+                )
+                return error_response(
+                    500,
+                    "Failed to save rejected artifact metadata",
+                    error_code="DDB_SAVE_ERROR",
+                )
 
             return error_response(
                 424,
