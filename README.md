@@ -70,7 +70,7 @@ ModelGuard provides a centralized, trustworthy platform for managing machine lea
 - **Frontend**: React 19, TypeScript, Vite, TanStack Router, Tailwind CSS
 - **Database**: DynamoDB (metadata), S3 (artifact files)
 - **Auth**: AWS Cognito with JWT tokens
-- **AI/ML**: AWS Bedrock (Amazon Titan) for content analysis
+- **AI/ML**: AWS Bedrock (Amazon Nova Lite) for content analysis
 
 ### Project Structure
 
