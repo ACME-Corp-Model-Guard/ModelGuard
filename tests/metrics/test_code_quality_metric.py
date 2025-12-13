@@ -79,7 +79,7 @@ def test_code_quality_metric_success(metric, model_artifact, code_artifact):
 
 
 # =====================================================================================
-# FAILURE: ModelArtifact does not have code_artifact_id → expect fallback score 0.0
+# NO CODE ARTIFACT: ModelArtifact does not have code_artifact_id → expect neutral 0.5
 # =====================================================================================
 def test_code_quality_metric_no_code_artifact(metric, model_artifact, code_artifact):
 
@@ -91,7 +91,7 @@ def test_code_quality_metric_no_code_artifact(metric, model_artifact, code_artif
     ) as mock_load:
         result = metric.score(model_artifact)
 
-    assert result["code_quality"] == 0.0
+    assert result["code_quality"] == 0.5  # Neutral score when no artifact linked
     assert not mock_load.called  # load_artifact_metadata should not be called
 
 

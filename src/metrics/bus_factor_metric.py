@@ -40,7 +40,7 @@ class BusFactorMetric(Metric):
             clogger.debug(
                 f"No code artifact_id for model {model.artifact_id}, " f"returning default score"
             )
-            return {"bus_factor": 0.0}
+            return {"bus_factor": 0.5}  # Neutral score when no artifact linked
 
         code_artifact = load_artifact_metadata(model.code_artifact_id)
         if not isinstance(code_artifact, CodeArtifact):
