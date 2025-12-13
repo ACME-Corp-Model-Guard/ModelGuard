@@ -1,7 +1,7 @@
 """
 POST /artifacts
 Enumerate artifacts in the registry by applying one or more ArtifactQuery filters.
-Supports optional pagination via the `offset` query paramete and returns a list
+Supports optional pagination via the `offset` query parameter and returns a list
 of ArtifactMetadata objects along with a next-page offset.
 
 Each query may specify fields such as name or type, and the results are combined
@@ -13,6 +13,7 @@ using OR semantics.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Tuple
 
 from src.auth import AuthContext, auth_required
@@ -222,8 +223,6 @@ def lambda_handler(
     raw_body = event.get("body")
 
     if isinstance(raw_body, str):
-        import json
-
         try:
             body = json.loads(raw_body)
         except Exception:

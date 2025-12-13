@@ -74,8 +74,17 @@ def create_artifact(artifact_type: ArtifactType, **kwargs: Any) -> BaseArtifact:
     # Step 1: Get artifact class (factory pattern)
     artifact_class = _get_artifact_class(artifact_type)
 
+    # Step 1.5: Store name, if provided
+    if "name" in kwargs:
+        name = kwargs["name"]
+
     # Step 2: Enrich kwargs with external metadata if needed
-    kwargs = _enrich_kwargs_with_metadata(artifact_type, kwargs)
+    if _is_new_artifact(kwargs):
+        kwargs = _enrich_kwargs_with_metadata(artifact_type, kwargs)
+
+    # Step 2.5: Overwrite fetched name with provided name if given
+    if "name" in locals():
+        kwargs["name"] = name
 
     # Step 3: Instantiate artifact
     artifact = artifact_class(**kwargs)
@@ -131,16 +140,16 @@ def _enrich_kwargs_with_metadata(
     artifact_type: ArtifactType, kwargs: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Fetch external metadata and merge into kwargs if name not provided.
+    Fetch external metadata and merge into kwargs if this is a new artifact with a source_url.
 
-    If the caller provides a source_url but no name, this function will
+    If the caller provides a source_url but is not an existing artifact, this function will
     fetch metadata from the external source (HuggingFace, GitHub, npm, PyPI)
     and merge it into the kwargs dict. This allows creating artifacts with
     minimal input - just a URL.
 
     Args:
         artifact_type: Type of artifact being created
-        kwargs: Constructor arguments (may be missing 'name')
+        kwargs: Constructor arguments
 
     Returns:
         Updated kwargs dict with metadata merged in
@@ -153,9 +162,9 @@ def _enrich_kwargs_with_metadata(
     # (it's not a constructor parameter)
     kwargs.pop("artifact_type", None)
 
-    # Only fetch metadata if name is not provided
+    # Only fetch metadata if this is a new artifact with a source_url
     url = kwargs.get("source_url")
-    if not kwargs.get("name") and isinstance(url, str):
+    if _is_new_artifact(kwargs) and isinstance(url, str):
         try:
             clogger.debug(f"Fetching metadata for {artifact_type} from {url}")
             metadata = fetch_artifact_metadata(url=url, artifact_type=artifact_type)
