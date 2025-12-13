@@ -136,3 +136,139 @@ def test_save_item_converts_floats():
     assert isinstance(saved_item["score"], Decimal)
     assert saved_item["score"] == Decimal("0.85")
     assert saved_item["name"] == "test"
+
+
+# =============================================================================
+# Load Item Tests
+# =============================================================================
+
+
+def test_load_item_from_key_returns_item():
+    """Test loading an item by key."""
+    mock_table = MagicMock()
+    mock_table.get_item.return_value = {"Item": {"artifact_id": "123", "name": "test"}}
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        result = dynamo_utils.load_item_from_key("table", {"artifact_id": "123"})
+
+    assert result == {"artifact_id": "123", "name": "test"}
+    mock_table.get_item.assert_called_once_with(Key={"artifact_id": "123"})
+
+
+def test_load_item_from_key_not_found():
+    """Test loading non-existent item returns None."""
+    mock_table = MagicMock()
+    mock_table.get_item.return_value = {}  # No Item key
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        result = dynamo_utils.load_item_from_key("table", {"artifact_id": "nonexistent"})
+
+    assert result is None
+
+
+# =============================================================================
+# Error Handling Tests
+# =============================================================================
+
+
+def test_save_item_raises_on_client_error():
+    """Test that save_item_to_table raises on ClientError."""
+    from botocore.exceptions import ClientError
+
+    mock_table = MagicMock()
+    mock_table.put_item.side_effect = ClientError(
+        {"Error": {"Code": "ValidationException"}}, "PutItem"
+    )
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        import pytest
+
+        with pytest.raises(ClientError):
+            dynamo_utils.save_item_to_table("table", {"id": "test"})
+
+
+def test_load_item_raises_on_client_error():
+    """Test that load_item_from_key raises on ClientError."""
+    from botocore.exceptions import ClientError
+
+    mock_table = MagicMock()
+    mock_table.get_item.side_effect = ClientError(
+        {"Error": {"Code": "ResourceNotFoundException"}}, "GetItem"
+    )
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        import pytest
+
+        with pytest.raises(ClientError):
+            dynamo_utils.load_item_from_key("table", {"artifact_id": "123"})
+
+
+# =============================================================================
+# Search Table Edge Cases
+# =============================================================================
+
+
+def test_search_table_by_fields_no_matches():
+    """Test search with no matching items."""
+    items = [
+        {"name": "A", "type": "model"},
+        {"name": "B", "type": "dataset"},
+    ]
+    result = dynamo_utils.search_table_by_fields("table", {"type": "code"}, item_list=items)
+    assert result == []
+
+
+def test_search_table_by_fields_multiple_fields():
+    """Test search with multiple field conditions."""
+    items = [
+        {"name": "A", "type": "model", "status": "active"},
+        {"name": "B", "type": "model", "status": "inactive"},
+        {"name": "C", "type": "dataset", "status": "active"},
+    ]
+    result = dynamo_utils.search_table_by_fields(
+        "table", {"type": "model", "status": "active"}, item_list=items
+    )
+    assert result == [{"name": "A", "type": "model", "status": "active"}]
+
+
+def test_search_table_by_fields_scans_when_no_item_list():
+    """Test that search scans table when no item_list provided."""
+    mock_table = MagicMock()
+    mock_table.scan.return_value = {
+        "Items": [{"name": "A", "type": "model"}, {"name": "B", "type": "dataset"}]
+    }
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        result = dynamo_utils.search_table_by_fields("table", {"type": "model"})
+
+    assert result == [{"name": "A", "type": "model"}]
+
+
+# =============================================================================
+# Batch Delete Edge Cases
+# =============================================================================
+
+
+def test_batch_delete_skips_missing_key():
+    """Test that batch_delete skips items without the key."""
+    mock_table = MagicMock()
+    items = [
+        {"artifact_id": "1"},
+        {"other_field": "value"},  # Missing artifact_id
+        {"artifact_id": "2"},
+    ]
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        count = dynamo_utils.batch_delete("table", items, "artifact_id")
+
+    assert count == 2  # Only items with the key are deleted
+
+
+def test_batch_delete_empty_list():
+    """Test batch_delete with empty list."""
+    mock_table = MagicMock()
+
+    with patch("src.storage.dynamo_utils.get_ddb_table", return_value=mock_table):
+        count = dynamo_utils.batch_delete("table", [], "artifact_id")
+
+    assert count == 0
