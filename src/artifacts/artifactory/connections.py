@@ -202,12 +202,17 @@ def _(artifact: CodeArtifact) -> None:
 
             if not rejected:
                 # Save updated model
+                clogger.debug(f" Updating connected ModelArtifact {model_artifact.artifact_id} ")
                 save_artifact_metadata(model_artifact)
             elif not scores_below_threshold(model_artifact):
                 # Promote if scores valid
+                clogger.debug(f" Promoting connected ModelArtifact {model_artifact.artifact_id} ")
                 promote(model_artifact)
             else:
                 # Save updated rejected model
+                clogger.debug(
+                    f" Updating connected Rejected ModelArtifact {model_artifact.artifact_id} "
+                )
                 save_artifact_metadata(model_artifact, rejected=True)
 
     # Get all models (both accepted and rejected)
