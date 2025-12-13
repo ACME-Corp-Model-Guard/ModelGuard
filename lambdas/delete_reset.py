@@ -15,7 +15,7 @@ from typing import Any, Dict
 
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
-from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE
+from src.settings import ARTIFACTS_BUCKET, ARTIFACTS_TABLE, REJECTED_ARTIFACTS_TABLE
 from src.storage.dynamo_utils import clear_table
 from src.storage.s3_utils import clear_bucket
 from src.utils.bootstrap import bootstrap_system
@@ -74,6 +74,9 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     clogger.info(f"Clearing DynamoDB table: {ARTIFACTS_TABLE}")
     clear_table(ARTIFACTS_TABLE, key_name="artifact_id")
+
+    clogger.info(f"Clearing DynamoDB table: {REJECTED_ARTIFACTS_TABLE}")
+    clear_table(REJECTED_ARTIFACTS_TABLE, key_name="artifact_id")
 
     # ---------------------------------------------------------------------
     # Step 2 — Clear S3 artifacts bucket
