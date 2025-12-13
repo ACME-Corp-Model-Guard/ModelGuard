@@ -21,10 +21,10 @@ class SizeMetric(Metric):
     - Server: 64GB capacity
 
     Each device gets a score based on how well the model fits:
-    - Model fits comfortably (< 50% of capacity): 1.0
-    - Model fits but tight (50-80% of capacity): 0.7
-    - Model barely fits (80-95% of capacity): 0.4
-    - Model doesn't fit (> 95% of capacity): 0.0
+    - Model fits comfortably (< 70% of capacity): 1.0
+    - Model fits but tight (70-90% of capacity): 0.7
+    - Model barely fits (90-100% of capacity): 0.4
+    - Model doesn't fit (> 100% of capacity): 0.0
     """
 
     # Device capacities in bytes
@@ -107,15 +107,12 @@ class SizeMetric(Metric):
         # Calculate utilization percentage
         utilization = size_bytes / capacity_bytes
 
-        if utilization < 0.5:
-            # Model fits comfortably (< 50% of capacity)
+        if utilization < 0.7:
+            # Model fits comfortably (< 70% of capacity)
             return 1.0
-        elif utilization < 0.8:
-            # Model fits but tight (50-80% of capacity)
+        elif utilization < 0.9:
+            # Model fits but tight (70-90% of capacity)
             return 0.7
-        elif utilization < 0.95:
-            # Model barely fits (80-95% of capacity)
-            return 0.4
         else:
-            # Model is at the limit (95-100% of capacity)
-            return 0.1
+            # Model barely fits (90-100% of capacity)
+            return 0.4
