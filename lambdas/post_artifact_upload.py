@@ -162,11 +162,7 @@ def lambda_handler(
 
     clogger.info(
         "Artifact created successfully",
-        extra={
-            "artifact_id": artifact.artifact_id,
-            "artifact_type": artifact_type,
-            "artifact_name": artifact.name,
-        },
+        extra=artifact.to_dict(),
     )
 
     # ---------------------------------------------------------------------
