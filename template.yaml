@@ -261,6 +261,50 @@ Resources:
       Description: Standard user access to artifacts
       Precedence: 2
 
+  ###########################################################
+  # WAF - DoS Protection
+  ###########################################################
+  ModelGuardWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: ModelGuard-API-Protection
+      Description: Rate limiting and DoS protection for ModelGuard API
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: RateLimitPerIP
+          Priority: 1
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 1000  # Max requests per 5-minute window per IP
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitPerIP
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 2
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesCommonRuleSet
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: ModelGuardWebACL
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
   ############################################################
   # API Gateway
   ############################################################
@@ -269,6 +313,11 @@ Resources:
     Properties:
       StageName: dev
       Description: ModelGuard MVP API
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingBurstLimit: 50   # Max concurrent requests
+          ThrottlingRateLimit: 100   # Requests per second
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Authorization,Authorization'"
@@ -278,6 +327,14 @@ Resources:
         # Authorizers:
           # CognitoAuthorizer:
             # UserPoolArn: !GetAtt ModelGuardUserPool.Arn
+
+  # Associate WAF WebACL with API Gateway (must be created after stage exists)
+  ModelGuardWebACLAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    DependsOn: ModelGuardApidevStage  # SAM creates stage with name: {ApiLogicalId}{StageName}Stage
+    Properties:
+      ResourceArn: !Sub 'arn:aws:apigateway:${DeploymentRegion}::/restapis/${ModelGuardApi}/stages/dev'
+      WebACLArn: !GetAtt ModelGuardWebACL.Arn
 
   ############################################################
   # Auth Endpoint (Unauthenticated)
@@ -329,6 +386,7 @@ Resources:
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       MemorySize: 1536  # MB of RAM (also sets /tmp to 1.5GB)
       Timeout: 120  # 2 minutes for artifact download/upload operations
+      ReservedConcurrentExecutions: 10  # Limit concurrent uploads to prevent resource exhaustion
       Events:
         CreateArtifact:
           Type: Api
