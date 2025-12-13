@@ -22,7 +22,7 @@ from .persistence import (
     load_all_artifacts,
     load_all_artifacts_by_fields,
 )
-from .utils import scores_below_threshold
+from .rejection import scores_below_threshold
 
 __all__ = [
     "create_artifact",
