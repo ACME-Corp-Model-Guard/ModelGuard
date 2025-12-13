@@ -252,16 +252,20 @@ def test_load_all_artifacts_by_fields_with_type_filter():
 
 @patch("src.artifacts.artifactory.connections.connect_artifact")
 @patch("src.artifacts.artifactory.factory.upload_artifact_to_s3")
-def test_create_new_artifact_triggers_upload_and_connect(mock_upload, mock_connect):
+@patch("src.artifacts.artifactory._enrich_kwargs_with_metadata")
+def test_create_new_artifact_triggers_upload_and_connect(enrich_mock, mock_upload, mock_connect):
     """Test that creating NEW artifact (no s3_key) triggers S3 upload and connection."""
     create_artifact(
         artifact_type="model",
         name="new-model",
         size=1000,
         license="MIT",
-        source_url="https://example.com",
+        source_url="https://huggingface.co/new/model",
         # No s3_key = new artifact
     )
+
+    # Verify enrich metadata was called
+    enrich_mock.assert_called_once()
 
     # Verify S3 upload was called
     mock_upload.assert_called_once()
