@@ -89,8 +89,8 @@ def test_enrich_kwargs_fetches_metadata_when_name_missing(mock_fetch):
     assert result["license"] == "MIT"
 
 
-def test_enrich_kwargs_skips_fetch_when_name_provided():
-    """Test metadata fetch is skipped when name already provided."""
+def test_enrich_kwargs_skips_fetch_when_s3_key_provided():
+    """Test metadata fetch is skipped when s3_key already provided."""
     kwargs = {
         "s3_key": "existing-key",
         "source_url": "https://huggingface.co/test/model",
@@ -103,7 +103,7 @@ def test_enrich_kwargs_skips_fetch_when_name_provided():
         mock_fetch.assert_not_called()
 
         # Verify original kwargs unchanged
-        assert result["name"] == "existing-name"
+        assert result["s3_key"] == "existing-key"
 
 
 def test_enrich_kwargs_skips_fetch_when_no_source_url():
