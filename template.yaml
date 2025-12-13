@@ -386,7 +386,6 @@ Resources:
       Role: arn:aws:iam::378950442938:role/BasicLambdaRole
       MemorySize: 1536  # MB of RAM (also sets /tmp to 1.5GB)
       Timeout: 120  # 2 minutes for artifact download/upload operations
-      ReservedConcurrentExecutions: 10  # Limit concurrent uploads to prevent resource exhaustion
       Events:
         CreateArtifact:
           Type: Api
