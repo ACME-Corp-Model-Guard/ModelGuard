@@ -201,9 +201,14 @@ def _(artifact: CodeArtifact) -> None:
             model_artifact.compute_scores(CODE_METRICS)  # Recompute scores
 
             if not rejected:
+                # Save updated model
                 save_artifact_metadata(model_artifact)
             elif not scores_below_threshold(model_artifact):
+                # Promote if scores valid
                 promote(model_artifact)
+            else:
+                # Save updated rejected model
+                save_artifact_metadata(model_artifact, rejected=True)
 
     # Get all models (both accepted and rejected)
     model_artifacts: List[BaseArtifact] = load_all_artifacts()
@@ -264,12 +269,17 @@ def _(artifact: DatasetArtifact) -> None:
 
             if not rejected:
                 # save updated model
+                clogger.debug(f" Updating connected ModelArtifact {model_artifact.artifact_id} ")
                 save_artifact_metadata(model_artifact)
             elif not scores_below_threshold(model_artifact):
                 # promote if scores valid
+                clogger.debug(f" Promoting connected ModelArtifact {model_artifact.artifact_id} ")
                 promote(model_artifact)
             else:
                 # save updated rejected model
+                clogger.debug(
+                    f" Updating connected Rejected ModelArtifact {model_artifact.artifact_id} "
+                )
                 save_artifact_metadata(model_artifact, rejected=True)
 
     # Get all models (both accepted and rejected)
@@ -293,6 +303,4 @@ def _(artifact: DatasetArtifact) -> None:
 
     clogger.info(
         f"Connected artifact {artifact.artifact_id} ({artifact.artifact_type}) "
-        f"to Models {connected_model_artifacts} "
-        f"and Rejected Models {connected_rejected_model_artifacts}"
     )
