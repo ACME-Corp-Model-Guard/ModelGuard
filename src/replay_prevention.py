@@ -3,7 +3,7 @@ Replay attack prevention using request fingerprinting.
 
 This module provides transparent replay detection by generating SHA-256 hashes
 of request components (token, method, path, body) and tracking them in DynamoDB
-with a 60-second TTL. Replayed requests within the time window are rejected.
+with a 5-second TTL. Replayed requests within the time window are rejected.
 
 Completely transparent to clients - no new headers or API changes required.
 """
@@ -24,7 +24,7 @@ from src.settings import FINGERPRINTS_TABLE
 # Configuration
 # ==============================================================================
 
-REPLAY_WINDOW_SECONDS = 60
+REPLAY_WINDOW_SECONDS = 5
 
 
 # ==============================================================================
@@ -135,7 +135,7 @@ def is_request_replayed(
     request_body: Optional[str],
 ) -> bool:
     """
-    Check if this request fingerprint has been seen within 60-second window.
+    Check if this request fingerprint has been seen within the replay window.
 
     Queries DynamoDB FingerprintsTable for the calculated fingerprint.
     If found, the request is a replay within the time window.
@@ -185,12 +185,12 @@ def record_request_fingerprint(
     request_body: Optional[str],
 ) -> None:
     """
-    Record fingerprint in DynamoDB with TTL for 60-second window.
+    Record fingerprint in DynamoDB with TTL for replay window.
 
     Stores the following fields:
       - fingerprint: SHA-256 hash (Primary Key)
       - timestamp: Current Unix epoch
-      - ttl_expiry: Current time + 60 seconds (DynamoDB auto-deletes)
+      - ttl_expiry: Current time + REPLAY_WINDOW_SECONDS (DynamoDB auto-deletes)
       - token_partial: First 16 chars of token (for audit logs)
       - method: HTTP method (for audit logs)
       - path: Resource path (for audit logs)
