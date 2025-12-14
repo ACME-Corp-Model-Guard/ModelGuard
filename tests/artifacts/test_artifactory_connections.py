@@ -230,7 +230,6 @@ def test_connect_code_finds_models_by_name(mock_load_all, mock_load_by_fields, m
     mock_load_by_fields.assert_any_call(
         fields={"code_name": "my-training-code"},
         artifact_type="model",
-        artifact_list=[],
     )
 
 
@@ -348,7 +347,6 @@ def test_connect_dataset_finds_models_by_name(mock_load_all, mock_load_by_fields
     mock_load_by_fields.assert_any_call(
         fields={"dataset_name": "wikitext-103"},
         artifact_type="model",
-        artifact_list=[],
     )
 
 
