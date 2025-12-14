@@ -258,8 +258,11 @@ class PerformanceClaimsMetric(Metric):
                 clogger.info(f"{log_prefix} Evidence found ({evidence}), returning 1.0")
                 return {"performance_claims": 1.0}
             else:
-                clogger.debug(f"{log_prefix} No evidence found, returning 0.0")
-                return {"performance_claims": 0.0}
+                clogger.debug(
+                    f"{log_prefix} No direct evidence found, "
+                    f"but files still exist, so returning 0.5"
+                )
+                return {"performance_claims": 0.5}
 
         except Exception as e:
             clogger.exception(
