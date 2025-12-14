@@ -1,3 +1,16 @@
+# -----------------------------------------------------------------------------
+# External API Tokens (Secrets Manager)
+# -----------------------------------------------------------------------------
+from src.aws.secrets import get_secret_value
+
+# These environment variables should be set to the secret name and key
+GITHUB_SECRET_NAME = os.environ.get("GITHUB_SECRET_NAME", "ModelGuard/ExternalAPITokens")
+GITHUB_TOKEN_KEY = os.environ.get("GITHUB_TOKEN_KEY", "GITHUB_TOKEN")
+
+try:
+    GITHUB_TOKEN = get_secret_value(GITHUB_SECRET_NAME, GITHUB_TOKEN_KEY)
+except Exception:
+    GITHUB_TOKEN = None
 """
 Global application settings loaded from environment variables.
 Used throughout the Lambda functions and shared utility modules.
@@ -59,8 +72,7 @@ BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", "us-east-1")
 # -----------------------------------------------------------------------------
 # Default Admin User Settings for /reset Endpoint
 # -----------------------------------------------------------------------------
-DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
-DEFAULT_ADMIN_PASSWORD: str = "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;"
+ADMIN_SECRET_NAME: str = "DEFAULT_ADMIN_INFO"
 DEFAULT_ADMIN_GROUP: str = "Admin"
 
 

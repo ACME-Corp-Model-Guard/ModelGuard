@@ -16,6 +16,7 @@ import requests
 
 from src.artifacts.types import ArtifactType
 from src.logutil import clogger
+from src.aws.secrets import get_secret_value
 
 
 class FileDownloadError(Exception):
@@ -27,6 +28,13 @@ class FileDownloadError(Exception):
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
+
+
+def _get_github_headers() -> Dict[str, str]:
+    """Construct GitHub API headers with token."""
+    return {"Authorization": f"Bearer {get_secret_value('ACCESS_TOKENS', 'GH_TOKEN')}"}
+
+
 def _parse_github_url(source_url: str) -> Tuple[str, str]:
     """Extract (owner, repo) from a GitHub URL."""
     parts = source_url.rstrip("/").split("github.com/")
@@ -61,7 +69,9 @@ def _download_repo_tarball(owner: str, repo: str, artifact_id: str) -> str:
     clogger.debug(f"[GitHub] Downloading from API: {tarball_url}")
 
     try:
-        response = requests.get(tarball_url, timeout=300, stream=True)
+        response = requests.get(
+            tarball_url, timeout=300, stream=True, headers=_get_github_headers()
+        )
         response.raise_for_status()
 
         # Create temp file directly in /tmp (no subdirectory needed)
@@ -137,7 +147,7 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         owner, repo = _parse_github_url(url)
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, timeout=10, headers=_get_github_headers())
         response.raise_for_status()
         data = response.json()
 
@@ -146,7 +156,10 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         try:
             contributors_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
             contributors_response = requests.get(
-                contributors_url, timeout=10, params={"per_page": 100}
+                contributors_url,
+                timeout=10,
+                params={"per_page": 100},
+                headers=_get_github_headers(),
             )
             # Handle rate limiting gracefully
             if contributors_response.status_code == 403:

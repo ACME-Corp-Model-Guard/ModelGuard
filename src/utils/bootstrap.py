@@ -23,11 +23,11 @@ from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 
 from src.logutil import clogger
 from src.settings import (
+    ADMIN_SECRET_NAME,
     DEFAULT_ADMIN_GROUP,
-    DEFAULT_ADMIN_PASSWORD,
-    DEFAULT_ADMIN_USERNAME,
     USER_POOL_ID,
 )
+from src.aws.secrets import get_secret_value
 
 
 # =====================================================================================
@@ -142,8 +142,8 @@ def bootstrap_system() -> None:
     # Ensure default admin user exists + confirmed
     _ensure_user_exists(
         cognito,
-        username=DEFAULT_ADMIN_USERNAME,
-        password=DEFAULT_ADMIN_PASSWORD,
+        username=get_secret_value(ADMIN_SECRET_NAME, "DEFAULT_ADMIN_USERNAME"),
+        password=get_secret_value(ADMIN_SECRET_NAME, "DEFAULT_ADMIN_PASSWORD"),
         admin_group=DEFAULT_ADMIN_GROUP,
     )
 
