@@ -1,0 +1,424 @@
+[1mdiff --git a/src/artifacts/utils/api_ingestion.py b/src/artifacts/utils/api_ingestion.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..ec467e2[m
+[1m--- /dev/null[m
+[1m+++ b/src/artifacts/utils/api_ingestion.py[m
+[36m@@ -0,0 +1,603 @@[m
+[32m+[m[32m"""[m
+[32m+[m[32mArtifact ingestion utilities for fetching metadata from external sources.[m
+[32m+[m[32mSupports HuggingFace Hub (models/datasets) and GitHub (code).[m
+[32m+[m[32m"""[m
+[32m+[m
+[32m+[m[32mfrom typing import Dict, Any, Optional, List[m
+[32m+[m[32mimport requests[m
+[32m+[m[32mfrom src.logger import logger[m
+[32m+[m[32mfrom .types import ArtifactType[m
+[32m+[m
+[32m+[m
+[32m+[m[32mclass IngestionError(Exception):[m
+[32m+[m[32m    """Raised when artifact ingestion fails."""[m
+[32m+[m
+[32m+[m[32m    pass[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Fetch model metadata from HuggingFace Hub API.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        url: HuggingFace model URL (e.g., "https://huggingface.co/bert-base-uncased")[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        Dictionary containing model metadata (name, size, license, etc.)[m
+[32m+[m
+[32m+[m[32m    Raises:[m
+[32m+[m[32m        IngestionError: If fetching or parsing fails[m
+[32m+[m[32m    """[m
+[32m+[m[32m    logger.info(f"Fetching HuggingFace model metadata from: {url}")[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # Parse model ID from URL[m
+[32m+[m[32m        # URL format: https://huggingface.co/{model_id}[m
+[32m+[m[32m        parts = url.rstrip("/").split("huggingface.co/")[m
+[32m+[m[32m        if len(parts) < 2:[m
+[32m+[m[32m            raise IngestionError(f"Invalid HuggingFace URL format: {url}")[m
+[32m+[m
+[32m+[m[32m        model_id = parts[1][m
+[32m+[m[32m        logger.debug(f"Parsed model ID: {model_id}")[m
+[32m+[m
+[32m+[m[32m        # Call HuggingFace API[m
+[32m+[m[32m        api_url = f"https://huggingface.co/api/models/{model_id}"[m
+[32m+[m[32m        response = requests.get(api_url, timeout=10)[m
+[32m+[m[32m        response.raise_for_status()[m
+[32m+[m
+[32m+[m[32m        data = response.json()[m
+[32m+[m
+[32m+[m[32m        # Extract relevant metadata with robust error handling[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            name = model_id.split("/")[-1][m
+[32m+[m[32m        except (IndexError, AttributeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse model name from ID: {model_id}")[m
+[32m+[m[32m            name = "unknown"[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            size = data.get("safetensors", {}).get("total", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse size for model: {model_id}")[m
+[32m+[m[32m            size = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            license = data.get("cardData", {}).get("license", "unknown")[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse license for model: {model_id}")[m
+[32m+[m[32m            license = "unknown"[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            downloads = data.get("downloads", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse downloads for model: {model_id}")[m
+[32m+[m[32m            downloads = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            likes = data.get("likes", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse likes for model: {model_id}")[m
+[32m+[m[32m            likes = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            card_data = data.get("cardData", {})[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse cardData for model: {model_id}")[m
+[32m+[m[32m            card_data = {}[m
+[32m+[m
+[32m+[m[32m        metadata = {[m
+[32m+[m[32m            "name": name,[m
+[32m+[m[32m            "size": size,[m
+[32m+[m[32m            "license": license,[m
+[32m+[m[32m            "metadata": {[m
+[32m+[m[32m                "downloads": downloads,[m
+[32m+[m[32m                "likes": likes,[m
+[32m+[m[32m                "cardData": card_data,[m
+[32m+[m[32m            },[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        logger.info(f"Successfully fetched metadata for model: {model_id}")[m
+[32m+[m[32m        return metadata[m
+[32m+[m
+[32m+[m[32m    except requests.RequestException as e:[m
+[32m+[m[32m        logger.error(f"Failed to fetch HuggingFace model metadata: {e}", exc_info=True)[m
+[32m+[m[32m        raise IngestionError(f"Failed to fetch model metadata from HuggingFace: {e}")[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Fetch dataset metadata from HuggingFace Hub API.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        url: HuggingFace dataset URL (e.g., "https://huggingface.co/datasets/squad")[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        Dictionary containing dataset metadata (name, size, etc.)[m
+[32m+[m
+[32m+[m[32m    Raises:[m
+[32m+[m[32m        IngestionError: If fetching or parsing fails[m
+[32m+[m[32m    """[m
+[32m+[m[32m    logger.info(f"Fetching HuggingFace dataset metadata from: {url}")[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # Parse dataset ID from URL[m
+[32m+[m[32m        # URL format: https://huggingface.co/datasets/{dataset_id}[m
+[32m+[m[32m        parts = url.rstrip("/").split("huggingface.co/datasets/")[m
+[32m+[m[32m        if len(parts) < 2:[m
+[32m+[m[32m            raise IngestionError(f"Invalid HuggingFace dataset URL format: {url}")[m
+[32m+[m
+[32m+[m[32m        dataset_id = parts[1][m
+[32m+[m[32m        logger.debug(f"Parsed dataset ID: {dataset_id}")[m
+[32m+[m
+[32m+[m[32m        # Call HuggingFace API[m
+[32m+[m[32m        api_url = f"https://huggingface.co/api/datasets/{dataset_id}"[m
+[32m+[m[32m        response = requests.get(api_url, timeout=10)[m
+[32m+[m[32m        response.raise_for_status()[m
+[32m+[m
+[32m+[m[32m        data = response.json()[m
+[32m+[m
+[32m+[m[32m        # Extract relevant metadata with robust error handling[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            name = dataset_id.split("/")[-1][m
+[32m+[m[32m        except (IndexError, AttributeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse dataset name from ID: {dataset_id}")[m
+[32m+[m[32m            name = "unknown"[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            downloads = data.get("downloads", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse downloads for dataset: {dataset_id}")[m
+[32m+[m[32m            downloads = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            likes = data.get("likes", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse likes for dataset: {dataset_id}")[m
+[32m+[m[32m            likes = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            card_data = data.get("cardData", {})[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse cardData for dataset: {dataset_id}")[m
+[32m+[m[32m            card_data = {}[m
+[32m+[m
+[32m+[m[32m        metadata = {[m
+[32m+[m[32m            "name": name,[m
+[32m+[m[32m            "metadata": {[m
+[32m+[m[32m                "downloads": downloads,[m
+[32m+[m[32m                "likes": likes,[m
+[32m+[m[32m                "cardData": card_data,[m
+[32m+[m[32m            },[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        logger.info(f"Successfully fetched metadata for dataset: {dataset_id}")[m
+[32m+[m[32m        return metadata[m
+[32m+[m
+[32m+[m[32m    except requests.RequestException as e:[m
+[32m+[m[32m        logger.error([m
+[32m+[m[32m            f"Failed to fetch HuggingFace dataset metadata: {e}", exc_info=True[m
+[32m+[m[32m        )[m
+[32m+[m[32m        raise IngestionError(f"Failed to fetch dataset metadata from HuggingFace: {e}")[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef fetch_github_code_metadata(url: str) -> Dict[str, Any]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Fetch code repository metadata from GitHub API.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        url: GitHub repository URL (e.g., "https://github.com/owner/repo")[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        Dictionary containing repository metadata (name, size, license, etc.)[m
+[32m+[m
+[32m+[m[32m    Raises:[m
+[32m+[m[32m        IngestionError: If fetching or parsing fails[m
+[32m+[m[32m    """[m
+[32m+[m[32m    logger.info(f"Fetching GitHub repository metadata from: {url}")[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # Parse owner/repo from URL[m
+[32m+[m[32m        # URL format: https://github.com/{owner}/{repo}[m
+[32m+[m[32m        parts = url.rstrip("/").split("github.com/")[m
+[32m+[m[32m        if len(parts) < 2:[m
+[32m+[m[32m            raise IngestionError(f"Invalid GitHub URL format: {url}")[m
+[32m+[m
+[32m+[m[32m        repo_path = parts[1].split("/")[:2]  # Get owner/repo, ignore subdirs[m
+[32m+[m[32m        if len(repo_path) < 2:[m
+[32m+[m[32m            raise IngestionError(f"Invalid GitHub repository URL: {url}")[m
+[32m+[m
+[32m+[m[32m        owner, repo = repo_path[m
+[32m+[m[32m        logger.debug(f"Parsed GitHub repo: {owner}/{repo}")[m
+[32m+[m
+[32m+[m[32m        # Call GitHub API[m
+[32m+[m[32m        api_url = f"https://api.github.com/repos/{owner}/{repo}"[m
+[32m+[m[32m        response = requests.get(api_url, timeout=10)[m
+[32m+[m[32m        response.raise_for_status()[m
+[32m+[m
+[32m+[m[32m        data = response.json()[m
+[32m+[m
+[32m+[m[32m        # Extract relevant metadata with robust error handling for each field[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            name = data.get("name", repo)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse name for repo: {owner}/{repo}")[m
+[32m+[m[32m            name = repo[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            description = data.get("description")[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse description for repo: {owner}/{repo}")[m
+[32m+[m[32m            description = None[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            language = data.get("language")[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse language for repo: {owner}/{repo}")[m
+[32m+[m[32m            language = None[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            size = data.get("size", 0) * 1024[m
+[32m+[m[32m        except (AttributeError, TypeError, ValueError):[m
+[32m+[m[32m            logger.warning(f"Could not parse size for repo: {owner}/{repo}")[m
+[32m+[m[32m            size = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            license_data = data.get("license", {})[m
+[32m+[m[32m            license = ([m
+[32m+[m[32m                license_data.get("spdx_id", "unknown")[m
+[32m+[m[32m                if isinstance(license_data, dict)[m
+[32m+[m[32m                else "unknown"[m
+[32m+[m[32m            )[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse license for repo: {owner}/{repo}")[m
+[32m+[m[32m            license = "unknown"[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            stars = data.get("stargazers_count", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse stars for repo: {owner}/{repo}")[m
+[32m+[m[32m            stars = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            forks = data.get("forks_count", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse forks for repo: {owner}/{repo}")[m
+[32m+[m[32m            forks = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            open_issues = data.get("open_issues_count", 0)[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse open_issues for repo: {owner}/{repo}")[m
+[32m+[m[32m            open_issues = 0[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            default_branch = data.get("default_branch", "main")[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse default_branch for repo: {owner}/{repo}")[m
+[32m+[m[32m            default_branch = "main"[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            clone_url = data.get("clone_url")[m
+[32m+[m[32m        except (AttributeError, TypeError):[m
+[32m+[m[32m            logger.warning(f"Could not parse clone_url for repo: {owner}/{repo}")[m
+[32m+[m[32m            clone_url = None[m
+[32m+[m
+[32m+[m[32m        metadata = {[m
+[32m+[m[32m            "name": name,[m
+[32m+[m[32m            "metadata": {[m
+[32m+[m[32m                "description": description,[m
+[32m+[m[32m                "language": language,[m
+[32m+[m[32m                "size": size,[m
+[32m+[m[32m                "license": license,[m
+[32m+[m[32m                "stars": stars,[m
+[32m+[m[32m                "forks": forks,[m
+[32m+[m[32m                "open_issues": open_issues,[m
+[32m+[m[32m                "default_branch": default_branch,[m
+[32m+[m[32m                "clone_url": clone_url,[m
+[32m+[m[32m            },[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        logger.info(f"Successfully fetched metadata for GitHub repo: {owner}/{repo}")[m
+[32m+[m[32m        return metadata[m
+[32m+[m
+[32m+[m[32m    except requests.RequestException as e:[m
+[32m+[m[32m        logger.error(f"Failed to fetch GitHub repository metadata: {e}", exc_info=True)[m
+[32m+[m[32m        raise IngestionError(f"Failed to fetch repository metadata from GitHub: {e}")[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef fetch_artifact_metadata(url: str, artifact_type: ArtifactType) -> Dict[str, Any]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Fetch artifact metadata from URL based on artifact type.[m
+[32m+[m[32m    Delegates to appropriate fetcher function.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        url: URL to artifact (HuggingFace or GitHub)[m
+[32m+[m[32m        artifact_type: One of 'model', 'dataset', 'code'[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        Dictionary containing artifact metadata[m
+[32m+[m
+[32m+[m[32m    Raises:[m
+[32m+[m[32m        IngestionError: If fetching fails or artifact_type is invalid[m
+[32m+[m[32m    """[m
+[32m+[m[32m    logger.info(f"Fetching {artifact_type} metadata from URL: {url}")[m
+[32m+[m
+[32m+[m[32m    if artifact_type == "model":[m
+[32m+[m[32m        if "huggingface.co" not in url:[m
+[32m+[m[32m            raise IngestionError(f"Model URL must be from HuggingFace Hub: {url}")[m
+[32m+[m[32m        return fetch_huggingface_model_metadata(url)[m
+[32m+[m
+[32m+[m[32m    elif artifact_type == "dataset":[m
+[32m+[m[32m        if "huggingface.co" not in url:[m
+[32m+[m[32m            raise IngestionError(f"Dataset URL must be from HuggingFace Hub: {url}")[m
+[32m+[m[32m        return fetch_huggingface_dataset_metadata(url)[m
+[32m+[m
+[32m+[m[32m    elif artifact_type == "code":[m
+[32m+[m[32m        if "github.com" not in url:[m
+[32m+[m[32m            raise IngestionError(f"Code URL must be from GitHub: {url}")[m
+[32m+[m[32m        return fetch_github_code_metadata(url)[m
+[32m+[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        raise IngestionError([m
+[32m+[m[32m            f"Invalid artifact_type: {artifact_type}. Must be 'model', 'dataset', or 'code'"[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef extract_github_url_from_huggingface_metadata([m
+[32m+[m[32m    metadata: Dict[str, Any][m
+[32m+[m[32m) -> Optional[str]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Extract GitHub repository URL from HuggingFace model metadata.[m
+[32m+[m
+[32m+[m[32m    Checks various fields where GitHub URL might be stored in the metadata.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        metadata: Model metadata dictionary (from artifact.metadata or API response)[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        GitHub repository URL if found, None otherwise[m
+[32m+[m[32m    """[m
+[32m+[m[32m    if not metadata:[m
+[32m+[m[32m        return None[m
+[32m+[m
+[32m+[m[32m    # Check top-level metadata fields[m
+[32m+[m[32m    github_url = ([m
+[32m+[m[32m        metadata.get("github_url")[m
+[32m+[m[32m        or metadata.get("github")[m
+[32m+[m[32m        or metadata.get("code_repository")[m
+[32m+[m[32m        or metadata.get("repository")[m
+[32m+[m[32m    )[m
+[32m+[m[32m    if github_url and "github.com" in str(github_url):[m
+[32m+[m[32m        return str(github_url)[m
+[32m+[m
+[32m+[m[32m    # Check nested metadata.cardData[m
+[32m+[m[32m    card_data = metadata.get("metadata", {}).get("cardData", {})[m
+[32m+[m[32m    if isinstance(card_data, dict):[m
+[32m+[m[32m        github_url = ([m
+[32m+[m[32m            card_data.get("github")[m
+[32m+[m[32m            or card_data.get("code_repository")[m
+[32m+[m[32m            or card_data.get("repository")[m
+[32m+[m[32m        )[m
+[32m+[m[32m        if github_url and "github.com" in str(github_url):[m
+[32m+[m[32m            return str(github_url)[m
+[32m+[m
+[32m+[m[32m    # Check direct cardData (if metadata structure is different)[m
+[32m+[m[32m    card_data = metadata.get("cardData", {})[m
+[32m+[m[32m    if isinstance(card_data, dict):[m
+[32m+[m[32m        github_url = ([m
+[32m+[m[32m            card_data.get("github")[m
+[32m+[m[32m            or card_data.get("code_repository")[m
+[32m+[m[32m            or card_data.get("repository")[m
+[32m+[m[32m        )[m
+[32m+[m[32m        if github_url and "github.com" in str(github_url):[m
+[32m+[m[32m            return str(github_url)[m
+[32m+[m
+[32m+[m[32m    return None[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef fetch_github_contributors(github_url: str) -> List[Dict[str, int]]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Fetch contributor statistics from GitHub API.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        github_url: GitHub repository URL (e.g., "https://github.com/owner/repo")[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        List of contributor dictionaries with 'contributions' field.[m
+[32m+[m[32m        Empty list if fetching fails or URL is invalid.[m
+[32m+[m
+[32m+[m[32m    Raises:[m
+[32m+[m[32m        IngestionError: If URL format is invalid[m
+[32m+[m[32m    """[m
+[32m+[m[32m    logger.info(f"Fetching GitHub contributors from: {github_url}")[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # Parse owner/repo from URL[m
+[32m+[m[32m        parts = github_url.rstrip("/").split("github.com/")[m
+[32m+[m[32m        if len(parts) < 2:[m
+[32m+[m[32m            raise IngestionError(f"Invalid GitHub URL format: {github_url}")[m
+[32m+
