@@ -12,11 +12,43 @@ This module centralizes ALL DynamoDB interactions:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional
 
 from botocore.exceptions import ClientError
 from src.aws.clients import get_ddb_table
-from src.logger import logger
+from src.logutil import clogger
+
+
+# =============================================================================
+# DynamoDB Type Conversion
+# =============================================================================
+def _convert_floats_to_decimal(obj: Any) -> Any:
+    """
+    Recursively convert all float values to Decimal for DynamoDB compatibility.
+
+    DynamoDB doesn't support Python float type - it requires Decimal for numbers.
+    This function walks through nested dictionaries and lists, converting all
+    floats to Decimal while preserving other types.
+
+    Args:
+        obj: Object to convert (can be dict, list, float, or any other type)
+
+    Returns:
+        Converted object with all floats replaced by Decimals
+    """
+    if isinstance(obj, float):
+        # Handle special float values
+        if obj != obj:  # NaN check
+            return None
+        if obj == float("inf") or obj == float("-inf"):
+            return None
+        return Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: _convert_floats_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_floats_to_decimal(item) for item in obj]
+    return obj
 
 
 # =============================================================================
@@ -74,19 +106,21 @@ def search_table_by_fields(
 def save_item_to_table(table_name: str, item: Dict[str, Any]) -> None:
     """
     Save a generic item to a DynamoDB table.
+
+    Automatically converts all float values to Decimal for DynamoDB compatibility.
     """
     table = get_ddb_table(table_name)
     try:
+        # Convert floats to Decimal before saving
+        item = _convert_floats_to_decimal(item)
         table.put_item(Item=item)
-        logger.info(f"[DDB] Saved item to {table_name}")
+        clogger.info(f"[DDB] Saved item to {table_name}")
     except ClientError as e:
-        logger.error(f"[DDB] Failed to save item to {table_name}: {e}")
+        clogger.error(f"[DDB] Failed to save item to {table_name}: {e}")
         raise
 
 
-def load_item_from_key(
-    table_name: str, key: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+def load_item_from_key(table_name: str, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Load a generic item from a DynamoDB table by its key.
     """
@@ -95,12 +129,12 @@ def load_item_from_key(
         response = table.get_item(Key=key)
         item = response.get("Item")
         if item:
-            logger.info(f"[DDB] Loaded item from {table_name} with key={key}")
+            clogger.info(f"[DDB] Loaded item from {table_name} with key={key}")
         else:
-            logger.warning(f"[DDB] No item found in {table_name} with key={key}")
+            clogger.warning(f"[DDB] No item found in {table_name} with key={key}")
         return item
     except ClientError as e:
-        logger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
+        clogger.error(f"[DDB] Failed to load item from {table_name} with key={key}: {e}")
         raise
 
 
@@ -132,3 +166,27 @@ def clear_table(table_name: str, key_name: str) -> int:
     """
     items = scan_table(table_name)
     return batch_delete(table_name, items, key_name)
+
+
+def delete_item(table_name: str, key_name: str, key_value: str) -> bool:
+    """
+    Delete a single item from a DynamoDB table by its key.
+
+    Args:
+        table_name: Name of the DynamoDB table
+        key_name: Name of the partition key field
+        key_value: Value of the partition key
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    table = get_ddb_table(table_name)
+    try:
+        table.delete_item(Key={key_name: key_value})
+        clogger.info(f"[DDB] Deleted item from {table_name} with {key_name}={key_value}")
+        return True
+    except ClientError as e:
+        clogger.error(
+            f"[DDB] Failed to delete item from {table_name} with {key_name}={key_value}: {e}"
+        )
+        raise

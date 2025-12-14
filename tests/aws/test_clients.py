@@ -28,9 +28,7 @@ def reset_before_each_test(monkeypatch):
 
 def test_get_dynamodb_initializes_once(monkeypatch):
     mock_resource = MagicMock()
-    monkeypatch.setattr(
-        clients.boto3, "resource", lambda svc, region_name=None: mock_resource
-    )
+    monkeypatch.setattr(clients.boto3, "resource", lambda svc, region_name=None: mock_resource)
 
     r1 = clients.get_dynamodb()
     r2 = clients.get_dynamodb()

@@ -4,7 +4,7 @@ import os
 import tempfile
 from typing import TYPE_CHECKING, Dict
 
-from src.logger import logger
+from src.logutil import clogger, log_operation
 from src.metrics.metric import Metric
 from src.storage.s3_utils import download_artifact_from_s3
 from src.storage.file_extraction import extract_relevant_files
@@ -56,7 +56,7 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
         # Step 0 — Validate S3 key
         # ------------------------------------------------------------------
         if not model.s3_key:
-            logger.warning(f"[ramp_up] Model {model.artifact_id} missing s3_key")
+            clogger.warning(f"[ramp_up] Model {model.artifact_id} missing s3_key")
             return {self.SCORE_FIELD: 0.0}
 
         # Use the CodeQualityMetric temp-file pattern
@@ -66,27 +66,35 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             # ------------------------------------------------------------------
             # Step 1 — Download model tarball from S3
             # ------------------------------------------------------------------
-            logger.debug(f"[ramp_up] Downloading bundle for model {model.artifact_id}")
-
-            download_artifact_from_s3(
+            with log_operation(
+                "s3_download",
                 artifact_id=model.artifact_id,
                 s3_key=model.s3_key,
-                local_path=tmp_tar,
-            )
+            ):
+                download_artifact_from_s3(
+                    artifact_id=model.artifact_id,
+                    s3_key=model.s3_key,
+                    local_path=tmp_tar,
+                )
 
             # ------------------------------------------------------------------
             # Step 2 — Extract relevant documentation files
             # ------------------------------------------------------------------
-            files = extract_relevant_files(
-                tar_path=tmp_tar,
-                include_ext=self.INCLUDE_EXT,
+            with log_operation(
+                "extract_files",
+                artifact_id=model.artifact_id,
                 max_files=self.MAX_FILES,
-                max_chars=self.MAX_CHARS_PER_FILE,
-                prioritize_readme=True,
-            )
+            ):
+                files = extract_relevant_files(
+                    tar_path=tmp_tar,
+                    include_ext=self.INCLUDE_EXT,
+                    max_files=self.MAX_FILES,
+                    max_chars=self.MAX_CHARS_PER_FILE,
+                    prioritize_readme=True,
+                )
 
             if not files:
-                logger.warning(
+                clogger.warning(
                     f"[ramp_up] No relevant files extracted for model {model.artifact_id}"
                 )
                 return {self.SCORE_FIELD: 0.0}
@@ -104,7 +112,12 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             # ------------------------------------------------------------------
             # Step 4 — Query LLM (JSON mode)
             # ------------------------------------------------------------------
-            response = ask_llm(prompt, return_json=True)
+            with log_operation(
+                "llm_analysis",
+                artifact_id=model.artifact_id,
+                file_count=len(files),
+            ):
+                response = ask_llm(prompt, return_json=True)
 
             # ------------------------------------------------------------------
             # Step 5 — Extract score
@@ -112,17 +125,15 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                logger.error(
-                    f"[ramp_up] Invalid score for model {model.artifact_id}: {response}"
-                )
+                clogger.error(f"[ramp_up] Invalid score for model {model.artifact_id}: {response}")
                 return {self.SCORE_FIELD: 0.0}
 
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            logger.error(
-                f"[ramp_up] Evaluation failed for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[ramp_up] Evaluation failed for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {self.SCORE_FIELD: 0.0}
 
@@ -132,4 +143,4 @@ This metric evaluates how easy it is for an engineer to onboard and begin using 
                 if os.path.exists(tmp_tar):
                     os.unlink(tmp_tar)
             except Exception:
-                logger.warning(f"[ramp_up] Failed to remove temp file {tmp_tar}")
+                clogger.warning(f"[ramp_up] Failed to remove temp file {tmp_tar}")

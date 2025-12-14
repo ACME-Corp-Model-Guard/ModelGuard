@@ -1,3 +1,6 @@
+# TODO: OpenAPI Compliance Issues
+# - [ ] 202 Accepted: Implement async ingestion with deferred rating
+#       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
 """
 POST /artifact/{artifact_type}
 Ingest a new artifact from a source URL and store metadata in DynamoDB.
@@ -8,14 +11,23 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, TYPE_CHECKING
 
-from src.artifacts.artifactory import create_artifact, save_artifact_metadata
+if TYPE_CHECKING:
+    from src.artifacts.model_artifact import ModelArtifact
+
+from src.artifacts.artifactory import (
+    create_artifact,
+    load_all_artifacts_by_fields,
+    save_artifact_metadata,
+    scores_below_threshold,
+)
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
-from src.metrics.registry import METRICS
+from src.logutil import clogger, log_lambda_handler
+from src.settings import MINIMUM_METRIC_THRESHOLD
 from src.storage.downloaders.dispatchers import FileDownloadError
+from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -48,15 +60,13 @@ from src.utils.http import (
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("POST /artifact/{type}", log_request_body=True, log_response_body=True)
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[post_artifact] Handling POST /artifact request")
-
     # ---------------------------------------------------------------------
     # Step 1 — Extract artifact_type
     # ---------------------------------------------------------------------
@@ -78,7 +88,13 @@ def lambda_handler(
         )
     artifact_type = cast(ArtifactType, artifact_type_raw)
 
-    logger.info(f"[post_artifact] artifact_type={artifact_type}")
+    clogger.info(
+        "Processing artifact upload",
+        extra={
+            "artifact_type": artifact_type,
+            "user": auth.get("username"),
+        },
+    )
 
     # ---------------------------------------------------------------------
     # Step 2 — Parse request body
@@ -93,6 +109,7 @@ def lambda_handler(
         )
 
     url = body.get("url")
+    name = body.get("name")  # Optional: autograder may provide this
     if not url:
         return error_response(
             400,
@@ -100,17 +117,32 @@ def lambda_handler(
             error_code="MISSING_URL",
         )
 
-    logger.info(f"[post_artifact] ingest_url={url}")
+    # ---------------------------------------------------------------------
+    # Step 2.1 — Check for duplicate artifact (409 Conflict)
+    # ---------------------------------------------------------------------
+    existing = load_all_artifacts_by_fields({"source_url": url})
+    if existing:
+        clogger.info(f"[post_artifact] Duplicate artifact detected: {existing[0].artifact_id}")
+        return error_response(
+            409,
+            f"Artifact already exists with this source URL (id: {existing[0].artifact_id})",
+            error_code="ARTIFACT_EXISTS",
+        )
 
     # ---------------------------------------------------------------------
     # Step 3 — Fetch upstream metadata and create artifact object
     # ---------------------------------------------------------------------
     try:
-        artifact = create_artifact(artifact_type, source_url=url, metrics=METRICS)
+        artifact = create_artifact(artifact_type, source_url=url, name=name)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
-        logger.error(
-            f"[post_artifact] Upstream metadata fetch failed: {e}",
+        clogger.error(
+            "Upstream metadata fetch failed",
+            extra={
+                "artifact_type": artifact_type,
+                "source_url": url,
+                "error_type": type(e).__name__,
+            },
         )
         return error_response(
             404,
@@ -118,8 +150,13 @@ def lambda_handler(
             error_code="SOURCE_NOT_FOUND",
         )
     except Exception as e:
-        logger.error(
-            f"[post_artifact] Unexpected metadata ingestion failure: {e}",
+        clogger.exception(
+            "Unexpected metadata ingestion failure",
+            extra={
+                "artifact_type": artifact_type,
+                "source_url": url,
+                "error_type": type(e).__name__,
+            },
         )
         return error_response(
             500,
@@ -127,15 +164,67 @@ def lambda_handler(
             error_code="INGESTION_FAILURE",
         )
 
-    logger.info(f"[post_artifact] Created artifact: id={artifact.artifact_id}")
+    clogger.info(
+        "Artifact created successfully",
+        extra=artifact.to_dict(),
+    )
+
+    # ---------------------------------------------------------------------
+    # Step 3.1 — Check quality threshold for models (424 Failed Dependency)
+    # ---------------------------------------------------------------------
+    if artifact.artifact_type == "model":
+        failing_metrics = scores_below_threshold(cast("ModelArtifact", artifact))
+
+        if failing_metrics:
+            clogger.warning(
+                f"[post_artifact] Model {artifact.artifact_id} rejected: "
+                f"metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): {failing_metrics}"
+            )
+            # Save to rejected artifacts table
+            try:
+                save_artifact_metadata(artifact, rejected=True)
+            except Exception as e:
+                clogger.exception(
+                    "Failed to save rejected artifact metadata",
+                    extra={
+                        "artifact_id": artifact.artifact_id,
+                        "error_type": type(e).__name__,
+                    },
+                )
+                return error_response(
+                    500,
+                    "Failed to save rejected artifact metadata",
+                    error_code="DDB_SAVE_ERROR",
+                )
+
+            return error_response(
+                424,
+                f"Model rejected: metrics below threshold ({MINIMUM_METRIC_THRESHOLD}): "
+                f"{', '.join(failing_metrics)}",
+                error_code="QUALITY_THRESHOLD_NOT_MET",
+            )
 
     # ---------------------------------------------------------------------
     # Step 4 — Save metadata to DynamoDB
     # ---------------------------------------------------------------------
     try:
         save_artifact_metadata(artifact)
+        clogger.info(
+            f"Artifact saved to DynamoDB: {artifact.artifact_id}",
+            extra={
+                "artifact_id": artifact.artifact_id,
+                "artifact_type": artifact_type,
+                "artifact_name": artifact.name,
+            },
+        )
     except Exception as e:
-        logger.error(f"[post_artifact] Failed to save metadata: {e}")
+        clogger.exception(
+            "Failed to save metadata",
+            extra={
+                "artifact_id": artifact.artifact_id,
+                "error_type": type(e).__name__,
+            },
+        )
         return error_response(
             500,
             "Failed to save artifact metadata",
@@ -145,6 +234,9 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 5 — Build ArtifactResponse
     # ---------------------------------------------------------------------
+    # Generate presigned download URL (same as GET /artifacts/{type}/{id})
+    download_url = generate_s3_download_url(artifact.artifact_id, s3_key=artifact.s3_key)
+
     response_body = {
         "metadata": {
             "id": artifact.artifact_id,
@@ -153,11 +245,8 @@ def lambda_handler(
         },
         "data": {
             "url": artifact.source_url,
-            # TODO: Figure out what this URL should be
-            #       Spec requires this field but does not
-            #       explicitly require presigned URLs
-            "download_url": artifact.s3_key,
+            "download_url": download_url,
         },
     }
 
-    return json_response(200, response_body)
+    return json_response(201, response_body)

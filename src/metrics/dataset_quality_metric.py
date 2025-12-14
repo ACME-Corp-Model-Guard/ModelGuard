@@ -5,7 +5,7 @@ import tempfile
 from typing import TYPE_CHECKING, Dict
 
 from src.artifacts.dataset_artifact import DatasetArtifact
-from src.logger import logger
+from src.logutil import clogger, log_operation
 from src.metrics.metric import Metric
 from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.file_extraction import extract_relevant_files
@@ -66,19 +66,19 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         # ------------------------------------------------------------------
         dataset_id = model.dataset_artifact_id
         if dataset_id is None:
-            logger.warning(
-                f"[dataset_quality] No dataset artifact_id for model {model.artifact_id}"
+            clogger.debug(
+                f"No dataset artifact_id for model {model.artifact_id}, returning default score"
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score when no artifact linked
 
         dataset_artifact = load_artifact_metadata(dataset_id)
 
         if not isinstance(dataset_artifact, DatasetArtifact):
-            logger.warning(
+            clogger.warning(
                 f"[dataset_quality] Missing or invalid dataset artifact for model "
-                f"{model.artifact_id}"
+                f"{model.artifact_id}, returning neutral score"
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score when artifact can't be evaluated
 
         # ------------------------------------------------------------------
         # Step 1 — Download dataset tarball from S3
@@ -86,33 +86,39 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
         tmp_tar = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
 
         try:
-            logger.debug(
-                f"[dataset_quality] Downloading dataset bundle for {dataset_artifact.artifact_id}"
-            )
-
-            download_artifact_from_s3(
+            with log_operation(
+                "s3_download",
                 artifact_id=dataset_artifact.artifact_id,
                 s3_key=dataset_artifact.s3_key,
-                local_path=tmp_tar,
-            )
+            ):
+                download_artifact_from_s3(
+                    artifact_id=dataset_artifact.artifact_id,
+                    s3_key=dataset_artifact.s3_key,
+                    local_path=tmp_tar,
+                )
 
             # ------------------------------------------------------------------
             # Step 2 — Extract relevant dataset files
             # ------------------------------------------------------------------
-            files = extract_relevant_files(
-                tar_path=tmp_tar,
-                include_ext=self.INCLUDE_EXT,
+            with log_operation(
+                "extract_files",
+                artifact_id=dataset_artifact.artifact_id,
                 max_files=self.MAX_FILES,
-                max_chars=self.MAX_CHARS_PER_FILE,
-                prioritize_readme=True,
-            )
+            ):
+                files = extract_relevant_files(
+                    tar_path=tmp_tar,
+                    include_ext=self.INCLUDE_EXT,
+                    max_files=self.MAX_FILES,
+                    max_chars=self.MAX_CHARS_PER_FILE,
+                    prioritize_readme=True,
+                )
 
             if not files:
-                logger.warning(
+                clogger.warning(
                     f"[dataset_quality] No relevant dataset files extracted for "
-                    f"{dataset_artifact.artifact_id}"
+                    f"{dataset_artifact.artifact_id}, returning neutral score"
                 )
-                return {self.SCORE_FIELD: 0.0}
+                return {self.SCORE_FIELD: 0.5}  # Neutral score when no files to analyze
 
             # ------------------------------------------------------------------
             # Step 3 — Build LLM prompt
@@ -127,7 +133,12 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             # ------------------------------------------------------------------
             # Step 4 — Ask LLM
             # ------------------------------------------------------------------
-            response = ask_llm(prompt, return_json=True)
+            with log_operation(
+                "llm_analysis",
+                artifact_id=dataset_artifact.artifact_id,
+                file_count=len(files),
+            ):
+                response = ask_llm(prompt, return_json=True)
 
             # ------------------------------------------------------------------
             # Step 5 — Extract score
@@ -135,22 +146,22 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
             score = extract_llm_score_field(response, self.SCORE_FIELD)
 
             if score is None:
-                logger.error(
+                clogger.warning(
                     f"[dataset_quality] Invalid score returned for {dataset_artifact.artifact_id}: "
-                    f"{response}"
+                    f"{response}, returning neutral score"
                 )
-                return {self.SCORE_FIELD: 0.0}
+                return {self.SCORE_FIELD: 0.5}  # Neutral score when LLM response invalid
 
             # Clamp to [0.0, 1.0]
             score = max(0.0, min(float(score), 1.0))
             return {self.SCORE_FIELD: score}
 
         except Exception as e:
-            logger.error(
-                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"[dataset_quality] Evaluation failed for {dataset_artifact.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
-            return {self.SCORE_FIELD: 0.0}
+            return {self.SCORE_FIELD: 0.5}  # Neutral score on evaluation error
 
         finally:
             # ------------------------------------------------------------------
@@ -160,6 +171,4 @@ A score near 0.0 indicates a poor, inconsistent, or unusable dataset.
                 if os.path.exists(tmp_tar):
                     os.unlink(tmp_tar)
             except Exception:
-                logger.warning(
-                    f"[dataset_quality] Failed to remove temp file {tmp_tar}"
-                )
+                clogger.warning(f"[dataset_quality] Failed to remove temp file {tmp_tar}")

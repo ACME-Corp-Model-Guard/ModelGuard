@@ -10,7 +10,7 @@ from typing import Any, Dict, cast
 
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logutil import clogger, log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
@@ -41,15 +41,13 @@ from src.utils.http import (
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("GET /artifacts/{type}/{id}")
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[get_artifact] Handling artifact retrieval request")
-
     # ---------------------------------------------------------------------
     # Step 1 - Extract path parameters
     # ---------------------------------------------------------------------
@@ -75,10 +73,6 @@ def lambda_handler(
         )
     artifact_type = cast(ArtifactType, artifact_type)
 
-    logger.debug(
-        f"[get_artifact] artifact_type={artifact_type}, artifact_id={artifact_id}"
-    )
-
     # ---------------------------------------------------------------------
     # Step 3 - Load metadata from DynamoDB
     # ---------------------------------------------------------------------
@@ -97,10 +91,16 @@ def lambda_handler(
     try:
         download_url = generate_s3_download_url(artifact_id, s3_key=s3_key)
     except Exception as e:
-        logger.error(f"[get_artifact] Failed to generate presigned URL: {e}")
-        return error_response(
-            500, "Failed to generate download URL", error_code="S3_ERROR"
+        clogger.exception(
+            "Failed to generate presigned URL",
+            extra={
+                "artifact_id": artifact_id,
+                "artifact_type": artifact_type,
+                "s3_key": s3_key,
+                "error_type": type(e).__name__,
+            },
         )
+        return error_response(500, "Failed to generate download URL", error_code="S3_ERROR")
 
     # ---------------------------------------------------------------------
     # Step 5 - Build the returned Artifact object per OpenAPI spec

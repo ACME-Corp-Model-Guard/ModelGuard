@@ -1,19 +1,377 @@
+# TODO: OpenAPI Compliance Issues
+# - [ ] 202 Accepted: Implement async update with deferred rating
+#       (artifact stored but rating computed asynchronously; /rate returns 404 until ready)
 """
-Lambda function for PUT /artifacts/{artifact_type}/{id} endpoint
-Update existing artifact
+PUT /artifacts/{artifact_type}/{id}
+Update an existing artifact with a new upstream URL.
+
+High-level behavior:
+  1. Load existing artifact metadata for the supplied id (previous version).
+  2. Create a *new* candidate artifact from the provided URL.
+  3. For model artifacts, compare the candidate's new NetScore against the
+     previous artifact's NetScore:
+       - If the new NetScore is LOWER than the previous:
+           • Delete the new artifact's S3 object.
+           • Keep the old artifact (no metadata changes).
+       - If the new NetScore is GREATER OR EQUAL:
+           • Delete the old artifact's S3 object.
+           • Overwrite the old artifact's metadata with the new artifact's
+             metadata (re-using the original artifact_id).
+  4. For non-model artifacts, we always accept the update (no NetScore check).
 """
+
+from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional, cast
+
+from src.artifacts.artifactory import (
+    create_artifact,
+    load_artifact_metadata,
+    save_artifact_metadata,
+)
+from src.artifacts.base_artifact import BaseArtifact
+from src.artifacts.types import ArtifactType
+from src.auth import AuthContext, auth_required
+from src.logutil import clogger, log_lambda_handler
+from src.settings import ARTIFACTS_BUCKET
+from src.storage.downloaders.dispatchers import FileDownloadError
+from src.storage.s3_utils import delete_objects
+from src.utils.http import (
+    LambdaResponse,
+    error_response,
+    json_response,
+    translate_exceptions,
+)
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_body(event: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Stub handler for PUT /artifacts/{artifact_type}/{id} - Update artifact
-    Update the content of an existing artifact
+    Parse the request body as JSON and return it as a dict.
+
+    The expected body format per OpenAPI spec is the Artifact schema:
+        {
+            "metadata": {
+                "name": "<artifact_name>",
+                "id": "<artifact_id>",
+                "type": "<artifact_type>"
+            },
+            "data": {
+                "url": "<new_source_url>"
+            }
+        }
     """
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"message": "Artifact updated successfully"}),
-    }
+    raw_body = event.get("body") or "{}"
+
+    if isinstance(raw_body, dict):
+        body = raw_body
+    elif isinstance(raw_body, str):
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Request body must be valid JSON: {exc}") from exc
+    else:
+        raise ValueError("Request body must be a JSON object or JSON string.")
+
+    # Validate Artifact schema structure
+    if not isinstance(body, dict):
+        raise ValueError("Request body must be an object.")
+
+    metadata = body.get("metadata")
+    data = body.get("data")
+
+    if not isinstance(metadata, dict):
+        raise ValueError("Request body must include 'metadata' object.")
+    if not isinstance(data, dict):
+        raise ValueError("Request body must include 'data' object.")
+
+    # Validate required fields
+    if "name" not in metadata:
+        raise ValueError("Request metadata must include 'name'.")
+    if "id" not in metadata:
+        raise ValueError("Request metadata must include 'id'.")
+    if "type" not in metadata:
+        raise ValueError("Request metadata must include 'type'.")
+    if "url" not in data:
+        raise ValueError("Request data must include 'url'.")
+
+    return body
+
+
+def _validate_name_id_match(
+    request_metadata: Dict[str, Any],
+    path_artifact_id: str,
+    existing_artifact: BaseArtifact,
+) -> None:
+    """
+    Validate that the request metadata name and id match the existing artifact.
+
+    Per OpenAPI spec: "The name and id must match."
+
+    Raises:
+        ValueError: If name or id don't match
+    """
+    request_name = request_metadata.get("name")
+    request_id = request_metadata.get("id")
+
+    # Validate ID matches path parameter
+    if request_id != path_artifact_id:
+        raise ValueError(
+            f"Request metadata id '{request_id}' does not match path parameter '{path_artifact_id}'"
+        )
+
+    # Validate name matches existing artifact
+    if request_name != existing_artifact.name:
+        raise ValueError(
+            f"Request metadata name '{request_name}' does not match "
+            f"existing artifact name '{existing_artifact.name}'"
+        )
+
+
+def _get_net_score(artifact: BaseArtifact) -> Optional[float]:
+    """
+    Extract NetScore from a ModelArtifact's scores dict, if present.
+
+    Returns:
+        float NetScore in [0.0, 1.0], or None if not applicable/not available/missing.
+    """
+    scores = getattr(artifact, "scores", None)
+    if not isinstance(scores, dict):
+        return None
+
+    raw = scores.get("NetScore")
+    if raw is None:
+        return None
+
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+# =============================================================================
+# Lambda Handler: PUT /artifacts/{artifact_type}/{id}
+# =============================================================================
+
+
+@translate_exceptions
+@log_lambda_handler("PUT /artifacts/{type}/{id}", log_request_body=True)
+@auth_required
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+    auth: AuthContext,  # Use for auth side effects
+    # ) -> Dict[str, Any]:
+) -> LambdaResponse:
+    clogger.info("[put_artifact_update] Handling artifact update request")
+
+    # ------------------------------------------------------------------
+    # Step 1 - Extract & validate path parameters
+    # ------------------------------------------------------------------
+    path_params = event.get("pathParameters") or {}
+    artifact_type_raw = path_params.get("artifact_type")
+    artifact_id = path_params.get("id")
+
+    if not artifact_type_raw or not artifact_id:
+        return error_response(
+            400,
+            "Missing required path parameters: artifact_type or id",
+            error_code="INVALID_REQUEST",
+        )
+    if artifact_type_raw not in ("model", "dataset", "code"):
+        return error_response(
+            400,
+            f"Invalid artifact_type '{artifact_type_raw}'",
+            error_code="INVALID_ARTIFACT_TYPE",
+        )
+
+    artifact_type = cast(ArtifactType, artifact_type_raw)
+    clogger.debug(
+        f"[put_artifact_update] artifact_type = {artifact_type}, artifact_id = {artifact_id}"
+    )
+
+    # ------------------------------------------------------------------
+    # Step 2 - Parse and validate request body (Artifact schema)
+    # ------------------------------------------------------------------
+    try:
+        body = _parse_body(event)
+    except ValueError as exc:
+        clogger.warning(f"[put_artifact_update] Invalid request body: {exc}")
+        return error_response(400, str(exc), error_code="INVALID_REQUEST")
+
+    request_metadata = body["metadata"]
+    request_data = body["data"]
+    url = request_data["url"]
+
+    if not isinstance(url, str) or not url.strip():
+        return error_response(
+            400, "Request data.url must be a non-empty string", error_code="MISSING_URL"
+        )
+    clogger.info(f"[put_artifact_update] update_url = {url}")
+
+    # ------------------------------------------------------------------
+    # Step 3 - Load existing artifact metadata (previous version)
+    # ------------------------------------------------------------------
+    old_artifact = load_artifact_metadata(artifact_id)
+    if old_artifact is None:
+        clogger.warning(f"[put_artifact_update] Artifact '{artifact_id}' does not exist")
+        return error_response(
+            404, f"Artifact '{artifact_id}' does not exist", error_code="NOT_FOUND"
+        )
+
+    old_s3_key = getattr(old_artifact, "s3_key", None)
+    clogger.debug(
+        f"[put_artifact_update] Loaded old artifact"
+        f"id = {old_artifact.artifact_id}, s3_key = {old_s3_key}"
+    )
+
+    # ------------------------------------------------------------------
+    # Step 3.1 - Validate "name and id must match" requirement
+    # ------------------------------------------------------------------
+    try:
+        _validate_name_id_match(request_metadata, artifact_id, old_artifact)
+    except ValueError as exc:
+        clogger.warning(f"[put_artifact_update] Name/ID validation failed: {exc}")
+        return error_response(400, str(exc), error_code="NAME_ID_MISMATCH")
+
+    # ------------------------------------------------------------------
+    # Step 4 - Create a new candidate artifact from the new URL
+    # ------------------------------------------------------------------
+
+    """
+    Note: Let create_artifact generate a fresh artifact_id.
+    - If the update is accepted, we will overwrite it with the original id before
+    saving metadata, so the logical artifact id stays stable.
+    """
+    try:
+        new_artifact = create_artifact(artifact_type, source_url=url)
+    except FileDownloadError as e:
+        clogger.error(
+            "[put_artifact_update] Upstream artifact download/metadata failed",
+            extra={"error_type": type(e).__name__},
+        )
+        return error_response(
+            404,
+            "Artifact metadata could not be fetched from the source URL",
+            error_code="SOURCE_NOT_FOUND",
+        )
+    except Exception as e:  # pragma: no cover - safety net
+        clogger.exception(
+            "[put_artifact_update] Unexpected error during artifact creation",
+            extra={"error_type": type(e).__name__},
+        )
+        return error_response(
+            500,
+            "Unexpected error during artifact update",
+            error_code="INGESTION_FAILURE",
+        )
+
+    clogger.info(
+        f"[put_artifact_update] Created candidate artifact: "
+        f"id={new_artifact.artifact_id}, type={new_artifact.artifact_type}, "
+        f"s3_key={getattr(new_artifact, 's3_key', None)}"
+    )
+
+    # ------------------------------------------------------------------
+    # Step 5 - For models, compare NetScore against previous version
+    # ------------------------------------------------------------------
+    accept_update = True
+
+    if artifact_type == "model":
+        new_score = _get_net_score(new_artifact)
+        old_score = _get_net_score(old_artifact)
+
+        if new_score is None:
+            clogger.warning(
+                "[put_artifact_update] NetScore missing for new model; "
+                "treating as 0.0 for comparison"
+            )
+            new_score = 0.0
+
+        """
+        If the previous model had no NetScore (legacy data), treat its threshold as 0.0
+        to avoid permanently blocking updates.
+        """
+        threshold = 0.0 if old_score is None else old_score
+
+        clogger.info(
+            "[put_artifact_update] NetScore comparison: "
+            f"old={threshold:.4f}, new={new_score:.4f}"
+        )
+
+        # Only accept the update if the new score is at least as good as the old score
+        if new_score < threshold:
+            accept_update = False
+
+    # ------------------------------------------------------------------
+    # Step 5.1 - Reject update: delete *new* S3 object, keep old artifact
+    # ------------------------------------------------------------------
+    if not accept_update:
+        new_s3_key = getattr(new_artifact, "s3_key", None)
+        if ARTIFACTS_BUCKET and new_s3_key:
+            clogger.info(
+                f"[put_artifact_update] Update rejected; deleting new S3 object "
+                f"s3://{ARTIFACTS_BUCKET}/{new_s3_key}"
+            )
+            try:
+                delete_objects(ARTIFACTS_BUCKET, [new_s3_key])
+            except Exception as e:  # pragma: no cover - best effort cleanup
+                clogger.exception(
+                    f"[put_artifact_update] Failed to delete new artifact S3 key " f"{new_s3_key}",
+                    extra={"error_type": type(e).__name__},
+                )
+
+        return error_response(
+            400,
+            "Updated artifact failed NetScore threshold (lower than previous); "
+            "original artifact preserved",
+            error_code="LOW_NET_SCORE",
+        )
+
+    # ------------------------------------------------------------------
+    # Step 5.2 - Accept update:
+    #   - Delete old S3 object
+    #   - Overwrite old metadata with new artifact metadata
+    # ------------------------------------------------------------------
+    if ARTIFACTS_BUCKET and old_s3_key:
+        clogger.info(
+            f"[put_artifact_update] Update accepted; deleting old S3 object "
+            f"s3://{ARTIFACTS_BUCKET}/{old_s3_key}"
+        )
+        try:
+            delete_objects(ARTIFACTS_BUCKET, [old_s3_key])
+        except Exception as e:  # pragma: no cover - best effort cleanup
+            clogger.exception(
+                f"[put_artifact_update] Failed to delete old artifact S3 key " f"{old_s3_key}",
+                extra={"error_type": type(e).__name__},
+            )
+
+    # Align IDs so we overwrite the existing artifact row in DynamoDB.
+    new_artifact.artifact_id = old_artifact.artifact_id
+    new_artifact.artifact_type = old_artifact.artifact_type
+
+    try:
+        save_artifact_metadata(new_artifact)
+    except Exception as e:
+        clogger.exception(
+            "[put_artifact_update] Failed to save updated artifact metadata",
+            extra={"error_type": type(e).__name__},
+        )
+        return error_response(
+            500,
+            "Failed to save updated artifact metadata",
+            error_code="DDB_SAVE_ERROR",
+        )
+
+    # ------------------------------------------------------------------
+    # Step 6 - Return success response (per OpenAPI spec: just a message)
+    # ------------------------------------------------------------------
+    clogger.info(
+        f"[put_artifact_update] Artifact update succeeded for id={new_artifact.artifact_id}"
+    )
+    return json_response(200, {"message": "Artifact is updated"})

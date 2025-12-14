@@ -29,6 +29,7 @@ LINEAGE_METRICS: list[Metric] = [
 CODE_METRICS: list[Metric] = [
     CodeQualityMetric(),
     AvailabilityMetric(),
+    BusFactorMetric(),
 ]
 
 DATASET_METRICS: list[Metric] = [

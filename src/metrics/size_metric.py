@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Union
 
-from src.logger import logger
+from src.logutil import clogger
 
 from .metric import Metric
 
@@ -21,10 +21,10 @@ class SizeMetric(Metric):
     - Server: 64GB capacity
 
     Each device gets a score based on how well the model fits:
-    - Model fits comfortably (< 50% of capacity): 1.0
-    - Model fits but tight (50-80% of capacity): 0.7
-    - Model barely fits (80-95% of capacity): 0.4
-    - Model doesn't fit (> 95% of capacity): 0.0
+    - Model fits comfortably (< 70% of capacity): 1.0
+    - Model fits but tight (70-90% of capacity): 0.7
+    - Model barely fits (90-100% of capacity): 0.4
+    - Model doesn't fit (> 100% of capacity): 0.0
     """
 
     # Device capacities in bytes
@@ -48,7 +48,7 @@ class SizeMetric(Metric):
 
         # Handle missing or invalid size
         if not size_bytes or size_bytes <= 0:
-            logger.debug(
+            clogger.debug(
                 f"No valid size information for model {model.artifact_id}, "
                 f"returning neutral scores"
             )
@@ -62,18 +62,14 @@ class SizeMetric(Metric):
         try:
             scores = {
                 "size_pi": self._calculate_device_score(size_bytes, self.PI_CAPACITY),
-                "size_nano": self._calculate_device_score(
-                    size_bytes, self.NANO_CAPACITY
-                ),
+                "size_nano": self._calculate_device_score(size_bytes, self.NANO_CAPACITY),
                 "size_pc": self._calculate_device_score(size_bytes, self.PC_CAPACITY),
-                "size_server": self._calculate_device_score(
-                    size_bytes, self.SERVER_CAPACITY
-                ),
+                "size_server": self._calculate_device_score(size_bytes, self.SERVER_CAPACITY),
             }
 
             # Convert to human-readable format for logging
             size_gb = size_bytes / (1024 * 1024 * 1024)
-            logger.debug(
+            clogger.debug(
                 f"Size scores for {model.artifact_id} (size: {size_gb:.2f} GB): "
                 f"Pi={scores['size_pi']:.3f}, Nano={scores['size_nano']:.3f}, "
                 f"Pc={scores['size_pc']:.3f}, Server={scores['size_server']:.3f}"
@@ -82,9 +78,9 @@ class SizeMetric(Metric):
             return scores
 
         except Exception as e:
-            logger.error(
-                f"Failed to calculate size scores for model {model.artifact_id}: {e}",
-                exc_info=True,
+            clogger.exception(
+                f"Failed to calculate size scores for model {model.artifact_id}",
+                extra={"error_type": type(e).__name__},
             )
             return {
                 "size_pi": 0.5,
@@ -93,9 +89,7 @@ class SizeMetric(Metric):
                 "size_server": 0.5,
             }
 
-    def _calculate_device_score(
-        self, size_bytes: float, capacity_bytes: float
-    ) -> float:
+    def _calculate_device_score(self, size_bytes: float, capacity_bytes: float) -> float:
         """
         Calculate size score for a specific device capacity.
 
@@ -113,15 +107,12 @@ class SizeMetric(Metric):
         # Calculate utilization percentage
         utilization = size_bytes / capacity_bytes
 
-        if utilization < 0.5:
-            # Model fits comfortably (< 50% of capacity)
+        if utilization < 0.7:
+            # Model fits comfortably (< 70% of capacity)
             return 1.0
-        elif utilization < 0.8:
-            # Model fits but tight (50-80% of capacity)
+        elif utilization < 0.9:
+            # Model fits but tight (70-90% of capacity)
             return 0.7
-        elif utilization < 0.95:
-            # Model barely fits (80-95% of capacity)
-            return 0.4
         else:
-            # Model is at the limit (95-100% of capacity)
-            return 0.1
+            # Model barely fits (90-100% of capacity)
+            return 0.4

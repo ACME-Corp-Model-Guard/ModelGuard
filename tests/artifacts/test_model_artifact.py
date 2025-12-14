@@ -57,8 +57,6 @@ def test_init_without_metrics(model_artifact):
 
 def test_compute_scores_parallel(model_artifact, mock_metrics):
     """Verify that compute_scores runs all metrics in parallel and populates scores."""
-    from src.artifacts import model_artifact as ma_module
-
     # Compute scores with a set of mock metrics
     model_artifact.compute_scores(mock_metrics)
 
@@ -91,9 +89,9 @@ def test_compute_scores_handles_exceptions(model_artifact):
     assert "Good" in model_artifact.scores
     assert isinstance(model_artifact.scores["Good"], (float, int))
 
-    # Bad metric should have defaulted to 0.0
+    # Bad metric should have defaulted to 0.0 (but still track latency)
     assert model_artifact.scores["Bad"] == 0.0
-    assert model_artifact.scores_latency["Bad"] == 0.0
+    assert model_artifact.scores_latency["Bad"] >= 0.0  # Now tracks time even for failures
     print("Handled exception in BadMetric as expected.")
 
 

@@ -11,18 +11,68 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 
 
 class FileDownloadError(Exception):
     """Raised when a HuggingFace download fails."""
 
     pass
+
+
+# =============================================================================
+# Selective Download Configuration
+# =============================================================================
+# Skip large binary weight files to avoid disk space exhaustion in Lambda.
+# Only download metadata files needed for metric computation.
+
+# Glob patterns to ignore (large binary files)
+IGNORE_PATTERNS: List[str] = [
+    # PyTorch weights
+    "*.bin",
+    "pytorch_model*.bin",
+    # Safetensors weights
+    "*.safetensors",
+    "model*.safetensors",
+    # Other model formats
+    "*.pt",
+    "*.pth",
+    "*.onnx",
+    "*.gguf",
+    "*.ggml",
+    # TensorFlow/Keras
+    "*.h5",
+    "tf_model.h5",
+    # Flax/JAX
+    "*.msgpack",
+    "flax_model.msgpack",
+    # Large dataset files
+    "*.arrow",
+    "*.parquet",
+]
+
+# Glob patterns to allow (metadata and documentation files)
+ALLOW_PATTERNS: List[str] = [
+    # Config files
+    "*.json",
+    "*.yaml",
+    "*.yml",
+    "*.cfg",
+    "*.ini",
+    # Documentation
+    "*.md",
+    "*.txt",
+    "*.rst",
+    "README*",
+    "LICENSE*",
+    # Code samples
+    "*.py",
+]
 
 
 # =====================================================================================
@@ -46,14 +96,19 @@ def download_from_huggingface(
 
     Raises:
         FileDownloadError: If URL parsing fails, HF download fails, or packaging fails
+
+    Note:
+        The caller is responsible for cleaning up the returned tarball file.
     """
 
-    logger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
+    clogger.info(f"[HF] Downloading artifact {artifact_id} from {source_url}")
 
     if artifact_type == "code":
         raise FileDownloadError("Code artifacts cannot be downloaded from HuggingFace")
 
     cache_dir: Optional[str] = None
+    tar_path: Optional[str] = None
+    success = False
 
     try:
         # Import huggingface_hub lazily
@@ -68,49 +123,85 @@ def download_from_huggingface(
                 "huggingface_hub is required. Install via: pip install huggingface_hub"
             )
 
+        # Configure HuggingFace to use /tmp for all caching and logging
+        # This prevents "Read-only file system" errors in Lambda environment
+        os.environ["HF_HOME"] = "/tmp/.cache/huggingface"
+
         # ------------------------------------------------------------
         # Parse HuggingFace repo ID from URL
         # ------------------------------------------------------------
         # URL examples:
         #   https://huggingface.co/owner/model
-        #   https://huggingface.co/owner/dataset
+        #   https://huggingface.co/datasets/owner/dataset
         #
-        # We want: "owner/model"
+        # We want: "owner/model" or "owner/dataset" (without the datasets/ prefix)
         # ------------------------------------------------------------
         parts = source_url.rstrip("/").split("huggingface.co/")
         if len(parts) < 2:
             raise FileDownloadError(f"Invalid HuggingFace URL: {source_url}")
 
-        repo_path = parts[1].split("/")
-        if len(repo_path) < 2:
+        # Get the path after the domain
+        path_after_domain = parts[1]
+
+        # Remove 'datasets/' or 'models/' prefix if present
+        # This ensures consistent parsing regardless of URL format
+        if path_after_domain.startswith("datasets/"):
+            path_after_domain = path_after_domain[len("datasets/") :]
+        elif path_after_domain.startswith("models/"):
+            path_after_domain = path_after_domain[len("models/") :]
+
+        # Parse repo_id from the remaining path
+        # HuggingFace repos can be:
+        #   - "organization/model" (e.g., "google/bert-base-uncased")
+        #   - "model" (e.g., "distilbert-base-uncased-distilled-squad")
+        repo_path = path_after_domain.split("/")
+
+        if len(repo_path) >= 2:
+            # Standard format: organization/model
+            repo_id = f"{repo_path[0]}/{repo_path[1]}"
+        elif len(repo_path) == 1 and repo_path[0]:
+            # Single segment: just model name (no organization)
+            repo_id = repo_path[0]
+        else:
             raise FileDownloadError(f"Invalid HuggingFace repository URL: {source_url}")
 
-        repo_id = f"{repo_path[0]}/{repo_path[1]}"
+        clogger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
 
-        logger.debug(f"[HF] Parsed repo_id={repo_id} from source={source_url}")
+        # Download HF snapshot into temporary directory (explicitly use /tmp for Lambda)
+        cache_dir = tempfile.mkdtemp(dir="/tmp", prefix=f"hf_{artifact_id}_")
 
-        # Download HF snapshot into temporary directory
-        cache_dir = tempfile.mkdtemp(prefix=f"hf_{artifact_id}_")
+        clogger.debug(
+            f"[HF] Using selective download patterns "
+            f"(ignoring: {len(IGNORE_PATTERNS)} patterns, allowing: {len(ALLOW_PATTERNS)} patterns)"
+        )
 
         snapshot_path = snapshot_download(
             repo_id=repo_id,
             repo_type=artifact_type,  # "model" or "dataset"
             cache_dir=cache_dir,
             local_dir=cache_dir,
+            ignore_patterns=IGNORE_PATTERNS,
+            allow_patterns=ALLOW_PATTERNS,
         )
 
-        # Package into tar archive
+        # Package into tar archive (explicitly use /tmp for Lambda)
         import tarfile
 
-        tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+        tar_path = tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".tar.gz",
+            prefix=f"hf_{artifact_id}_",
+            dir="/tmp",
+        ).name
 
-        logger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
+        clogger.debug(f"[HF] Packaging snapshot into tar archive: {tar_path}")
 
         with tarfile.open(tar_path, "w:gz") as tar:
             tar.add(snapshot_path, arcname=os.path.basename(snapshot_path))
 
-        logger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
+        clogger.info(f"[HF] Successfully downloaded {artifact_id} → {tar_path}")
 
+        success = True
         return tar_path
 
     except RepositoryNotFoundError:
@@ -120,21 +211,27 @@ def download_from_huggingface(
         raise FileDownloadError(f"HuggingFace revision not found: {e}")
 
     except Exception as e:
-        logger.error(f"[HF] Download failed: {e}")
+        clogger.error(f"[HF] Download failed: {e}")
         raise FileDownloadError(f"HuggingFace download failed: {e}")
 
     finally:
-        # Clean up temporary cache directory
+        # Clean up temporary cache directory (always)
         if cache_dir and os.path.exists(cache_dir):
             try:
                 import shutil
 
                 shutil.rmtree(cache_dir)
-                logger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
+                clogger.debug(f"[HF] Cleaned up HF cache: {cache_dir}")
             except Exception as cleanup_err:
-                logger.warning(
-                    f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}"
-                )
+                clogger.warning(f"[HF] Failed to clean up HF cache dir {cache_dir}: {cleanup_err}")
+
+        # Clean up tarball on failure (only caller cleans up on success)
+        if not success and tar_path and os.path.exists(tar_path):
+            try:
+                os.unlink(tar_path)
+                clogger.debug(f"[HF] Cleaned up tarball on failure: {tar_path}")
+            except Exception as cleanup_err:
+                clogger.warning(f"[HF] Failed to clean up tarball {tar_path}: {cleanup_err}")
 
 
 # =====================================================================================
@@ -142,9 +239,14 @@ def download_from_huggingface(
 # =====================================================================================
 def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
     """
-    Fetch model metadata from HuggingFace Hub API.
+    Fetch model metadata from HuggingFace Hub API, including README content.
+
+    This fetches:
+    - Basic model info (name, size, license)
+    - Full cardData (tags, datasets, model-index, etc.)
+    - README content for performance claims detection
     """
-    logger.info(f"[HF] Fetching model metadata: {url}")
+    clogger.info(f"[HF] Fetching model metadata: {url}")
 
     try:
         parts = url.rstrip("/").split("huggingface.co/")
@@ -152,27 +254,65 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
             raise ValueError(f"Invalid HuggingFace model URL: {url}")
 
         model_id = parts[1]
+        # Remove any prefix like 'models/' if present
+        if model_id.startswith("models/"):
+            model_id = model_id[len("models/") :]
+
         api_url = f"https://huggingface.co/api/models/{model_id}"
 
         response = requests.get(api_url, timeout=10)
         response.raise_for_status()
         data = response.json()
 
+        # Get full cardData for model-index, tags, datasets, etc.
+        card_data = data.get("cardData", {}) or {}
+
         metadata = {
             "name": model_id.split("/")[-1],
             "size": data.get("safetensors", {}).get("total", 0),
-            "license": data.get("cardData", {}).get("license", "unknown"),
+            "license": card_data.get("license", "unknown"),
             "metadata": {
                 "downloads": data.get("downloads", 0),
                 "likes": data.get("likes", 0),
+                "cardData": card_data,  # Include full cardData for metrics
             },
         }
+
+        # Fetch README content for performance claims detection
+        readme_content = _fetch_readme_content(model_id)
+        if readme_content:
+            metadata["metadata"]["model_card_content"] = readme_content
+            clogger.debug(f"[HF] Fetched README ({len(readme_content)} chars) for {model_id}")
 
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch model metadata: {e}")
+        clogger.error(f"[HF] Failed to fetch model metadata: {e}")
         raise
+
+
+def _fetch_readme_content(model_id: str) -> Optional[str]:
+    """
+    Fetch README.md content from HuggingFace repo.
+
+    Args:
+        model_id: HuggingFace model ID (e.g., "google-bert/bert-base-uncased")
+
+    Returns:
+        README content as string, or None if not found
+    """
+    readme_url = f"https://huggingface.co/{model_id}/raw/main/README.md"
+
+    try:
+        response = requests.get(readme_url, timeout=10)
+        if response.status_code == 200:
+            return response.text
+        else:
+            clogger.debug(f"[HF] README not found for {model_id} (status {response.status_code})")
+            return None
+    except Exception as e:
+        clogger.debug(f"[HF] Failed to fetch README for {model_id}: {e}")
+        return None
 
 
 # =====================================================================================
@@ -182,7 +322,7 @@ def fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:
     """
     Fetch dataset metadata from HuggingFace Hub API.
     """
-    logger.info(f"[HF] Fetching dataset metadata: {url}")
+    clogger.info(f"[HF] Fetching dataset metadata: {url}")
 
     try:
         parts = url.rstrip("/").split("huggingface.co/datasets/")
@@ -208,5 +348,5 @@ def fetch_huggingface_dataset_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[HF] Failed to fetch dataset metadata: {e}")
+        clogger.error(f"[HF] Failed to fetch dataset metadata: {e}")
         raise

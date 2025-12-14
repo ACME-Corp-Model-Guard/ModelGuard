@@ -1,11 +1,16 @@
+"""
+Logging configuration and setup for ModelGuard.
+
+Configures loguru for both AWS Lambda (JSON output) and local development (pretty console output).
+"""
+
 import os
 import sys
-from functools import wraps
-from typing import Any, Callable, TypeVar
 
 from loguru import logger
 
-F = TypeVar("F", bound=Callable[..., Any])
+# Export the raw loguru logger instance
+__all__ = ["logger", "setup_logging"]
 
 
 # -----------------------------------------------------------------------------
@@ -34,6 +39,9 @@ def setup_logging() -> None:
     elif log_level == "2":
         log_level = "DEBUG"
 
+    # Temporarily Force Log Level to DEBUG for Debugging
+    log_level = "DEBUG"
+
     # Check if running in AWS Lambda
     is_lambda = bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
@@ -46,9 +54,9 @@ def setup_logging() -> None:
                 "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {name}:{function}:{line} | {message}"
             ),
             serialize=True,  # JSON output for CloudWatch
-            enqueue=True,  # async logging
+            enqueue=False,  # sync logging
             backtrace=True,  # show full stack traces
-            diagnose=True,  # show variable values in stack traces (may expose sensitive info)
+            diagnose=False,  # SECURITY: Disabled to avoid exposing variable values
         )
     else:
         # Local development: Pretty format
@@ -62,41 +70,10 @@ def setup_logging() -> None:
                 "<level>{message}</level>"
             ),
             colorize=True,
-            enqueue=True,
+            enqueue=False,
             backtrace=True,
             diagnose=True,
         )
 
     # Log initialization message
     logger.info(f"Logging initialized with level: {log_level}")
-
-
-# Initialize logging when module is imported
-setup_logging()
-
-# Export the main logger for convenience
-__all__ = ["logger"]
-
-
-# -----------------------------------------------------------------------------
-# Logging decorator
-# -----------------------------------------------------------------------------
-def with_logging(func: F) -> F:
-    """
-    Decorator that logs entry, exit, and errors for any Lambda handler.
-    """
-
-    @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        logger.info(f"Entering {func.__name__}")
-
-        try:
-            result = func(*args, **kwargs)
-            logger.info(f"Exiting {func.__name__}")
-            return result
-
-        except Exception as e:
-            logger.error(f"Unhandled exception in {func.__name__}: {e}")
-            raise
-
-    return wrapper  # type: ignore[return-value]

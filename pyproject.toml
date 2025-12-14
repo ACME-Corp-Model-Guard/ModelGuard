@@ -6,6 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "ModelGuard"
 version = "0.1.0"
 
+[tool.black]
+line-length = 100
+
 [tool.isort]
 profile = "black"
 line_length = 100
@@ -19,7 +22,7 @@ disallow_incomplete_defs = true
 follow_imports = "silent"
 ignore_missing_imports = true
 show_error_codes = true
-exclude = "tests/"
+exclude = ["tests/", "shell.py"]
 
 [tool.pytest.ini_options]
 addopts = "-v"
@@ -29,7 +32,7 @@ python_files = "test_*.py"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["tests/*", "__init__.py", "src/settings.py", "src/logger.py"]
+omit = ["tests/*", "__init__.py", "src/settings.py", "src/logutil/*"]
 
 [tool.coverage.report]
 exclude_lines = [

@@ -9,15 +9,13 @@ Used during artifact ingestion before uploading artifacts to S3.
 
 from __future__ import annotations
 
-import os
-import subprocess
 import tempfile
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import requests
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 
 
 class FileDownloadError(Exception):
@@ -40,52 +38,52 @@ def _parse_github_url(source_url: str) -> Tuple[str, str]:
         raise FileDownloadError(f"Invalid GitHub repository URL: {source_url}")
 
     owner, repo = repo_parts
+
+    # Strip .git suffix if present
+    if repo.endswith(".git"):
+        repo = repo[:-4]  # Remove last 4 characters (".git")
+
     return owner, repo
 
 
-def _clone_repo(clone_url: str, dest: str) -> None:
-    """Clone the repository into dest."""
-    result = subprocess.run(
-        ["git", "clone", "--depth", "1", clone_url, dest],
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
+def _download_repo_tarball(owner: str, repo: str, artifact_id: str) -> str:
+    """
+    Download repository as tarball from GitHub API.
 
-    if result.returncode != 0:
-        stderr = result.stderr.strip() or "Unknown Git error"
-        raise FileDownloadError(f"Git clone failed: {stderr}")
+    Uses GitHub's official REST API which doesn't require git binary.
+    Automatically uses the repository's default branch.
+    Returns the path to the downloaded tarball file.
 
+    The caller is responsible for cleaning up the returned file.
+    """
+    tarball_url = f"https://api.github.com/repos/{owner}/{repo}/tarball"
 
-def _make_tarball(repo_path: str, repo_name: str) -> str:
-    """Create a tar.gz archive from a cloned repo."""
-    import tarfile
+    clogger.debug(f"[GitHub] Downloading from API: {tarball_url}")
 
-    tar_path = tempfile.NamedTemporaryFile(delete=False, suffix=".tar.gz").name
+    try:
+        response = requests.get(tarball_url, timeout=300, stream=True)
+        response.raise_for_status()
 
-    with tarfile.open(tar_path, "w:gz") as tar:
-        for root, dirs, files in os.walk(repo_path):
-            if ".git" in dirs:
-                dirs.remove(".git")
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.join(repo_name, os.path.relpath(file_path, repo_path))
-                tar.add(file_path, arcname=arcname)
+        # Create temp file directly in /tmp (no subdirectory needed)
+        # Using NamedTemporaryFile with delete=False so caller can clean it up
+        tar_file = tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".tar.gz",
+            prefix=f"gh_{artifact_id}_",
+            dir="/tmp",
+        )
+        tarball_path = tar_file.name
 
-    return tar_path
+        with tar_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    tar_file.write(chunk)
 
+        clogger.debug(f"[GitHub] Successfully downloaded tarball to {tarball_path}")
+        return tarball_path
 
-def _cleanup_temp_dir(temp_dir: Optional[str]) -> None:
-    """Safely remove the temporary clone directory."""
-    if temp_dir and os.path.exists(temp_dir):
-        try:
-            import shutil
-
-            shutil.rmtree(temp_dir)
-        except Exception as err:
-            logger.warning(
-                f"[GitHub] Failed to remove temp directory {temp_dir}: {err}"
-            )
+    except requests.RequestException as e:
+        raise FileDownloadError(f"Failed to download repository from API: {e}")
 
 
 # ==============================================================================
@@ -99,43 +97,31 @@ def download_from_github(
     """
     High-level function that downloads a GitHub repo as a tar.gz archive.
 
-    Orchestrates all steps using the helper functions above.
+    Downloads the repository as a tarball directly using GitHub's archive API.
+    This approach doesn't require the git binary, making it suitable for
+    Lambda environments.
+
+    The caller is responsible for cleaning up the returned tarball file.
     """
-    logger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
+    clogger.info(f"[GitHub] Downloading artifact {artifact_id} from {source_url}")
 
     if artifact_type != "code":
         raise FileDownloadError("Only 'code' artifacts may be downloaded from GitHub")
 
-    temp_dir: Optional[str] = None
-
     try:
         # Step 1 — Parse repo identifier
         owner, repo = _parse_github_url(source_url)
-        clone_url = f"https://github.com/{owner}/{repo}.git"
 
-        # Step 2 — Clone to temp dir
-        temp_dir = tempfile.mkdtemp(prefix=f"gh_{artifact_id}_")
-        clone_path = os.path.join(temp_dir, repo)
+        # Step 2 — Download tarball directly to /tmp (no subdirectory needed)
+        clogger.debug(f"[GitHub] Downloading {owner}/{repo} as tarball")
+        tar_path = _download_repo_tarball(owner, repo, artifact_id)
 
-        logger.debug(f"[GitHub] Cloning {clone_url} → {clone_path}")
-        _clone_repo(clone_url, clone_path)
-
-        # Step 3 — Package into tar.gz
-        logger.debug(f"[GitHub] Creating tar archive for {artifact_id}")
-        tar_path = _make_tarball(clone_path, repo)
-
-        logger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
+        clogger.info(f"[GitHub] Successfully downloaded {artifact_id} → {tar_path}")
         return tar_path
 
-    except subprocess.TimeoutExpired:
-        raise FileDownloadError("GitHub clone operation timed out after 300 seconds")
-
     except Exception as e:
-        logger.error(f"[GitHub] Download failed: {e}")
+        clogger.error(f"[GitHub] Download failed: {e}")
         raise FileDownloadError(f"GitHub download failed: {e}")
-
-    finally:
-        _cleanup_temp_dir(temp_dir)
 
 
 # =====================================================================================
@@ -145,14 +131,10 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
     """
     Fetch code repository metadata from the GitHub REST API.
     """
-    logger.info(f"[GitHub] Fetching code metadata: {url}")
+    clogger.info(f"[GitHub] Fetching code metadata: {url}")
 
     try:
-        parts = url.rstrip("/").split("github.com/")
-        if len(parts) < 2:
-            raise ValueError(f"Invalid GitHub URL: {url}")
-
-        owner, repo = parts[1].split("/")[:2]
+        owner, repo = _parse_github_url(url)
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
 
         response = requests.get(api_url, timeout=10)
@@ -162,15 +144,13 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         # Fetch contributors for bus factor metric
         contributors = []
         try:
-            contributors_url = (
-                f"https://api.github.com/repos/{owner}/{repo}/contributors"
-            )
+            contributors_url = f"https://api.github.com/repos/{owner}/{repo}/contributors"
             contributors_response = requests.get(
                 contributors_url, timeout=10, params={"per_page": 100}
             )
             # Handle rate limiting gracefully
             if contributors_response.status_code == 403:
-                logger.warning(
+                clogger.warning(
                     f"[GitHub] Rate limit exceeded when fetching contributors for {owner}/{repo}"
                 )
             else:
@@ -180,13 +160,11 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
                 for contrib in contributors_data:
                     if isinstance(contrib, dict) and "contributions" in contrib:
                         contributors.append({"contributions": contrib["contributions"]})
-                logger.debug(
+                clogger.debug(
                     f"[GitHub] Fetched {len(contributors)} contributors for {owner}/{repo}"
                 )
         except Exception as e:
-            logger.warning(
-                f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}"
-            )
+            clogger.warning(f"[GitHub] Failed to fetch contributors for {owner}/{repo}: {e}")
 
         metadata = {
             "name": data.get("name", repo),
@@ -207,5 +185,5 @@ def fetch_github_code_metadata(url: str) -> Dict[str, Any]:
         return metadata
 
     except Exception as e:
-        logger.error(f"[GitHub] Failed to fetch repo metadata: {e}")
+        clogger.error(f"[GitHub] Failed to fetch repo metadata: {e}")
         raise

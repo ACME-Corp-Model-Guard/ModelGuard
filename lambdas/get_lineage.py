@@ -5,7 +5,7 @@ Return the lineage graph for a model artifact.
 
 from typing import Any, Dict
 from src.auth import AuthContext, auth_required
-from src.logger import logger, with_logging
+from src.logutil import log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata
 from src.utils.http import (
     LambdaResponse,
@@ -38,8 +38,8 @@ def add_ancestors(root: ModelArtifact, nodes: list, edges: list) -> None:
             )
             edges.append(
                 {
-                    "from": parent.artifact_id,
-                    "to": root.artifact_id,
+                    "from_node_artifact_id": parent.artifact_id,
+                    "to_node_artifact_id": root.artifact_id,
                     "relationship": root.parent_model_relationship,
                 }
             )
@@ -62,8 +62,8 @@ def add_descendants(root: ModelArtifact, nodes: list, edges: list) -> None:
             )
             edges.append(
                 {
-                    "from": root.artifact_id,
-                    "to": child.artifact_id,
+                    "from_node_artifact_id": root.artifact_id,
+                    "to_node_artifact_id": child.artifact_id,
                     "relationship": child.parent_model_relationship,
                 }
             )
@@ -90,15 +90,13 @@ def add_descendants(root: ModelArtifact, nodes: list, edges: list) -> None:
 
 
 @translate_exceptions
-@with_logging
+@log_lambda_handler("GET /artifact/model/{id}/lineage")
 @auth_required
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,
     auth: AuthContext,
 ) -> LambdaResponse:
-    logger.info("[get_lineage] Handling lineage graph request")
-
     # ------------------------------------------------------------------
     # Step 1 - Extract id parameter
     # ------------------------------------------------------------------
@@ -111,8 +109,6 @@ def lambda_handler(
             "Missing required path parameter: id",
             error_code="INVALID_REQUEST",
         )
-
-    logger.debug(f"[get_lineage] Loading artifact with id={artifact_id}")
 
     # ------------------------------------------------------------------
     # Step 2 - Load the root model artifact

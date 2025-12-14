@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from src.artifacts.types import ArtifactType
-from src.logger import logger
+from src.logutil import clogger
 from src.storage.downloaders.github import FileDownloadError as GitHubDownloadError
 from src.storage.downloaders.github import (
     download_from_github,
@@ -59,9 +59,7 @@ def download_artifact(
         FileDownloadError: If no backend matches or the download fails.
     """
 
-    logger.info(
-        f"[dispatcher] Selecting downloader for artifact {artifact_id}: {source_url}"
-    )
+    clogger.info(f"[dispatcher] Selecting downloader for artifact {artifact_id}: {source_url}")
 
     # HuggingFace
     if "huggingface.co" in source_url:
@@ -78,7 +76,7 @@ def download_artifact(
             raise FileDownloadError(str(e)) from e
 
     # Unsupported URL
-    logger.error(f"[dispatcher] Unsupported download source: {source_url}")
+    clogger.error(f"[dispatcher] Unsupported download source: {source_url}")
     raise FileDownloadError(
         f"Unsupported source URL: {source_url}. Only HuggingFace and GitHub URLs are supported."
     )
