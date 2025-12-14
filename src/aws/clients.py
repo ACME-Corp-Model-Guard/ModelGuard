@@ -30,6 +30,7 @@ _dynamodb_resource: Optional[DynamoDBServiceResource] = None
 _s3_client: Optional[S3Client] = None
 _cognito_client: Optional[CognitoIdentityProviderClient] = None
 _bedrock_runtime: Optional[BedrockRuntimeClient] = None
+_secrets_manager_client: Optional[SecretsManagerClient] = None
 
 
 # =====================================================================================

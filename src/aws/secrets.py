@@ -6,7 +6,7 @@ import json
 from src.aws.clients import get_secrets_manager
 
 
-def get_secret(secret_name) -> dict:
+def get_secret(secret_name: str) -> dict:
     """
     retrieve secret dict from AWS Secrets Manager
 
