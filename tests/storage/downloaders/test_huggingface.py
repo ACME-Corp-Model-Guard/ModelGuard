@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import requests
+from unittest.mock import patch
 
 from src.storage.downloaders.huggingface import (
     FileDownloadError,
@@ -38,7 +39,8 @@ def test_hf_invalid_url_format():
         )
 
 
-def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.huggingface_hub.get_secret_value")
+def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch, tmp_path):
     """
     Test that dataset URLs with 'datasets/' prefix are parsed correctly.
     This verifies the fix for the dataset URL parsing bug where URLs like
@@ -46,6 +48,8 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
     parsed as repo_id='datasets/bookcorpus' instead of 'bookcorpus/bookcorpus'.
     """
     captured_repo_id = None
+
+    mock_get_secret_value.return_value = "FAKE_TOKEN"
 
     def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
         nonlocal captured_repo_id
@@ -145,13 +149,17 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
         ), f"URL {url} parsed to {captured_repo_id}, expected {expected_repo_id}"
 
 
-def test_download_from_huggingface_success(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.huggingface_hub.get_secret_value")
+def test_download_from_huggingface_success(mock_get_secret_value, monkeypatch, tmp_path):
     """
     Full pipeline:
     - mock snapshot_download
     - mock tarfile creation
     - mock cleanup
     """
+
+    mock_get_secret_value.return_value = "FAKE_TOKEN"
+
     # ------------------------------------------------------------------
     # Mock snapshot_download
     # ------------------------------------------------------------------

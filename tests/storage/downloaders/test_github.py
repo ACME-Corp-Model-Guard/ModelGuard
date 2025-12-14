@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 import requests
+from unittest.mock import patch
 
 from src.storage.downloaders.github import (
     FileDownloadError,
@@ -43,8 +44,11 @@ def test_parse_github_url_strips_git_suffix():
 # =============================================================================
 # _download_repo_tarball
 # =============================================================================
-def test_download_repo_tarball_success(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.github._get_github_headers")
+def test_download_repo_tarball_success(mock_get_headers, monkeypatch, tmp_path):
     """Test successful repo download via GitHub REST API."""
+
+    mock_get_headers.return_value = {"Authorization": "token FAKE_TOKEN"}
 
     class FakeResponse:
         status_code = 200
@@ -66,8 +70,11 @@ def test_download_repo_tarball_success(monkeypatch, tmp_path):
     assert result_path.startswith("/tmp/gh_test-artifact-id_")
 
 
-def test_download_repo_tarball_not_found(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.github._get_github_headers")
+def test_download_repo_tarball_not_found(mock_get_headers, monkeypatch, tmp_path):
     """Test handling of 404 (repository not found)."""
+
+    mock_get_headers.return_value = {"Authorization": "token FAKE_TOKEN"}
 
     class FakeResponse:
         status_code = 404
@@ -144,7 +151,11 @@ def test_download_from_github_parse_failure(monkeypatch):
 # =============================================================================
 # fetch_github_code_metadata
 # =============================================================================
-def test_fetch_github_code_metadata_success(monkeypatch):
+@patch("src.storage.downloaders.github._get_github_headers")
+def test_fetch_github_code_metadata_success(mock_get_headers, monkeypatch):
+
+    mock_get_headers.return_value = {"Authorization": "token FAKE_TOKEN"}
+
     class FakeResponse:
         def raise_for_status(self):
             pass
