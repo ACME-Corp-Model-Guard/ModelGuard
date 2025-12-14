@@ -215,7 +215,7 @@ def test_connect_model_skips_when_no_code_name(
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts")
 def test_connect_code_finds_models_by_name(
-    mock_find_names, mock_load_all, mock_load_by_fields, mock_save
+    mock_load_all, mock_load_by_fields, mock_save
 ):
     artifact = CodeArtifact(
         artifact_id="code-123",
