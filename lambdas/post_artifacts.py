@@ -31,7 +31,7 @@ from src.artifacts.artifactory import (
 from src.artifacts.base_artifact import BaseArtifact
 
 # Maximum number of artifacts allowed in a single query response
-MAX_QUERY_RESULTS = 5
+MAX_QUERY_RESULTS = 500
 
 
 # =============================================================================
@@ -152,7 +152,7 @@ def _filter_artifacts(
 def _paginate(
     items: List[Any],
     offset: int | None,
-    page_size: int = 50,
+    page_size: int = 5,
 ) -> Tuple[List[Any], int | None]:
     """
     Simple pagination helper.
