@@ -132,6 +132,7 @@ jobs:
           EOF
 
           echo "✅ Generated frontend Cognito config"
+          cat frontend/src/auth/generated-config.ts
 
       # -----------------------------
       # 8. Install frontend dependencies
