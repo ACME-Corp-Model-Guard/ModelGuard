@@ -135,7 +135,7 @@ jobs:
             clientId: "${USER_POOL_CLIENT_ID}", 
             domain: "${COGNITO_DOMAIN}",
             region: "${{ env.AWS_REGION }}",
-            authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/${USER_POOL_ID}"
+            authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/${USER_POOL_ID}",
             redirectUri: "https://${CLOUDFRONT_DOMAIN}/",
           }
           EOF
