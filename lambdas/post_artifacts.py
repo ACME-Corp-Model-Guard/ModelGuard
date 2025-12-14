@@ -202,8 +202,8 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     # Step 1 - Parse offset query parameter
     # ---------------------------------------------------------------------
-    query_params = event.get("queryStringParameters") or {}
-    raw_offset = query_params.get("offset")
+    headers = event.get("headers") or {}
+    raw_offset = headers.get("offset")
 
     clogger.debug(f"Received offset parameter: {raw_offset}")
 
