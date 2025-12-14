@@ -4,6 +4,7 @@ Centralized AWS Secrets Manager client factory with lazy initialization and cach
 
 import json
 from src.aws.clients import get_secrets_manager
+from src.logutil import clogger
 
 
 def get_secret(secret_name: str) -> dict:
@@ -32,5 +33,6 @@ def get_secret_value(secret_name: str, value: str) -> str:
     Returns:
         str: secret value as a string
     """
+    clogger.debug(f"Retrieving secret '{secret_name}' value for key '{value}'")
     secret_dict = get_secret(secret_name)
     return secret_dict[value]
