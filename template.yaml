@@ -275,6 +275,7 @@ Resources:
       UserPoolId: !Ref ModelGuardUserPool
       ClientName: ModelGuard-Web-Client
       GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
       CallbackURLs:
         - !Sub 'https://${CloudFrontDistribution.DomainName}/'
       LogoutURLs:
