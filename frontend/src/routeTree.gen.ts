@@ -9,38 +9,109 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as LineageRouteImport } from './routes/lineage'
+import { Route as ArtifactsRouteImport } from './routes/artifacts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ArtifactsTypeIdRouteImport } from './routes/artifacts.$type.$id'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LineageRoute = LineageRouteImport.update({
+  id: '/lineage',
+  path: '/lineage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtifactsRoute = ArtifactsRouteImport.update({
+  id: '/artifacts',
+  path: '/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArtifactsTypeIdRoute = ArtifactsTypeIdRouteImport.update({
+  id: '/$type/$id',
+  path: '/$type/$id',
+  getParentRoute: () => ArtifactsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/artifacts': typeof ArtifactsRouteWithChildren
+  '/lineage': typeof LineageRoute
+  '/upload': typeof UploadRoute
+  '/artifacts/$type/$id': typeof ArtifactsTypeIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/artifacts': typeof ArtifactsRouteWithChildren
+  '/lineage': typeof LineageRoute
+  '/upload': typeof UploadRoute
+  '/artifacts/$type/$id': typeof ArtifactsTypeIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/artifacts': typeof ArtifactsRouteWithChildren
+  '/lineage': typeof LineageRoute
+  '/upload': typeof UploadRoute
+  '/artifacts/$type/$id': typeof ArtifactsTypeIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/artifacts'
+    | '/lineage'
+    | '/upload'
+    | '/artifacts/$type/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/artifacts' | '/lineage' | '/upload' | '/artifacts/$type/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/artifacts'
+    | '/lineage'
+    | '/upload'
+    | '/artifacts/$type/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArtifactsRoute: typeof ArtifactsRouteWithChildren
+  LineageRoute: typeof LineageRoute
+  UploadRoute: typeof UploadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lineage': {
+      id: '/lineage'
+      path: '/lineage'
+      fullPath: '/lineage'
+      preLoaderRoute: typeof LineageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artifacts': {
+      id: '/artifacts'
+      path: '/artifacts'
+      fullPath: '/artifacts'
+      preLoaderRoute: typeof ArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +119,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/artifacts/$type/$id': {
+      id: '/artifacts/$type/$id'
+      path: '/$type/$id'
+      fullPath: '/artifacts/$type/$id'
+      preLoaderRoute: typeof ArtifactsTypeIdRouteImport
+      parentRoute: typeof ArtifactsRoute
+    }
   }
 }
 
+interface ArtifactsRouteChildren {
+  ArtifactsTypeIdRoute: typeof ArtifactsTypeIdRoute
+}
+
+const ArtifactsRouteChildren: ArtifactsRouteChildren = {
+  ArtifactsTypeIdRoute: ArtifactsTypeIdRoute,
+}
+
+const ArtifactsRouteWithChildren = ArtifactsRoute._addFileChildren(
+  ArtifactsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArtifactsRoute: ArtifactsRouteWithChildren,
+  LineageRoute: LineageRoute,
+  UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

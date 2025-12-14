@@ -14,6 +14,28 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  server: {
+    proxy: {
+      // Proxy API requests to backend
+      // Update this to match your backend API URL
+      '/health': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/artifacts': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/artifact': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/lineage': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
 })
 
 export default config
