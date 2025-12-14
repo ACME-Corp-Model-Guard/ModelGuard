@@ -174,7 +174,7 @@ def test_fetch_github_code_metadata_success(mock_get_headers, monkeypatch):
                 "clone_url": "https://github.com/user/repo.git",
             }
 
-    monkeypatch.setattr("requests.get", lambda url, timeout=10: FakeResponse())
+    monkeypatch.setattr("requests.get", lambda url, timeout=10, **kwargs: FakeResponse())
 
     metadata = fetch_github_code_metadata("https://github.com/user/repo")
     assert metadata["name"] == "repo"

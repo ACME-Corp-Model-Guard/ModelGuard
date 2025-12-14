@@ -39,7 +39,7 @@ def test_hf_invalid_url_format():
         )
 
 
-@patch("src.storage.downloaders.huggingface.huggingface_hub.get_secret_value")
+@patch("src.aws.secrets.get_secret_value")
 def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch, tmp_path):
     """
     Test that dataset URLs with 'datasets/' prefix are parsed correctly.
@@ -149,7 +149,7 @@ def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch,
         ), f"URL {url} parsed to {captured_repo_id}, expected {expected_repo_id}"
 
 
-@patch("src.storage.downloaders.huggingface.huggingface_hub.get_secret_value")
+@patch("src.aws.secrets.get_secret_value")
 def test_download_from_huggingface_success(mock_get_secret_value, monkeypatch, tmp_path):
     """
     Full pipeline:
