@@ -27,11 +27,11 @@ exclude = ["tests/", "shell.py"]
 [tool.pytest.ini_options]
 addopts = "-v"
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 python_files = "test_*.py"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "lambdas"]
 omit = ["tests/*", "__init__.py", "src/settings.py", "src/logutil/*"]
 
 [tool.coverage.report]
