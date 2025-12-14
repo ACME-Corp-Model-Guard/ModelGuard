@@ -164,7 +164,7 @@ def _paginate(
     Returns:
         sliced_items, next_offset
     """
-    start = offset or 0
+    start = 0 if offset is None else offset
     end = start + page_size
 
     sliced = items[start:end]
@@ -204,6 +204,8 @@ def lambda_handler(
     # ---------------------------------------------------------------------
     query_params = event.get("queryStringParameters") or {}
     raw_offset = query_params.get("offset")
+
+    clogger.debug(f"Received offset parameter: {raw_offset}")
 
     if raw_offset is not None:
         try:
