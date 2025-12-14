@@ -272,6 +272,12 @@ Resources:
         - COGNITO
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
 
   ModelGuardUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
