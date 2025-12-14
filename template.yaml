@@ -679,3 +679,8 @@ Outputs:
   CloudFrontDistribution:
     Description: "CloudFront distribution ID for the frontend"
     Value: !Ref CloudFrontDistribution
+  
+  CloudFrontDomainName:
+    Description: CloudFront distribution domain name
+    Value: !GetAtt CloudFrontDistribution.DomainName
+

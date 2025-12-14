@@ -46,7 +46,7 @@ const getRedirectUri = () => {
 export const cognitoAuthConfig = {
   authority: cognitoConfig.authority,
   client_id: cognitoConfig.clientId,
-  redirect_uri: getRedirectUri(),
+  redirect_uri: cognitoConfig.redirectUri || getRedirectUri(),
   response_type: "code",
   scope: "openid",
 };
