@@ -199,9 +199,7 @@ def _filter_by_type(
 
 
 def _filter_by_fields(
-    artifacts: List[BaseArtifact],
-    fields: Dict[str, Any],
-    match_threshold: float = 1.0
+    artifacts: List[BaseArtifact], fields: Dict[str, Any], match_threshold: float = 1.0
 ) -> List[BaseArtifact]:
     """
     Filter artifacts to only those matching all specified field criteria.
@@ -217,9 +215,7 @@ def _filter_by_fields(
 
 
 def _matches_all_fields(
-    artifact: BaseArtifact,
-    fields: Dict[str, Any],
-    match_threshold: float = 1.0
+    artifact: BaseArtifact, fields: Dict[str, Any], match_threshold: float = 1.0
 ) -> bool:
     """
     Check if an artifact matches all specified field criteria.

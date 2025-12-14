@@ -57,8 +57,7 @@ class BaseArtifact(ABC):
         self.metadata = metadata or {}
 
         clogger.debug(
-            f"Created BaseArtifact for {artifact_type} "
-            f"artifact: {self.artifact_id} name={name}"
+            f"Created BaseArtifact for {artifact_type} " f"artifact: {self.artifact_id} name={name}"
         )
 
     @abstractmethod
