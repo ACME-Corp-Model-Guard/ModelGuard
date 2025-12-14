@@ -44,7 +44,7 @@ def calculate_net_score(scores: Dict[str, Union[float, Dict[str, float]]]) -> fl
 
             # Clamp individual score to [0.0, 1.0]
             score = max(0.0, min(1.0, score))
-            total += weight * score
+            total += weight * float(score)
             weight_sum += weight
 
     # Calculate weighted average

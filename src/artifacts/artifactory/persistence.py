@@ -229,19 +229,23 @@ def _matches_all_fields(
     Args:
         artifact: Artifact to check
         fields: Dictionary of field names and expected values
+        match_threshold: Similarity threshold for fuzzy matching (0.0 to 1.0)
 
     Returns:
         True if artifact matches all criteria, False otherwise
     """
     for field_name, expected_value in fields.items():
         actual_value = getattr(artifact, field_name, None)
-        matcher = SequenceMatcher(
-            None,
-            str(actual_value).lower() if isinstance(actual_value, str) else actual_value,
-            str(expected_value).lower() if isinstance(expected_value, str) else expected_value
-        )
-        if matcher.ratio() < match_threshold:
-            return False
+        # Handle None values robustly
+        if isinstance(actual_value, str) and isinstance(expected_value, str):
+            actual = actual_value.lower() if actual_value is not None else ""
+            expected = expected_value.lower() if expected_value is not None else ""
+            matcher = SequenceMatcher(None, actual, expected)
+            if matcher.ratio() < match_threshold:
+                return False
+        else:
+            if actual_value != expected_value:
+                return False
     return True
 
 
