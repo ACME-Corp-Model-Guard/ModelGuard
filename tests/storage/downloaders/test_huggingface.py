@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import requests
+from unittest.mock import patch
 
 from src.storage.downloaders.huggingface import (
     FileDownloadError,
@@ -38,7 +39,11 @@ def test_hf_invalid_url_format():
         )
 
 
-def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.get_secret_value")
+@patch("huggingface_hub._snapshot_download.snapshot_download")
+def test_hf_url_parsing_with_datasets_prefix(
+    mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
+):
     """
     Test that dataset URLs with 'datasets/' prefix are parsed correctly.
     This verifies the fix for the dataset URL parsing bug where URLs like
@@ -47,6 +52,8 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
     """
     captured_repo_id = None
 
+    mock_get_secret_value.return_value = "FAKE_TOKEN"
+
     def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
         nonlocal captured_repo_id
         captured_repo_id = repo_id
@@ -54,6 +61,8 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
         os.makedirs(snapshot_path, exist_ok=True)
         Path(snapshot_path, "config.json").write_text("{}")
         return snapshot_path
+
+    mock_snapshot_download.side_effect = fake_snapshot_download
 
     class FakeErrors:
         class RepositoryNotFoundError(Exception):
@@ -145,16 +154,19 @@ def test_hf_url_parsing_with_datasets_prefix(monkeypatch, tmp_path):
         ), f"URL {url} parsed to {captured_repo_id}, expected {expected_repo_id}"
 
 
-def test_download_from_huggingface_success(monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.get_secret_value")
+@patch("huggingface_hub._snapshot_download.snapshot_download")
+def test_download_from_huggingface_success(
+    mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
+):
     """
     Full pipeline:
     - mock snapshot_download
     - mock tarfile creation
     - mock cleanup
     """
-    # ------------------------------------------------------------------
-    # Mock snapshot_download
-    # ------------------------------------------------------------------
+
+    mock_get_secret_value.return_value = "FAKE_TOKEN"
 
     def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
         # snapshot path (directory with files)
@@ -162,6 +174,8 @@ def test_download_from_huggingface_success(monkeypatch, tmp_path):
         os.makedirs(snapshot_path, exist_ok=True)
         Path(snapshot_path, "config.json").write_text("{}")
         return snapshot_path
+
+    mock_snapshot_download.side_effect = fake_snapshot_download
 
     # Fake huggingface_hub module
     class FakeErrors:

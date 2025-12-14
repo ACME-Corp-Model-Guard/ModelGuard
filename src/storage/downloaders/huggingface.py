@@ -17,6 +17,7 @@ import requests
 
 from src.artifacts.types import ArtifactType
 from src.logutil import clogger
+from src.aws.secrets import get_secret_value
 
 
 class FileDownloadError(Exception):
@@ -182,6 +183,7 @@ def download_from_huggingface(
             local_dir=cache_dir,
             ignore_patterns=IGNORE_PATTERNS,
             allow_patterns=ALLOW_PATTERNS,
+            token=get_secret_value("ACCESS_TOKENS", "HF_TOKEN"),
         )
 
         # Package into tar archive (explicitly use /tmp for Lambda)

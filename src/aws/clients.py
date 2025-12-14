@@ -17,6 +17,7 @@ import boto3
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource
+from mypy_boto3_secretsmanager.client import SecretsManagerClient
 from mypy_boto3_s3 import S3Client
 
 from src.settings import AWS_REGION
@@ -29,6 +30,7 @@ _dynamodb_resource: Optional[DynamoDBServiceResource] = None
 _s3_client: Optional[S3Client] = None
 _cognito_client: Optional[CognitoIdentityProviderClient] = None
 _bedrock_runtime: Optional[BedrockRuntimeClient] = None
+_secrets_manager_client: Optional[SecretsManagerClient] = None
 
 
 # =====================================================================================
@@ -123,3 +125,23 @@ def get_bedrock_runtime(region: Optional[str] = None) -> BedrockRuntimeClient:
         )
 
     return _bedrock_runtime
+
+
+# ====================================================================================
+# Secrets Manager
+# ====================================================================================
+
+
+def get_secrets_manager() -> SecretsManagerClient:
+    """
+    Return a cached Secrets Manager client.
+    """
+    global _secrets_manager_client
+
+    if boto3 is None:
+        raise RuntimeError("boto3 is not available in this environment")
+
+    if _secrets_manager_client is None:
+        _secrets_manager_client = boto3.client("secretsmanager", region_name=AWS_REGION)
+
+    return _secrets_manager_client
