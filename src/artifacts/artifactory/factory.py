@@ -233,6 +233,16 @@ def _initialize_new_artifact(artifact: BaseArtifact) -> None:
     if isinstance(artifact, ModelArtifact):
         _compute_initial_scores(artifact)
 
+    # Step 4: Determine if model is suspected of package confusion
+    from .package_confusion import is_suspected_package_confusion
+
+    if isinstance(artifact, ModelArtifact):
+        artifact.suspected_package_confusion = is_suspected_package_confusion(artifact)
+        clogger.debug(
+            f"Set suspected_package_confusion for {artifact.name}"
+            f"={artifact.suspected_package_confusion} "
+        )
+
 
 def _compute_initial_scores(artifact: ModelArtifact) -> None:
     """
@@ -254,8 +264,3 @@ def _compute_initial_scores(artifact: ModelArtifact) -> None:
 
     clogger.debug(f"Computing initial scores for model: {artifact.artifact_id}")
     artifact.compute_scores(METRICS)
-
-    # Initialize security fields
-    # NOTE: This was previously unreachable dead code at lines 107-110
-    # Moving it here fixes the bug and ensures it actually runs
-    artifact.suspected_package_confusion = False
