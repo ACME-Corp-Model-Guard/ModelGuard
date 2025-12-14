@@ -159,9 +159,7 @@ def _llm_extract_fields(artifact: ModelArtifact, files: Dict[str, str]) -> Optio
     just the name of the dataset"""
 
     parent_model_name_explanation = """Name of the parent/base model,
-    (do NOT include slashes or source.
-    For example, use 'bert-base-uncased',
-    not 'huggingface/bert-base-uncased')"""
+    Do NOT include slashes, organization, source, or owner."""
 
     prompt: str = build_extract_fields_from_files_prompt(
         fields={
