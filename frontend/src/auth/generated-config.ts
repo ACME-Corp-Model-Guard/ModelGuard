@@ -5,5 +5,5 @@ export const cognitoConfig = {
   domain: "PLACEHOLDER",
   region: "us-east-2",
   authority: "PLACEHOLDER",
-  redirectUri: "PLACEHOLDER"
+  redirectUri: "PLACEHOLDER",
 };
