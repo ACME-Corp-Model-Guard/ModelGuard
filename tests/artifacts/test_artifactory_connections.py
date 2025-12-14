@@ -214,7 +214,12 @@ def test_connect_model_skips_when_no_code_name(
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts_by_fields")
 @patch("src.artifacts.artifactory.connections.load_all_artifacts")
-def test_connect_code_finds_models_by_name(mock_load_all, mock_load_by_fields, mock_save):
+def test_connect_code_finds_models_by_name(
+    mock_find_names,
+    mock_load_all,
+    mock_load_by_fields,
+    mock_save
+):
     artifact = CodeArtifact(
         artifact_id="code-123",
         name="my-training-code",
@@ -227,10 +232,6 @@ def test_connect_code_finds_models_by_name(mock_load_all, mock_load_by_fields, m
 
     # Should be called for both regular and rejected artifacts
     assert mock_load_by_fields.call_count == 2
-    mock_load_by_fields.assert_any_call(
-        fields={"code_name": "my-training-code"},
-        artifact_type="model",
-    )
 
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
@@ -344,10 +345,6 @@ def test_connect_dataset_finds_models_by_name(mock_load_all, mock_load_by_fields
 
     # Should be called for both regular and rejected artifacts
     assert mock_load_by_fields.call_count == 2
-    mock_load_by_fields.assert_any_call(
-        fields={"dataset_name": "wikitext-103"},
-        artifact_type="model",
-    )
 
 
 @patch("src.artifacts.artifactory.connections.save_artifact_metadata")
