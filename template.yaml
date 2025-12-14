@@ -262,6 +262,17 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref ModelGuardUserPool
+      ClientName: ModelGuard-API-Client
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+
+  ModelGuardUserPoolClientWeb:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref ModelGuardUserPool
       ClientName: ModelGuard-Web-Client
       GenerateSecret: false
       CallbackURLs:
@@ -666,6 +677,12 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-UserPoolClientId'
 
+  UserPoolClientWebId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref ModelGuardUserPoolClientWeb
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolClientWebId'
+  
   CognitoDomain:
     Description: Cognito Domain for authentication
     Value: !Sub 'https://${ModelGuardUserPoolDomain}.auth.${DeploymentRegion}.amazoncognito.com'
