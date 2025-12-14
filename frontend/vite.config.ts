@@ -1,5 +1,5 @@
+// NOTE: This app is deployed as a SPA to S3/CloudFront. Ensure S3/CF fallback to index.html for all routes.
 import { defineConfig } from 'vite'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
@@ -11,7 +11,6 @@ const config = defineConfig({
       projects: ['./tsconfig.json'],
     }),
     tailwindcss(),
-    tanstackStart(),
     viteReact(),
   ],
   server: {

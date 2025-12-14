@@ -167,19 +167,22 @@ Resources:
   # Frontend Deployment
   ############################################################
   FrontendBucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketEncryption:
-          ServerSideEncryptionConfiguration:
-            - ServerSideEncryptionByDefault:
-                SSEAlgorithm: AES256 #(free)
-        PublicAccessBlockConfiguration:
-          BlockPublicAcls: true
-          BlockPublicPolicy: true
-          IgnorePublicAcls: true
-          RestrictPublicBuckets: true
-        VersioningConfiguration:
-          Status: Suspended
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 #(free)
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
 
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
@@ -196,7 +199,16 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        DefaultRootObject: index.tsx
+        DefaultRootObject: index.html
+                CustomErrorResponses:
+                  - ErrorCode: 404
+                    ResponsePagePath: "/index.html"
+                    ResponseCode: 200
+                    ErrorCachingMinTTL: 0
+                  - ErrorCode: 403
+                    ResponsePagePath: "/index.html"
+                    ResponseCode: 200
+                    ErrorCachingMinTTL: 0
         Origins:
           - Id: FrontendOrigin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
