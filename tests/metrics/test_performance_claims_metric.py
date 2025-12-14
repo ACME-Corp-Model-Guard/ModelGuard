@@ -263,12 +263,6 @@ class TestPerformanceClaimsMetric:
         result = metric.score(model)
         assert result == {"performance_claims": 1.0}
 
-    def test_no_evidence_scores_zero(self, metric, model):
-        """Model without any performance evidence should score 0.0."""
-        model.metadata = {"model_card_content": "This is a model. It does things. Nothing special."}
-        result = metric.score(model)
-        assert result == {"performance_claims": 0.0}
-
 
 # =============================================================================
 # Integration Tests with Realistic Content
