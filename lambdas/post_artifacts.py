@@ -31,7 +31,7 @@ from src.artifacts.artifactory import (
 from src.artifacts.base_artifact import BaseArtifact
 
 # Maximum number of artifacts allowed in a single query response
-MAX_QUERY_RESULTS = 500
+MAX_QUERY_RESULTS = 5
 
 
 # =============================================================================
