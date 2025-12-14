@@ -39,8 +39,8 @@ def test_hf_invalid_url_format():
         )
 
 
-@patch("src.aws.secrets.get_secret_value")
-@patch("src.storage.downloaders.huggingface.snapshot_download")
+@patch("src.storage.downloaders.huggingface.get_secret_value")
+@patch("huggingface_hub._snapshot_download.snapshot_download")
 def test_hf_url_parsing_with_datasets_prefix(
     mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
 ):
@@ -154,8 +154,8 @@ def test_hf_url_parsing_with_datasets_prefix(
         ), f"URL {url} parsed to {captured_repo_id}, expected {expected_repo_id}"
 
 
-@patch("src.aws.secrets.get_secret_value")
-@patch("src.storage.downloaders.huggingface.snapshot_download")
+@patch("src.storage.downloaders.huggingface.get_secret_value")
+@patch("huggingface_hub._snapshot_download.snapshot_download")
 def test_download_from_huggingface_success(
     mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
 ):
