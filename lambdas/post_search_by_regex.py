@@ -185,7 +185,14 @@ def _build_search_text(artifact: BaseArtifact, readme_text: str = "") -> str:
     metadata = getattr(artifact, "metadata", None)
     if isinstance(metadata, dict):
         for value in metadata.values():
-            parts.append(value)
+            # Only add string values, or convert non-strings to string safely
+            if isinstance(value, str):
+                parts.append(value)
+            else:
+                try:
+                    parts.append(json.dumps(value, ensure_ascii=False))
+                except Exception:
+                    parts.append(str(value))
 
     # Include README if provided
     if readme_text:
