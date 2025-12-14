@@ -8,6 +8,9 @@ This module uses Python's singledispatch to implement type-specific connection l
 
 Connections are bidirectional - when a code artifact is uploaded, it automatically
 links to existing models that reference it by name, and vice versa.
+
+Model Artifacts are rescored when connections are made;
+this may result in rejected artifacts being promoted to accepted status.
 """
 
 from functools import singledispatch
@@ -31,6 +34,9 @@ from .rejection import scores_below_threshold, promote
 # =============================================================================
 # Public API (Internal to artifactory module)
 # =============================================================================
+
+
+CONNECTION_MATCH_THRESHOLD = 0.7
 
 
 @singledispatch
@@ -122,6 +128,7 @@ def _(artifact: ModelArtifact) -> None:
                 fields={"parent_model_name": artifact.name},
                 artifact_type="model",
                 artifact_list=artifact_list,
+                match_threshold=CONNECTION_MATCH_THRESHOLD,
             )
 
             # Update child model artifacts to link to this parent model
@@ -190,6 +197,7 @@ def _(artifact: CodeArtifact) -> None:
         # Update linked model artifacts to reference this code artifact
         for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
+                clogger.debug(f" Skipping ModelArtifact {model_artifact.artifact_id} ")
                 continue
             model_artifact.code_artifact_id = artifact.artifact_id
 
@@ -223,6 +231,7 @@ def _(artifact: CodeArtifact) -> None:
         fields={"code_name": artifact.name},
         artifact_type="model",
         artifact_list=model_artifacts,
+        match_threshold=CONNECTION_MATCH_THRESHOLD,
     )
     update_connected_models(connected_model_artifacts)
 
@@ -230,6 +239,7 @@ def _(artifact: CodeArtifact) -> None:
         fields={"code_name": artifact.name},
         artifact_type="model",
         artifact_list=rejected_model_artifacts,
+        match_threshold=CONNECTION_MATCH_THRESHOLD,
     )
     update_connected_models(connected_rejected_model_artifacts, rejected=True)
 
@@ -261,6 +271,7 @@ def _(artifact: DatasetArtifact) -> None:
         # Update linked model artifacts to reference this dataset artifact
         for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
+                clogger.debug(f" Skipping ModelArtifact {model_artifact.artifact_id} ")
                 continue
             model_artifact.dataset_artifact_id = artifact.artifact_id
 
@@ -294,6 +305,7 @@ def _(artifact: DatasetArtifact) -> None:
         fields={"dataset_name": artifact.name},
         artifact_type="model",
         artifact_list=model_artifacts,
+        match_threshold=CONNECTION_MATCH_THRESHOLD,
     )
     update_connected_models(connected_model_artifacts)
 
@@ -301,6 +313,7 @@ def _(artifact: DatasetArtifact) -> None:
         fields={"dataset_name": artifact.name},
         artifact_type="model",
         artifact_list=rejected_model_artifacts,
+        match_threshold=CONNECTION_MATCH_THRESHOLD,
     )
     update_connected_models(connected_rejected_model_artifacts, rejected=True)
 

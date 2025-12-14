@@ -130,14 +130,14 @@ def lambda_handler(
         )
 
     # ---------------------------------------------------------------------
-    # Step 3 — Fetch upstream metadata and create artifact object
+    # Step 3 — Create artifact object
     # ---------------------------------------------------------------------
     try:
         artifact = create_artifact(artifact_type, source_url=url, name=name)
     except FileDownloadError as e:
         # The metadata-fetching process can raise FileDownloadError
         clogger.error(
-            "Upstream metadata fetch failed",
+            f"Upstream metadata fetch failed: {e}",
             extra={
                 "artifact_type": artifact_type,
                 "source_url": url,

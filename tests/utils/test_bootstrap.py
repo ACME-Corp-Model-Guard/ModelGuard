@@ -12,15 +12,31 @@ def mock_env(monkeypatch):
     """
     Ensure required environment variables exist.
     """
-    monkeypatch.setenv("DEFAULT_ADMIN_USERNAME", "admin")
-    monkeypatch.setenv("DEFAULT_ADMIN_PASSWORD", "Pass123!")
+    monkeypatch.setenv("ADMIN_SECRET_NAME", "dummy_secret")
     monkeypatch.setenv("DEFAULT_ADMIN_GROUP", "Admin")
     monkeypatch.setenv("USER_POOL_ID", "pool-123")
 
-    bootstrap.DEFAULT_ADMIN_USERNAME = "admin"
-    bootstrap.DEFAULT_ADMIN_PASSWORD = "Pass123!"
+    bootstrap.ADMIN_SECRET_NAME = "dummy_secret"
     bootstrap.DEFAULT_ADMIN_GROUP = "Admin"
     bootstrap.USER_POOL_ID = "pool-123"
+
+
+@pytest.fixture(autouse=True)
+def mock_secrets(monkeypatch):
+    """
+    Patch get_secret_value to return fixed admin credentials.
+    """
+
+    def fake_get_secret_value(secret_name: str, value: str) -> str:
+        secrets = {
+            "dummy_secret": {
+                "DEFAULT_ADMIN_USERNAME": "admin",
+                "DEFAULT_ADMIN_PASSWORD": "Pass123!",
+            }
+        }
+        return secrets.get(secret_name, {}).get(value, "")
+
+    monkeypatch.setattr(bootstrap, "get_secret_value", fake_get_secret_value)
 
 
 @pytest.fixture

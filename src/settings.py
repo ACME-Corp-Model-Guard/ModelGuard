@@ -59,8 +59,7 @@ BEDROCK_REGION: str = os.environ.get("BEDROCK_REGION", "us-east-1")
 # -----------------------------------------------------------------------------
 # Default Admin User Settings for /reset Endpoint
 # -----------------------------------------------------------------------------
-DEFAULT_ADMIN_USERNAME: str = "ece30861defaultadminuser"
-DEFAULT_ADMIN_PASSWORD: str = "correcthorsebatterystaple123(!__+@**(A'\"`;DROP TABLE packages;"
+ADMIN_SECRET_NAME: str = "DEFAULT_ADMIN_INFO"
 DEFAULT_ADMIN_GROUP: str = "Admin"
 
 
