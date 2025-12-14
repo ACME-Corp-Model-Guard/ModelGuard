@@ -264,6 +264,10 @@ Resources:
       UserPoolId: !Ref ModelGuardUserPool
       ClientName: ModelGuard-Web-Client
       GenerateSecret: false
+      CallbackURLs:
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/'
+      LogoutURLs:
+        - !Sub 'https://${CloudFrontDistribution.DomainName}/'
       SupportedIdentityProviders:
         - COGNITO
       ExplicitAuthFlows:
