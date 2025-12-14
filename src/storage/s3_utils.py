@@ -125,6 +125,7 @@ def upload_artifact_to_s3(
         )
 
     except SourceDownloadError:
+        clogger.error(f"[s3_utils] Failed to download artifact {artifact_id} from {source_url}")
         raise
     except ClientError:
         clogger.error(f"[s3_utils] Failed to upload {artifact_id} to S3")

@@ -56,7 +56,10 @@ class BaseArtifact(ABC):
         self.s3_key = s3_key or f"{artifact_type}s/{self.artifact_id}"
         self.metadata = metadata or {}
 
-        clogger.debug(f"Initialized {artifact_type} artifact: {self.artifact_id}, name={name}")
+        clogger.debug(
+            f"Created BaseArtifact for {artifact_type} "
+            f"artifact: {self.artifact_id} name={name}"
+        )
 
     @abstractmethod
     def to_dict(self) -> Dict[str, Any]:
