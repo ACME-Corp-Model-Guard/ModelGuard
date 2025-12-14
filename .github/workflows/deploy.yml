@@ -87,6 +87,8 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucket`].OutputValue' --output text)
           CLOUDFRONT_DIST_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
             --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDistribution`].OutputValue' --output text)
+          CLOUDFRONT_DOMAIN=$(aws cloudformation describe-stacks --stack-name $STACK_NAME \
+            --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDomainName`].OutputValue' --output text)
 
           # Hard fail if anything important is missing
           if [ -z "$FRONTEND_BUCKET" ]; then
@@ -99,12 +101,18 @@ jobs:
             exit 1
           fi
 
+          if [ -z "$CLOUDFRONT_DOMAIN" ]; then
+            echo "❌ ERROR: CloudFrontDomainName output missing."
+            exit 1
+          fi
+
           # Export values
           echo "USER_POOL_ID=$USER_POOL_ID" >> $GITHUB_ENV
           echo "USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID" >> $GITHUB_ENV
           echo "COGNITO_DOMAIN=$COGNITO_DOMAIN" >> $GITHUB_ENV
           echo "FRONTEND_BUCKET=$FRONTEND_BUCKET" >> $GITHUB_ENV
           echo "CLOUDFRONT_DIST_ID=$CLOUDFRONT_DIST_ID" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DOMAIN=$CLOUDFRONT_DOMAIN" >> $GITHUB_ENV
 
       # -----------------------------
       # 7. Generate frontend Cognito config
@@ -128,6 +136,7 @@ jobs:
             domain: "${COGNITO_DOMAIN}",
             region: "${{ env.AWS_REGION }}",
             authority: "https://cognito-idp.${{ env.AWS_REGION }}.amazonaws.com/${USER_POOL_ID}"
+            redirectUri: "https://${CLOUDFRONT_DOMAIN}/",
           }
           EOF
 
