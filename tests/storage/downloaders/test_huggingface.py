@@ -40,7 +40,10 @@ def test_hf_invalid_url_format():
 
 
 @patch("src.aws.secrets.get_secret_value")
-def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.snapshot_download")
+def test_hf_url_parsing_with_datasets_prefix(
+    mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
+):
     """
     Test that dataset URLs with 'datasets/' prefix are parsed correctly.
     This verifies the fix for the dataset URL parsing bug where URLs like
@@ -58,6 +61,8 @@ def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch,
         os.makedirs(snapshot_path, exist_ok=True)
         Path(snapshot_path, "config.json").write_text("{}")
         return snapshot_path
+
+    mock_snapshot_download.side_effect = fake_snapshot_download
 
     class FakeErrors:
         class RepositoryNotFoundError(Exception):
@@ -150,7 +155,10 @@ def test_hf_url_parsing_with_datasets_prefix(mock_get_secret_value, monkeypatch,
 
 
 @patch("src.aws.secrets.get_secret_value")
-def test_download_from_huggingface_success(mock_get_secret_value, monkeypatch, tmp_path):
+@patch("src.storage.downloaders.huggingface.snapshot_download")
+def test_download_from_huggingface_success(
+    mock_snapshot_download, mock_get_secret_value, monkeypatch, tmp_path
+):
     """
     Full pipeline:
     - mock snapshot_download
@@ -160,16 +168,14 @@ def test_download_from_huggingface_success(mock_get_secret_value, monkeypatch, t
 
     mock_get_secret_value.return_value = "FAKE_TOKEN"
 
-    # ------------------------------------------------------------------
-    # Mock snapshot_download
-    # ------------------------------------------------------------------
-
     def fake_snapshot_download(repo_id: str, repo_type: str, cache_dir: str, **kwargs):
         # snapshot path (directory with files)
         snapshot_path = os.path.join(cache_dir, "snapshot")
         os.makedirs(snapshot_path, exist_ok=True)
         Path(snapshot_path, "config.json").write_text("{}")
         return snapshot_path
+
+    mock_snapshot_download.side_effect = fake_snapshot_download
 
     # Fake huggingface_hub module
     class FakeErrors:
