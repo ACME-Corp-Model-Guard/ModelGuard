@@ -122,6 +122,7 @@ def _(artifact: ModelArtifact) -> None:
                 fields={"parent_model_name": artifact.name},
                 artifact_type="model",
                 artifact_list=artifact_list,
+                match_threshold=0.5,
             )
 
             # Update child model artifacts to link to this parent model
@@ -190,6 +191,7 @@ def _(artifact: CodeArtifact) -> None:
         # Update linked model artifacts to reference this code artifact
         for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.code_artifact_id:
+                clogger.debug(f" Skipping ModelArtifact {model_artifact.artifact_id} ")
                 continue
             model_artifact.code_artifact_id = artifact.artifact_id
 
@@ -223,6 +225,7 @@ def _(artifact: CodeArtifact) -> None:
         fields={"code_name": artifact.name},
         artifact_type="model",
         artifact_list=model_artifacts,
+        match_threshold=0.5,
     )
     update_connected_models(connected_model_artifacts)
 
@@ -230,6 +233,7 @@ def _(artifact: CodeArtifact) -> None:
         fields={"code_name": artifact.name},
         artifact_type="model",
         artifact_list=rejected_model_artifacts,
+        match_threshold=0.5,
     )
     update_connected_models(connected_rejected_model_artifacts, rejected=True)
 
@@ -261,6 +265,7 @@ def _(artifact: DatasetArtifact) -> None:
         # Update linked model artifacts to reference this dataset artifact
         for model_artifact in artifacts:
             if not isinstance(model_artifact, ModelArtifact) or model_artifact.dataset_artifact_id:
+                clogger.debug(f" Skipping ModelArtifact {model_artifact.artifact_id} ")
                 continue
             model_artifact.dataset_artifact_id = artifact.artifact_id
 
@@ -294,6 +299,7 @@ def _(artifact: DatasetArtifact) -> None:
         fields={"dataset_name": artifact.name},
         artifact_type="model",
         artifact_list=model_artifacts,
+        match_threshold=0.5,
     )
     update_connected_models(connected_model_artifacts)
 
@@ -301,6 +307,7 @@ def _(artifact: DatasetArtifact) -> None:
         fields={"dataset_name": artifact.name},
         artifact_type="model",
         artifact_list=rejected_model_artifacts,
+        match_threshold=0.5,
     )
     update_connected_models(connected_rejected_model_artifacts, rejected=True)
 

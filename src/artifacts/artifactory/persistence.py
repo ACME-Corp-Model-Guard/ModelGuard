@@ -9,6 +9,7 @@ This module contains functions for:
 """
 
 from typing import Any, Dict, List, Optional
+from difflib import SequenceMatcher
 
 from src.artifacts.base_artifact import BaseArtifact
 from src.artifacts.types import ArtifactType
@@ -132,6 +133,7 @@ def load_all_artifacts_by_fields(
     fields: Dict[str, Any],
     artifact_type: Optional[ArtifactType] = None,
     artifact_list: Optional[List[BaseArtifact]] = None,
+    match_threshold: float = 1.0,
 ) -> List[BaseArtifact]:
     """
     Load artifacts matching specific field criteria.
@@ -144,6 +146,7 @@ def load_all_artifacts_by_fields(
             Example: {"name": "bert-base-uncased"} or {"license": "MIT"}
         artifact_type: Optional filter by artifact type ('model', 'dataset', 'code')
         artifact_list: Optional pre-loaded artifact list to search within (optimization)
+        fuzzy_match: If True, uses fuzzy matching for string fields (default False)
 
     Returns:
         List of artifacts matching all criteria
@@ -167,8 +170,11 @@ def load_all_artifacts_by_fields(
     if artifact_type:
         candidates = _filter_by_type(candidates, artifact_type)
 
-    # Filter by field values
-    return _filter_by_fields(candidates, fields)
+    filtered_artifacts = _filter_by_fields(candidates, fields, match_threshold)
+    clogger.debug(
+        f"Filtered artifacts by fields {fields}, resulting in {len(filtered_artifacts)} artifacts"
+    )
+    return filtered_artifacts
 
 
 # =============================================================================
@@ -192,7 +198,11 @@ def _filter_by_type(
     return [a for a in artifacts if a.artifact_type == artifact_type]
 
 
-def _filter_by_fields(artifacts: List[BaseArtifact], fields: Dict[str, Any]) -> List[BaseArtifact]:
+def _filter_by_fields(
+    artifacts: List[BaseArtifact],
+    fields: Dict[str, Any],
+    match_threshold: float = 1.0
+) -> List[BaseArtifact]:
     """
     Filter artifacts to only those matching all specified field criteria.
 
@@ -203,10 +213,14 @@ def _filter_by_fields(artifacts: List[BaseArtifact], fields: Dict[str, Any]) -> 
     Returns:
         List of artifacts matching all field criteria
     """
-    return [a for a in artifacts if _matches_all_fields(a, fields)]
+    return [a for a in artifacts if _matches_all_fields(a, fields, match_threshold)]
 
 
-def _matches_all_fields(artifact: BaseArtifact, fields: Dict[str, Any]) -> bool:
+def _matches_all_fields(
+    artifact: BaseArtifact,
+    fields: Dict[str, Any],
+    match_threshold: float = 1.0
+) -> bool:
     """
     Check if an artifact matches all specified field criteria.
 
@@ -221,7 +235,12 @@ def _matches_all_fields(artifact: BaseArtifact, fields: Dict[str, Any]) -> bool:
     """
     for field_name, expected_value in fields.items():
         actual_value = getattr(artifact, field_name, None)
-        if not _values_equal_ignoring_case(actual_value, expected_value):
+        matcher = SequenceMatcher(
+            None,
+            str(actual_value).lower() if isinstance(actual_value, str) else actual_value,
+            str(expected_value).lower() if isinstance(expected_value, str) else expected_value
+        )
+        if matcher.ratio() < match_threshold:
             return False
     return True
 
