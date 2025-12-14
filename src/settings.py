@@ -1,16 +1,3 @@
-# -----------------------------------------------------------------------------
-# External API Tokens (Secrets Manager)
-# -----------------------------------------------------------------------------
-from src.aws.secrets import get_secret_value
-
-# These environment variables should be set to the secret name and key
-GITHUB_SECRET_NAME = os.environ.get("GITHUB_SECRET_NAME", "ModelGuard/ExternalAPITokens")
-GITHUB_TOKEN_KEY = os.environ.get("GITHUB_TOKEN_KEY", "GITHUB_TOKEN")
-
-try:
-    GITHUB_TOKEN = get_secret_value(GITHUB_SECRET_NAME, GITHUB_TOKEN_KEY)
-except Exception:
-    GITHUB_TOKEN = None
 """
 Global application settings loaded from environment variables.
 Used throughout the Lambda functions and shared utility modules.
