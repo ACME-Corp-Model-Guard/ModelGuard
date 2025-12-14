@@ -151,6 +151,9 @@ def _llm_extract_fields(artifact: ModelArtifact, files: Dict[str, str]) -> Optio
         Dictionary with extracted field values, or None if extraction failed
     """
     # Build LLM prompt to extract connection fields
+    code_name_explanation = """Name of the code artifact's github repository,
+    Do NOT include slashes, source, or owner."""
+
     dataset_name_explanation = """Name of the dataset used for training, "
     Do NOT include the word 'dataset' in the response, "
     just the name of the dataset"""
@@ -159,10 +162,10 @@ def _llm_extract_fields(artifact: ModelArtifact, files: Dict[str, str]) -> Optio
     (do NOT include slashes or source.
     For example, use 'bert-base-uncased',
     not 'huggingface/bert-base-uncased')"""
-    
+
     prompt: str = build_extract_fields_from_files_prompt(
         fields={
-            "code_name": "Name of the code artifact's github repository",
+            "code_name": code_name_explanation,
             "dataset_name": dataset_name_explanation,
             "parent_model_name": parent_model_name_explanation,
             "parent_model_source": "File name where you learned parent model name (if any)",
