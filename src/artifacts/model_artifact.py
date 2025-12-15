@@ -48,6 +48,8 @@ class ModelArtifact(BaseArtifact):
         child_model_ids: Optional[List[str]] = None,
         # Security fields
         suspected_package_confusion: bool = False,
+        js_program_key: Optional[str] = None,
+        uploader_username: Optional[str] = None,
     ):
         """
         Initialize ModelArtifact.
@@ -72,6 +74,8 @@ class ModelArtifact(BaseArtifact):
             parent_model_id: Optional link to parent model (for lineage)
             child_model_ids: Optional list of child model IDs (for lineage)
             suspected_package_confusion: is this model suspected of package confusion
+            js_program_key: Optional JS program key for security analysis
+            uploader_username: Optional username of the uploader
         """
         super().__init__(
             artifact_id=artifact_id,
@@ -103,6 +107,8 @@ class ModelArtifact(BaseArtifact):
 
         # Security fields
         self.suspected_package_confusion = suspected_package_confusion
+        self.js_program_key = js_program_key
+        self.uploader_username = uploader_username
 
     def compute_scores(self, metrics: List[Metric]) -> None:
         """

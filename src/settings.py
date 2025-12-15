@@ -35,10 +35,15 @@ USER_PERMISSIONS_TABLE: str = _require_env("USER_PERMISSIONS_TABLE")
 
 # S3 bucket
 ARTIFACTS_BUCKET: str = _require_env("ARTIFACTS_BUCKET")
+JS_PROGRAMS_BUCKET: str = _require_env("JS_PROGRAMS_BUCKET")
+JS_PROGRAMS_PREFIX: str = os.environ.get("JS_PROGRAMS_PREFIX", "admin-scripts/")
 
 # Cognito
 USER_POOL_ID: str = _require_env("USER_POOL_ID")
 USER_POOL_CLIENT_ID: str = _require_env("USER_POOL_CLIENT_ID")
+
+# Lambda function names
+JS_RUNNER_LAMBDA_NAME: str = _require_env("JS_RUNNER_LAMBDA_NAME")
 
 # Logging Configuration (Optional)
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")

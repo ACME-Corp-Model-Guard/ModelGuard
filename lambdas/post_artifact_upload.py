@@ -11,10 +11,9 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, cast, TYPE_CHECKING
+from typing import Any, Dict, cast
 
-if TYPE_CHECKING:
-    from src.artifacts.model_artifact import ModelArtifact
+from src.artifacts.model_artifact import ModelArtifact
 
 from src.artifacts.artifactory import (
     create_artifact,
@@ -170,6 +169,11 @@ def lambda_handler(
         "Artifact created successfully",
         extra=artifact.to_dict(),
     )
+
+    # Add uploader username to artifact if applicable
+    if isinstance(artifact, ModelArtifact):
+        clogger.debug(f"User {auth.get('username')} is uploading model artifact {artifact.name}")
+        artifact.uploader_username = auth.get("username")
 
     # ---------------------------------------------------------------------
     # Step 3.1 — Check quality threshold for models (424 Failed Dependency)

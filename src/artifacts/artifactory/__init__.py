@@ -23,6 +23,7 @@ from .persistence import (
     load_all_artifacts_by_fields,
 )
 from .rejection import scores_below_threshold
+from .js_programs import run_js_program
 
 __all__ = [
     "create_artifact",
@@ -31,4 +32,5 @@ __all__ = [
     "load_all_artifacts",
     "load_all_artifacts_by_fields",
     "scores_below_threshold",
+    "run_js_program",
 ]

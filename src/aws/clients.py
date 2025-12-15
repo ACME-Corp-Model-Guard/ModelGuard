@@ -31,6 +31,7 @@ _s3_client: Optional[S3Client] = None
 _cognito_client: Optional[CognitoIdentityProviderClient] = None
 _bedrock_runtime: Optional[BedrockRuntimeClient] = None
 _secrets_manager_client: Optional[SecretsManagerClient] = None
+_lambda_client: Optional[Any] = None
 
 
 # =====================================================================================
@@ -148,6 +149,24 @@ def get_secrets_manager() -> SecretsManagerClient:
 
 
 # =====================================================================================
+# Lambda
+# =====================================================================================
+
+
+def get_lambda_client() -> Any:
+    """
+    Return a cached Lambda client.
+    """
+    global _lambda_client
+
+    if boto3 is None:
+        raise RuntimeError("boto3 is not available in this environment")
+    if _lambda_client is None:
+        _lambda_client = boto3.client("lambda", region_name=AWS_REGION)
+
+    return _lambda_client
+
+
 # Testing Support
 # =====================================================================================
 
@@ -161,10 +180,11 @@ def reset_clients() -> None:
     production code.
     """
     global _dynamodb_resource, _s3_client, _cognito_client
-    global _bedrock_runtime, _secrets_manager_client
+    global _bedrock_runtime, _secrets_manager_client, _lambda_client
 
     _dynamodb_resource = None
     _s3_client = None
     _cognito_client = None
     _bedrock_runtime = None
     _secrets_manager_client = None
+    _lambda_client = None

@@ -15,6 +15,8 @@ def pytest_configure(config):
     os.environ.setdefault("ARTIFACTS_BUCKET", "test-bucket")
     os.environ.setdefault("USER_POOL_ID", "fakepool")
     os.environ.setdefault("USER_POOL_CLIENT_ID", "fakeclient")
+    os.environ.setdefault("JS_RUNNER_LAMBDA_NAME", "js-runner-test-lambda")
+    os.environ.setdefault("JS_PROGRAMS_BUCKET", "js-programs-test-bucket")
 
     # Patch urllib3 before any modules are imported during collection.
     # This is necessary because src/auth.py loads JWKS at import time.
