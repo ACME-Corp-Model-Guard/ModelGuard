@@ -31,6 +31,7 @@ _s3_client: Optional[S3Client] = None
 _cognito_client: Optional[CognitoIdentityProviderClient] = None
 _bedrock_runtime: Optional[BedrockRuntimeClient] = None
 _secrets_manager_client: Optional[SecretsManagerClient] = None
+_lambda_client: Optional[Any] = None
 
 
 # =====================================================================================
@@ -179,10 +180,11 @@ def reset_clients() -> None:
     production code.
     """
     global _dynamodb_resource, _s3_client, _cognito_client
-    global _bedrock_runtime, _secrets_manager_client
+    global _bedrock_runtime, _secrets_manager_client, _lambda_client
 
     _dynamodb_resource = None
     _s3_client = None
     _cognito_client = None
     _bedrock_runtime = None
     _secrets_manager_client = None
+    _lambda_client = None
