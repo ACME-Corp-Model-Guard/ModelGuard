@@ -1,3 +1,22 @@
+"""
+Lambda function for POST /artifacts/PackageConfusionAudit
+Returns a list of suspected package confusion model uploads.
+
+OpenAPI Spec:
+Response 200: {
+    "suspected": [
+        {
+            "artifact_id": str,
+            "name": str,
+            "source_url": str,
+            "metadata": dict
+        },
+        ...
+    ]
+}
+Response 401: Authentication failed.
+"""
+
 import json
 from src.artifacts.artifactory.persistence import load_all_artifacts
 from src.artifacts.artifactory.package_confusion import is_suspected_package_confusion
@@ -8,11 +27,11 @@ from src.auth import auth_required
 
 
 @translate_exceptions
-@log_lambda_handler("POST /artifact/byRegEx", log_request_body=True)
+@log_lambda_handler("POST /artifacts/PackageConfusionAudit", log_request_body=True)
 @auth_required
 def lambda_handler(event, context):
     """
-    Lambda entrypoint for the PackageConfusionAudit endpoint.
+    Lambda entrypoint for the /artifacts/PackageConfusionAudit endpoint.
     Returns a list of suspected package confusion model uploads.
     """
     # Load all model artifacts

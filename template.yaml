@@ -574,6 +574,22 @@ Resources:
             Path: /artifact/byRegEx
             Method: POST
 
+  # POST /artifacts/PackageConfusionAudit
+  PostPackageConfusionAuditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_package_confusion.lambda_handler
+      Description: Audit for suspected package confusion uploads
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        PackageConfusionAudit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/PackageConfusionAudit
+            Method: POST
+
   ############################################################
   # Health & Tracks (Unauthenticated)
   ############################################################
