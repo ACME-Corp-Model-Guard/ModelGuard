@@ -31,6 +31,7 @@ from src.artifacts.artifactory import (
     save_artifact_metadata,
 )
 from src.artifacts.base_artifact import BaseArtifact
+from src.artifacts.model_artifact import ModelArtifact
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
@@ -367,6 +368,11 @@ def lambda_handler(
             "Failed to save updated artifact metadata",
             error_code="DDB_SAVE_ERROR",
         )
+
+    # Add uploader username to artifact if applicable
+    if isinstance(new_artifact, ModelArtifact):
+        clogger.debug(f"User {auth.get('username')} is updating model artifact {new_artifact.name}")
+        new_artifact.uploader_username = auth.get("username")
 
     # ------------------------------------------------------------------
     # Step 6 - Return success response (per OpenAPI spec: just a message)

@@ -25,8 +25,21 @@ from src.settings import JS_PROGRAMS_BUCKET, JS_PROGRAMS_PREFIX
 
 @translate_exceptions
 @log_lambda_handler("POST /artifacts/UploadJSProgram/", log_request_body=True)
-@auth_required(admin_only=True)
+@auth_required
 def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> LambdaResponse:
+
+    # Verify admin permission
+    if "Admin" not in auth["groups"]:
+        clogger.warning(
+            f"[/reset] Non-admin user attempted reset: {auth['username']}, "
+            f"groups={auth['groups']}"
+        )
+        return error_response(
+            401,
+            "You do not have permission to reset the registry",
+            error_code="ADMIN_REQUIRED",
+        )
+
     # Parse body (should be JSON with artifact_id and js_program)
     raw_body = event.get("body")
     if isinstance(raw_body, str):

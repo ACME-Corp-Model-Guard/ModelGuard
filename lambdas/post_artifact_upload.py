@@ -169,6 +169,11 @@ def lambda_handler(
         extra=artifact.to_dict(),
     )
 
+    # Add uploader username to artifact if applicable
+    if isinstance(artifact, ModelArtifact):
+        clogger.debug(f"User {auth.get('username')} is uploading model artifact {artifact.name}")
+        artifact.uploader_username = auth.get("username")
+
     # ---------------------------------------------------------------------
     # Step 3.1 — Check quality threshold for models (424 Failed Dependency)
     # ---------------------------------------------------------------------
