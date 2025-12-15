@@ -794,7 +794,6 @@ Resources:
       Timeout: 10
       MemorySize: 256
       Tracing: Active
-      ReservedConcurrentExecutions: 2
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
