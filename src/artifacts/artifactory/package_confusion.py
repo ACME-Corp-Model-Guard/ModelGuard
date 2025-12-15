@@ -90,11 +90,11 @@ def is_canonical(model: ModelArtifact, popular_models: List[str]) -> bool:
 # =============================================================================
 
 
-def _get_popular_models(limit=500) -> List[str]:
+def _get_popular_models(limit: int = 500) -> List[str]:
     """
     Get a list of popular model IDs from Hugging Face Hub.
     """
-    return [m.modelId for m in list_models(sort="downloads", direction=-1, limit=limit)]
+    return [m.id for m in list_models(sort="downloads", direction=-1, limit=limit)]
 
 
 def _similarity(a: str, b: str) -> float:

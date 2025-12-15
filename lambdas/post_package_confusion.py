@@ -27,13 +27,18 @@ from src.utils.http import (
     LambdaResponse,
     json_response,
 )
-from src.auth import auth_required
+from src.auth import auth_required, AuthContext
+from typing import Dict, Any
 
 
 @translate_exceptions
 @log_lambda_handler("POST /artifacts/PackageConfusionAudit", log_request_body=True)
 @auth_required
-def lambda_handler(event, context) -> LambdaResponse:
+def lambda_handler(
+    event: Dict[str, Any],
+    context: Any,
+    auth: AuthContext,
+) -> LambdaResponse:
     """
     Lambda entrypoint for the /artifacts/PackageConfusionAudit endpoint.
     Returns a list of suspected package confusion model uploads.
