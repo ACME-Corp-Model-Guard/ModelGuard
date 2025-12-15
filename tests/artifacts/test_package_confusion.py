@@ -12,8 +12,9 @@ def mock_popular_models():
 @pytest.fixture
 def canonical_model():
     return ModelArtifact(
-        artifact_id="bert-base-uncased",
         name="bert-base-uncased",
+        source_url="http://example.com/model",
+        artifact_id="bert-base-uncased",
         metadata={"downloads": 2000000, "likes": 5000, "created_at": "2023-01-01T00:00:00Z"},
     )
 
@@ -21,8 +22,9 @@ def canonical_model():
 @pytest.fixture
 def suspicious_model():
     return ModelArtifact(
-        artifact_id="bert-base-uncased-fake",
         name="bert-base-uncased-fake",
+        source_url="http://example.com/model",
+        artifact_id="bert-base-uncased-fake",
         metadata={"downloads": 150, "likes": 1, "created_at": "2025-12-13T00:00:00Z"},
     )
 
@@ -30,8 +32,9 @@ def suspicious_model():
 @pytest.fixture
 def normal_model():
     return ModelArtifact(
-        artifact_id="my-cool-model",
         name="my-cool-model",
+        source_url="http://example.com/model",
+        artifact_id="my-cool-model",
         metadata={"downloads": 10, "likes": 0, "created_at": "2025-12-01T00:00:00Z"},
     )
 

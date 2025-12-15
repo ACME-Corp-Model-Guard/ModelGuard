@@ -153,7 +153,7 @@ def _get_model_age_days(model: ModelArtifact) -> int:
         model: The ModelArtifact instance
     """
     created_at = model.metadata.get("created_at")
-
+    created = None
     try:
         if isinstance(created_at, str):
             created = _parse_iso_date(created_at)
@@ -161,9 +161,11 @@ def _get_model_age_days(model: ModelArtifact) -> int:
         clogger.debug(f"Model {model.artifact_id} has invalid or missing created_at '{created_at}'")
         return 0
 
+    if created is None:
+        return 0
+
     now = datetime.now(timezone.utc)
     age_days = max((now - created).days, 1)
-
     return age_days
 
 
