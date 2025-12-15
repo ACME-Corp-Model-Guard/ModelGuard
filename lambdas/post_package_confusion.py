@@ -66,6 +66,6 @@ def lambda_handler(
                 )
                 pass
     return json_response(
-        statusCode=200,
+        status_code=200,
         body=json.dumps({"suspected": suspected}),
     )
