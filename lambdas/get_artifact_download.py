@@ -13,6 +13,7 @@ from src.artifacts.model_artifact import ModelArtifact
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
 from src.artifacts.artifactory import load_artifact_metadata, run_js_program
+from src.permissions import permissions_required
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -44,6 +45,7 @@ from src.utils.http import (
 @translate_exceptions
 @log_lambda_handler("GET /artifacts/{type}/{id}")
 @auth_required
+@permissions_required(["can_download"])
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,

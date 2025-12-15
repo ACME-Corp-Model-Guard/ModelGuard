@@ -22,6 +22,7 @@ from src.artifacts.artifactory import load_all_artifacts
 from src.artifacts.base_artifact import BaseArtifact
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
+from src.permissions import permissions_required
 from src.storage.file_extraction import extract_relevant_files
 from src.storage.s3_utils import download_artifact_from_s3
 from src.utils.http import (
@@ -247,6 +248,7 @@ def _search_artifacts(pattern: Pattern[str]) -> List[Dict[str, str]]:
 @translate_exceptions
 @log_lambda_handler("POST /artifact/byRegEx", log_request_body=True)
 @auth_required
+@permissions_required(["can_search"])
 def lambda_handler(event: Dict[str, Any], context: Any, auth: AuthContext) -> LambdaResponse:
     """
     Stub handler for POST /artifact/byRegEx - Search by regex
