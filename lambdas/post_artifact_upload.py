@@ -25,6 +25,7 @@ from src.artifacts.artifactory import (
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
+from src.permissions import permissions_required
 from src.settings import MINIMUM_METRIC_THRESHOLD
 from src.storage.downloaders.dispatchers import FileDownloadError
 from src.storage.s3_utils import generate_s3_download_url
@@ -62,6 +63,7 @@ from src.utils.http import (
 @translate_exceptions
 @log_lambda_handler("POST /artifact/{type}", log_request_body=True, log_response_body=True)
 @auth_required
+@permissions_required(["can_upload"])
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,

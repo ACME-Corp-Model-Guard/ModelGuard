@@ -17,11 +17,14 @@ Future responsibilities:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import boto3
 from botocore.exceptions import ClientError
 from mypy_boto3_cognito_idp.client import CognitoIdentityProviderClient
 
 from src.logutil import clogger
+from src.permissions import UserPermissions, save_user_permissions
 from src.settings import (
     ADMIN_SECRET_NAME,
     DEFAULT_ADMIN_GROUP,
@@ -127,6 +130,7 @@ def bootstrap_system() -> None:
         1. Ensure default admin group exists
         2. Create & confirm default admin user
         3. Associate admin user with Admin group
+        4. Set full permissions for default admin user
 
     Future:
         - Seed default artifacts
@@ -139,12 +143,40 @@ def bootstrap_system() -> None:
     # Ensure group exists
     _ensure_cognito_group_exists(cognito, DEFAULT_ADMIN_GROUP)
 
+    # Get admin username for permission setup
+    admin_username = get_secret_value(ADMIN_SECRET_NAME, "DEFAULT_ADMIN_USERNAME")
+
     # Ensure default admin user exists + confirmed
     _ensure_user_exists(
         cognito,
-        username=get_secret_value(ADMIN_SECRET_NAME, "DEFAULT_ADMIN_USERNAME"),
+        username=admin_username,
         password=get_secret_value(ADMIN_SECRET_NAME, "DEFAULT_ADMIN_PASSWORD"),
         admin_group=DEFAULT_ADMIN_GROUP,
     )
 
+    # Set full permissions for default admin user
+    _ensure_admin_permissions(admin_username)
+
     clogger.info("[bootstrap] System bootstrap completed")
+
+
+def _ensure_admin_permissions(username: str) -> None:
+    """
+    Ensure the default admin user has full permissions in the permissions table.
+
+    This is called during bootstrap to ensure the admin user can perform
+    all operations (upload, search, download) even though admins bypass
+    permission checks via Cognito group membership.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    admin_permissions: UserPermissions = {
+        "username": username,
+        "can_upload": True,
+        "can_search": True,
+        "can_download": True,
+        "created_at": now,
+        "created_by": "system",
+        "updated_at": None,
+    }
+    save_user_permissions(admin_permissions)
+    clogger.info(f"[bootstrap] Set full permissions for admin user: {username}")

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from src.artifacts.artifactory import package_confusion
 from src.artifacts.model_artifact import ModelArtifact
 

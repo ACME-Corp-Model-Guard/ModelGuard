@@ -1,6 +1,8 @@
 import os
 from types import SimpleNamespace
 
+import pytest
+
 
 def pytest_configure(config):
     # Set environment variables for AWS mocking
@@ -9,6 +11,7 @@ def pytest_configure(config):
     os.environ.setdefault("REJECTED_ARTIFACTS_TABLE", "RejectedArtifactsTestTable")
     os.environ.setdefault("TOKENS_TABLE", "TokensTestTable")
     os.environ.setdefault("FINGERPRINTS_TABLE", "FingerprintsTestTable")
+    os.environ.setdefault("USER_PERMISSIONS_TABLE", "UserPermissionsTestTable")
     os.environ.setdefault("ARTIFACTS_BUCKET", "test-bucket")
     os.environ.setdefault("USER_POOL_ID", "fakepool")
     os.environ.setdefault("USER_POOL_CLIENT_ID", "fakeclient")
@@ -27,3 +30,19 @@ def pytest_configure(config):
         return original_request(self, method, url, *args, **kwargs)
 
     urllib3.PoolManager.request = mock_request
+
+
+@pytest.fixture(autouse=True)
+def reset_aws_clients():
+    """
+    Reset cached AWS clients before each test.
+
+    This ensures that moto mocking works correctly when tests are run together.
+    Without this, a client cached outside the @mock_aws context would persist
+    and point to real AWS instead of the mocked AWS.
+    """
+    from src.aws.clients import reset_clients
+
+    reset_clients()
+    yield
+    reset_clients()
