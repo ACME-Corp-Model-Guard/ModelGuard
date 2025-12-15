@@ -28,7 +28,7 @@ def is_suspected_package_confusion(model: ModelArtifact) -> bool:
     """
 
     # Canonical models are not suspected
-    popular_models = set(_get_popular_models())
+    popular_models = _get_popular_models()
     if is_canonical(model, popular_models):
         clogger.debug(
             f"Model {model.artifact_id} ('{model.name}') is canonical, "
@@ -62,6 +62,7 @@ def is_suspected_package_confusion(model: ModelArtifact) -> bool:
             f"due to anomalous download patterns"
         )
         return True
+    return False  # not suspected package confusion
 
 
 # ============================================================================
@@ -69,7 +70,7 @@ def is_suspected_package_confusion(model: ModelArtifact) -> bool:
 # ============================================================================
 
 
-def is_canonical(model: ModelArtifact, popular_models: List[str]):
+def is_canonical(model: ModelArtifact, popular_models: List[str]) -> bool:
     """
     Determine if a model is canonical based on its ID and stats.
 
@@ -89,7 +90,7 @@ def is_canonical(model: ModelArtifact, popular_models: List[str]):
 # =============================================================================
 
 
-def _get_popular_models(limit=500):
+def _get_popular_models(limit=500) -> List[str]:
     """
     Get a list of popular model IDs from Hugging Face Hub.
     """
@@ -154,10 +155,11 @@ def _get_model_age_days(model: ModelArtifact) -> int:
     created_at = model.metadata.get("created_at")
 
     try:
-        created = _parse_iso_date(created_at)
+        if isinstance(created_at, str):
+            created = _parse_iso_date(created_at)
     except ValueError:
         clogger.debug(f"Model {model.artifact_id} has invalid or missing created_at '{created_at}'")
-        return 0.0
+        return 0
 
     now = datetime.now(timezone.utc)
     age_days = max((now - created).days, 1)

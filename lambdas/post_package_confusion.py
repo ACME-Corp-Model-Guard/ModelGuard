@@ -22,14 +22,18 @@ from src.artifacts.artifactory.persistence import load_all_artifacts
 from src.artifacts.artifactory.package_confusion import is_suspected_package_confusion
 from src.artifacts.model_artifact import ModelArtifact
 from src.logutil import log_lambda_handler, clogger
-from src.utils.http import translate_exceptions
+from src.utils.http import (
+    translate_exceptions,
+    LambdaResponse,
+    json_response,
+)
 from src.auth import auth_required
 
 
 @translate_exceptions
 @log_lambda_handler("POST /artifacts/PackageConfusionAudit", log_request_body=True)
 @auth_required
-def lambda_handler(event, context):
+def lambda_handler(event, context) -> LambdaResponse:
     """
     Lambda entrypoint for the /artifacts/PackageConfusionAudit endpoint.
     Returns a list of suspected package confusion model uploads.
@@ -56,8 +60,7 @@ def lambda_handler(event, context):
                     f"{artifact.artifact_id}: {e}"
                 )
                 pass
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"suspected": suspected}),
-    }
+    return json_response(
+        statusCode=200,
+        body=json.dumps({"suspected": suspected}),
+    )
