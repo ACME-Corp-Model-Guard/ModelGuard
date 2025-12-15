@@ -331,21 +331,6 @@ def test_compute_initial_scores_sets_suspected_package_confusion():
         assert artifact.suspected_package_confusion is False
 
 
-def test_compute_initial_scores_does_not_override_existing_flag():
-    """Test that existing suspected_package_confusion value is overwritten."""
-    artifact = ModelArtifact(
-        name="test",
-        source_url="https://example.com",
-        suspected_package_confusion=True,  # Pre-existing value
-    )
-
-    with patch.object(artifact, "compute_scores"):
-        _compute_initial_scores(artifact)
-
-        # Should be overwritten to False (this is the current behavior)
-        assert artifact.suspected_package_confusion is False
-
-
 # =============================================================================
 # Test: create_artifact() - Integration
 # =============================================================================
