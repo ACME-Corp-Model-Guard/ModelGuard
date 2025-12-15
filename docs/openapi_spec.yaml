@@ -1019,6 +1019,93 @@ paths:
         in: header
         required: true
 
+  /artifacts/PackageConfusionAudit:
+    post:
+      summary: "Audit for suspected package confusion uploads (NON-BASELINE)"
+      description: |
+        Returns a list of model artifacts suspected of being malicious uploads attempting package confusion attacks.
+        This endpoint applies similarity and anomaly heuristics to all model artifacts and returns those flagged as suspicious.
+      operationId: PackageConfusionAudit
+      responses:
+        "200":
+          description: List of suspected package confusion model uploads.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suspected:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        artifact_id:
+                          type: string
+                        name:
+                          type: string
+                        source_url:
+                          type: string
+                        metadata:
+                          type: object
+        "403":
+          description: Authentication failed due to invalid or missing AuthenticationToken.
+      parameters:
+        - name: X-Authorization
+          description: ""
+          schema:
+            $ref: "#/components/schemas/AuthenticationToken"
+          in: header
+          required: true
+
+# POST /artifacts/JSProgramUpload
+/artifacts/JSProgramUpload:
+  post:
+    summary: "Upload a JS program for a model (NON-BASELINE)"
+    description: |
+      Allows an admin to upload or update a JavaScript program for a specific model artifact. The JS program is used for sensitive model download enforcement. The program must be provided as plain text or base64-encoded, and will be stored in S3 and associated with the model.
+    operationId: JSProgramUpload
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - artifact_id
+              - js_program
+            properties:
+              artifact_id:
+                type: string
+                description: The unique id of the model artifact to associate the JS program with.
+              js_program:
+                type: string
+                description: The JavaScript program, as plain text or base64-encoded.
+              isBase64Encoded:
+                type: boolean
+                description: Set to true if js_program is base64-encoded.
+    responses:
+      "200":
+        description: JS program uploaded and associated with the model.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                s3_key:
+                  type: string
+      "400":
+        description: Missing or invalid request fields.
+      "403":
+        description: Authentication failed or user is not admin.
+      "404":
+        description: Model artifact not found.
+      "500":
+        description: Failed to upload JS program to S3 or update model.
+    tags:
+      - Admin
+
 components:
   schemas:
     Artifact:
