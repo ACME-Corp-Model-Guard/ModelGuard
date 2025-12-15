@@ -31,6 +31,7 @@ Globals:
         USER_POOL_CLIENT_ID: !Ref ModelGuardUserPoolClient
         TOKENS_TABLE: !Ref TokensTable
         FINGERPRINTS_TABLE: !Ref FingerprintsTable
+        USER_PERMISSIONS_TABLE: !Ref UserPermissionsTable
         HF_HOME: /tmp/.cache/huggingface  # Configure HuggingFace to use /tmp (Lambda writable)
     Tracing: Active
 
@@ -111,6 +112,25 @@ Resources:
           Value: ModelGuard
         - Key: Purpose
           Value: Replay-Attack-Prevention
+      SSESpecification: # Set server-side encryption to use AWS owned key (free)
+        SSEEnabled: false
+
+  UserPermissionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ModelGuard-User-Permissions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: username
+          AttributeType: S
+      KeySchema:
+        - AttributeName: username
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+        - Key: Purpose
+          Value: User-Permissions
       SSESpecification: # Set server-side encryption to use AWS owned key (free)
         SSEEnabled: false
 
@@ -407,6 +427,58 @@ Resources:
             Method: PUT
             # Auth:
               # Authorizer: NONE
+
+  ############################################################
+  # User Management Endpoints (Security Track)
+  ############################################################
+
+  # POST /users - Register new user (Admin only)
+  PostUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_users.lambda_handler
+      Description: Register new user (admin only)
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        CreateUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /users
+            Method: POST
+
+  # DELETE /users/{username} - Delete user account
+  DeleteUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.delete_users.lambda_handler
+      Description: Delete user account
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        DeleteUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /users/{username}
+            Method: DELETE
+
+  # GET /users/{username} - Get user info and permissions
+  GetUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.get_users.lambda_handler
+      Description: Get user info and permissions
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        GetUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /users/{username}
+            Method: GET
 
   ############################################################
   # Baseline Artifact Endpoints

@@ -181,12 +181,17 @@ def test_bootstrap_system_calls_both_steps(mock_cognito, monkeypatch):
     def fake_user(cognito, username, password, admin_group):
         called.append(("user", username, admin_group))
 
+    def fake_permissions(username):
+        called.append(("permissions", username))
+
     monkeypatch.setattr(bootstrap, "_ensure_cognito_group_exists", fake_group)
     monkeypatch.setattr(bootstrap, "_ensure_user_exists", fake_user)
+    monkeypatch.setattr(bootstrap, "_ensure_admin_permissions", fake_permissions)
 
     bootstrap.bootstrap_system()
 
     assert called == [
         ("group", "Admin"),
         ("user", "admin", "Admin"),
+        ("permissions", "admin"),
     ]

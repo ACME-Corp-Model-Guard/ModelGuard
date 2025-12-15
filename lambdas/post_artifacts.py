@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple
 
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
+from src.permissions import permissions_required
 from src.utils.http import (
     LambdaResponse,
     json_response,
@@ -194,6 +195,7 @@ def _paginate(
 @translate_exceptions
 @log_lambda_handler("POST /artifacts", log_request_body=True)
 @auth_required
+@permissions_required(["can_search"])
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,

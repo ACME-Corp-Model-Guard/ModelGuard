@@ -10,6 +10,7 @@ from typing import Any, Dict
 from src.artifacts.artifactory import load_all_artifacts_by_fields
 from src.auth import AuthContext, auth_required
 from src.logutil import log_lambda_handler
+from src.permissions import permissions_required
 from src.utils.http import (
     LambdaResponse,
     error_response,
@@ -37,6 +38,7 @@ from src.utils.http import (
 @translate_exceptions
 @log_lambda_handler("GET /artifact/byName/{name}")
 @auth_required
+@permissions_required(["can_search"])
 def lambda_handler(
     event: Dict[str, Any],
     context: Any,

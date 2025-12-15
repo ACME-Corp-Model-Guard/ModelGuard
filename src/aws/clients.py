@@ -145,3 +145,26 @@ def get_secrets_manager() -> SecretsManagerClient:
         _secrets_manager_client = boto3.client("secretsmanager", region_name=AWS_REGION)
 
     return _secrets_manager_client
+
+
+# =====================================================================================
+# Testing Support
+# =====================================================================================
+
+
+def reset_clients() -> None:
+    """
+    Reset all cached AWS clients.
+
+    This is primarily used for testing with moto to ensure that each test
+    gets fresh clients within its mock context. Should NOT be used in
+    production code.
+    """
+    global _dynamodb_resource, _s3_client, _cognito_client
+    global _bedrock_runtime, _secrets_manager_client
+
+    _dynamodb_resource = None
+    _s3_client = None
+    _cognito_client = None
+    _bedrock_runtime = None
+    _secrets_manager_client = None
