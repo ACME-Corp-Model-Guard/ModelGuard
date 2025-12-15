@@ -273,11 +273,11 @@ def fetch_huggingface_model_metadata(url: str) -> Dict[str, Any]:
             "name": model_id.split("/")[-1],
             "size": data.get("safetensors", {}).get("total", 0),
             "license": card_data.get("license", "unknown"),
-            "created_at": data.get("createdAt"),
             "metadata": {
                 "downloads": data.get("downloads", 0),
                 "likes": data.get("likes", 0),
                 "cardData": card_data,  # Include full cardData for metrics
+                "created_at": data.get("createdAt"),
             },
         }
 
