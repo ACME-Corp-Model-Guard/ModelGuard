@@ -11,7 +11,7 @@ from typing import Any, Dict, cast
 from src.artifacts.types import ArtifactType
 from src.auth import AuthContext, auth_required
 from src.logutil import clogger, log_lambda_handler
-from src.artifacts.artifactory import load_artifact_metadata
+from src.artifacts.artifactory import load_artifact_metadata, run_js_program
 from src.storage.s3_utils import generate_s3_download_url
 from src.utils.http import (
     LambdaResponse,
@@ -79,6 +79,64 @@ def lambda_handler(
     artifact = load_artifact_metadata(artifact_id)
     if artifact is None:
         return error_response(404, f"Artifact '{artifact_id}' does not exist")
+
+    # -----------------------------------------------------
+    # Step 3.5 - Check that artifact successfully runs its JS program (if any)
+    # -----------------------------------------------------
+    if artifact.js_program_key:
+        try:
+            result = run_js_program(
+                artifact,
+                auth.uploader_username,
+                auth.downloader_username,
+            )
+        except Exception as e:
+            clogger.error(
+                "Artifact JS program execution failed",
+                extra={
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_type": artifact.artifact_type,
+                    "error_type": type(e).__name__,
+                    "error_msg": str(e),
+                },
+            )
+            return error_response(
+                500,
+                "Artifact validation failed during JS program execution",
+                error_code="ARTIFACT_VALIDATION_FAILED",
+            )
+        if result.get("exit_code") != 0:
+            clogger.error(
+                "Artifact JS program returned non-zero exit code",
+                extra={
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_type": artifact.artifact_type,
+                    "exit_code": result.get("exit_code"),
+                    "stdout": result.get("stdout"),
+                    "stderr": result.get("stderr"),
+                },
+            )
+            return error_response(
+                500,
+                "Artifact validation failed during JS program execution",
+                error_code="ARTIFACT_VALIDATION_FAILED",
+            )
+        else:
+            clogger.info(
+                "Artifact JS program executed successfully",
+                extra={
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_type": artifact.artifact_type,
+                },
+            )
+    else:
+        clogger.info(
+            "No JS program associated with artifact; skipping execution",
+            extra={
+                "artifact_id": artifact.artifact_id,
+                "artifact_type": artifact.artifact_type,
+            },
+        )
 
     # ---------------------------------------------------------------------
     # Step 4 - Construct S3 key

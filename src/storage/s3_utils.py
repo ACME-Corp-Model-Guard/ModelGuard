@@ -44,19 +44,19 @@ def upload_file(s3_key: str, local_path: str, bucket: str = ARTIFACTS_BUCKET) ->
         raise
 
 
-def download_file(s3_key: str, local_path: str) -> None:
+def download_file(s3_key: str, local_path: str, bucket: str = ARTIFACTS_BUCKET) -> None:
     """
     Download an S3 object to the local filesystem.
     """
     s3: S3Client = get_s3()
 
-    clogger.debug(f"Downloading s3://{ARTIFACTS_BUCKET}/{s3_key} -> {local_path}")
+    clogger.debug(f"Downloading s3://{bucket}/{s3_key} -> {local_path}")
 
     try:
-        s3.download_file(ARTIFACTS_BUCKET, s3_key, local_path)
-        clogger.info(f"Downloaded: s3://{ARTIFACTS_BUCKET}/{s3_key}")
+        s3.download_file(bucket, s3_key, local_path)
+        clogger.info(f"Downloaded: s3://{bucket}/{s3_key}")
     except ClientError as e:
-        clogger.error(f"Failed to download s3://{ARTIFACTS_BUCKET}/{s3_key}: {e}")
+        clogger.error(f"Failed to download s3://{bucket}/{s3_key}: {e}")
         raise
 
 

@@ -41,6 +41,9 @@ JS_PROGRAMS_PREFIX: str = os.environ.get("JS_PROGRAMS_PREFIX", "admin-scripts/")
 USER_POOL_ID: str = _require_env("USER_POOL_ID")
 USER_POOL_CLIENT_ID: str = _require_env("USER_POOL_CLIENT_ID")
 
+# Lambda function names
+JS_RUNNER_LAMBDA_NAME: str = _require_env("JS_RUNNER_LAMBDA_NAME")
+
 # Logging Configuration (Optional)
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 

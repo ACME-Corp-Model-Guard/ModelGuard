@@ -145,3 +145,18 @@ def get_secrets_manager() -> SecretsManagerClient:
         _secrets_manager_client = boto3.client("secretsmanager", region_name=AWS_REGION)
 
     return _secrets_manager_client
+
+
+# =====================================================================================
+# Lambda
+# =====================================================================================
+
+
+def get_lambda_client() -> Any:
+    """
+    Return a cached Lambda client.
+    """
+    if boto3 is None:
+        raise RuntimeError("boto3 is not available in this environment")
+
+    return boto3.client("lambda", region_name=AWS_REGION)

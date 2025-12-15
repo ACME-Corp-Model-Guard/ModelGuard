@@ -27,6 +27,7 @@ Globals:
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
         JS_PROGRAMS_BUCKET: !Ref JSProgramsBucket
         JS_PROGRAMS_PREFIX: admin-scripts/
+        JS_RUNNER_LAMBDA_NAME: js-runner
         BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
         BEDROCK_REGION: us-east-1
         USER_POOL_ID: !Ref ModelGuardUserPool
@@ -688,18 +689,35 @@ Resources:
             Method: DELETE
 
   ############################################################
+  # POST /artifacts/UploadJSProgram/
+  ############################################################
+  JSProgramUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: lambdas.post_js_program_upload.lambda_handler
+      Description: Upload JS program for a model artifact
+      Role: arn:aws:iam::378950442938:role/BasicLambdaRole
+      Events:
+        UploadJSProgram:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ModelGuardApi
+            Path: /artifacts/UploadJSProgram
+            Method: POST
+
+  ############################################################
   # JS Runner
   ############################################################
-  Resources:
   JsRunnerFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: js-runner
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Architectures:
         - arm64
       CodeUri: src/
-      Handler: index.handler
+      Handler: lambdas.js_runner.handler
       Description: Executes admin-supplied JavaScript from S3
       Timeout: 10
       MemorySize: 256
