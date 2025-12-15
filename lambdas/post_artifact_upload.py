@@ -11,10 +11,9 @@ defined in the OpenAPI specification.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, cast, TYPE_CHECKING
+from typing import Any, Dict, cast
 
-if TYPE_CHECKING:
-    from src.artifacts.model_artifact import ModelArtifact
+from src.artifacts.model_artifact import ModelArtifact
 
 from src.artifacts.artifactory import (
     create_artifact,
