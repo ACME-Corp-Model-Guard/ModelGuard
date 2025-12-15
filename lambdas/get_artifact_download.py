@@ -95,7 +95,7 @@ def lambda_handler(
                 {
                     "uploader_username": uploader,
                     "downloader_username": downloader,
-                }
+                },
             )
         except Exception as e:
             clogger.error(

@@ -157,15 +157,15 @@ def get_lambda_client() -> Any:
     Return a cached Lambda client.
     """
     global _lambda_client
-    
+
     if boto3 is None:
         raise RuntimeError("boto3 is not available in this environment")
     if _lambda_client is None:
-      _lambda_client = boto3.client("lambda", region_name=AWS_REGION)
-      
+        _lambda_client = boto3.client("lambda", region_name=AWS_REGION)
+
     return _lambda_client
-  
-  
+
+
 # Testing Support
 # =====================================================================================
 
