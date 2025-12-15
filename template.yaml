@@ -25,6 +25,8 @@ Globals:
         ARTIFACTS_TABLE: !Ref ArtifactsTable
         REJECTED_ARTIFACTS_TABLE: !Ref RejectedArtifactsTable
         ARTIFACTS_BUCKET: !Ref ArtifactsBucket
+        JS_PROGRAMS_BUCKET: !Ref JSProgramsBucket
+        JS_PROGRAMS_PREFIX: admin-scripts/
         BEDROCK_MODEL_ID: us.amazon.nova-lite-v1:0
         BEDROCK_REGION: us-east-1
         USER_POOL_ID: !Ref ModelGuardUserPool
@@ -145,6 +147,28 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'modelguard-artifacts-files'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ArtifactsLogBucket
+        LogFilePrefix: "access-logs/"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256 #(free)
+      VersioningConfiguration:
+        Status: Suspended
+      Tags:
+        - Key: Project
+          Value: ModelGuard
+
+  JSProgramsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'modelguard-js-programs-files'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -663,6 +687,40 @@ Resources:
             Path: /artifacts/{artifact_type}/{id}
             Method: DELETE
 
+  ############################################################
+  # JS Runner
+  ############################################################
+  Resources:
+  JsRunnerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: js-runner
+      Runtime: nodejs18.x
+      Architectures:
+        - arm64
+      CodeUri: src/
+      Handler: index.handler
+      Description: Executes admin-supplied JavaScript from S3
+      Timeout: 10
+      MemorySize: 256
+      Tracing: Active
+      ReservedConcurrentExecutions: 2
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - arn:aws:s3:::!Ref JSProgramsBucket/*
+      Environment:
+        Variables:
+          SCRIPT_BUCKET: !Ref JSProgramsBucket
+
+############################################################
+# Outputs
+############################################################
+
 Outputs:
   ModelGuardApiUrl:
     Description: API Gateway endpoint URL for testing
@@ -717,4 +775,3 @@ Outputs:
   CloudFrontDomainName:
     Description: CloudFront distribution domain name
     Value: !GetAtt CloudFrontDistribution.DomainName
-

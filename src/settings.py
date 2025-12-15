@@ -34,6 +34,8 @@ FINGERPRINTS_TABLE: str = _require_env("FINGERPRINTS_TABLE")
 
 # S3 bucket
 ARTIFACTS_BUCKET: str = _require_env("ARTIFACTS_BUCKET")
+JS_PROGRAMS_BUCKET: str = _require_env("JS_PROGRAMS_BUCKET")
+JS_PROGRAMS_PREFIX: str = os.environ.get("JS_PROGRAMS_PREFIX", "admin-scripts/")
 
 # Cognito
 USER_POOL_ID: str = _require_env("USER_POOL_ID")
